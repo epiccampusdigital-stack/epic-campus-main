@@ -186,3 +186,31 @@ export interface Lead {
   notes?: string
   createdAt: string
 }
+
+export type SessionType = 'class' | 'consultation' | 'exam'
+export type SessionStatus = 'scheduled' | 'completed' | 'cancelled'
+export type RecurringType = 'once' | 'weekly' | 'daily'
+export type BookingStatus = 'open' | 'pending' | 'approved' | 'declined'
+
+export interface ScheduleSession {
+  id: string
+  type: SessionType
+  courseId: CourseId
+  courseName?: string
+  staffId: string
+  staffName: string
+  studentId?: string
+  studentName?: string
+  batchName?: string
+  date: string
+  startTime: string
+  endTime: string
+  location: string
+  notes?: string
+  status: SessionStatus
+  bookingStatus?: BookingStatus
+  isRecurring: boolean
+  recurringType: RecurringType
+  createdAt: string
+  createdBy: string
+}

@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { label: 'My Payments', href: '/my-payments', icon: 'ti-credit-card' },
   { label: 'My Results', href: '/my-results', icon: 'ti-certificate' },
   { label: 'My Materials', href: '/my-materials', icon: 'ti-books' },
+  { label: 'Book Consultation', href: '/my-schedule', icon: 'ti-calendar' },
   { label: 'My Visa', href: '/my-visa', icon: 'ti-plane' },
 ]
 

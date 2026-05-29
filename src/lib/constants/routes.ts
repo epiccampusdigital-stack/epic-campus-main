@@ -6,6 +6,7 @@ export const ROUTES = {
     students:   '/students',
     payments:   '/payments',
     attendance: '/attendance',
+    schedule:   '/schedule',
     staff:      '/staff',
     auditLog:   '/audit-log',
     reports:    '/reports',
@@ -16,6 +17,7 @@ export const ROUTES = {
     results:   '/my-results',
     materials: '/my-materials',
     payments:  '/my-payments',
+    schedule:  '/my-schedule',
     visa:      '/my-visa',
   },
 
