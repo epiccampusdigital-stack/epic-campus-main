@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { useExamPortal } from '@/components/exam/ExamContext'
+import Leaderboard from '@/components/exam/Leaderboard'
 import {
   fetchExamPapers,
   getLevelBadgeColor,
@@ -119,6 +120,16 @@ export default function ExamsPage() {
           )
         })}
       </div>
+
+      {papers.length > 0 && (
+        <div className="mt-10">
+          <Leaderboard
+            paperId={papers[0].id}
+            currentStudentId={user.role === 'student' ? studentKey : undefined}
+            title={`Leaderboard — ${papers[0].code}`}
+          />
+        </div>
+      )}
     </div>
   )
 }

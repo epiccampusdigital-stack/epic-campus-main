@@ -10,7 +10,7 @@ import { getCourseBadge } from '@/lib/student/portal'
 import { logAuditEvent } from '@/lib/audit/helpers'
 import { useStudentPortal } from '@/components/student/StudentContext'
 
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS = [
   { label: 'My Dashboard', href: '/my-dashboard', icon: 'ti-layout-dashboard' },
   { label: 'My Payments', href: '/my-payments', icon: 'ti-credit-card' },
   { label: 'My Results', href: '/my-results', icon: 'ti-certificate' },
@@ -18,6 +18,8 @@ const NAV_ITEMS = [
   { label: 'Book Consultation', href: '/my-schedule', icon: 'ti-calendar' },
   { label: 'My Visa', href: '/my-visa', icon: 'ti-plane' },
 ]
+
+const EXAM_NAV_ITEM = { label: 'Take Exam', href: '/exams', icon: 'ti-pencil' }
 
 export default function StudentSidebar() {
   const pathname = usePathname()
@@ -51,6 +53,14 @@ export default function StudentSidebar() {
   const courseLabel = student ? getCourseBadge(student.courseId) : ''
   const courseFlag = student ? COURSE_MAP[student.courseId]?.flag ?? '🎓' : '🎓'
 
+  const showExamLink =
+    student?.courseId === 'japan-ssw' ||
+    (student?.courseId != null && String(student.courseId).includes('japan'))
+
+  const navItems = showExamLink
+    ? [...BASE_NAV_ITEMS.slice(0, 1), EXAM_NAV_ITEM, ...BASE_NAV_ITEMS.slice(1)]
+    : BASE_NAV_ITEMS
+
   const sidebarContent = (
     <div className="flex h-full w-[240px] flex-col bg-[#0B3D6B]">
       <div className="px-4 py-4">
@@ -66,7 +76,7 @@ export default function StudentSidebar() {
       <div className="mx-4 border-t border-white/10" />
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const active = isActive(item.href)
           return (
             <Link

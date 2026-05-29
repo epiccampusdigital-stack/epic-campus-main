@@ -278,8 +278,9 @@ export interface PayrollRecord {
   createdAt: string
 }
 
-export type ExamPaperLevel = 'A1' | 'A2' | 'B1' | 'A2-B1'
+export type ExamPaperLevel = 'A1' | 'A2' | 'B1' | 'A2-B1' | 'N5' | 'N4'
 export type ExamPaperStatus = 'active' | 'draft'
+export type ExamPaperLanguage = 'bilingual' | 'japanese'
 export type ExamAttemptStatus = 'in_progress' | 'completed'
 export type ExamMarkingStatus = 'pending' | 'complete' | 'pending_review' | 'partial'
 export type ExamSection = 'reading' | 'listening' | 'writing' | 'speaking'
@@ -297,6 +298,8 @@ export interface ExamPaper {
   listeningMinutes: number
   writingMinutes: number
   speakingMinutes: number
+  language?: ExamPaperLanguage
+  courseIds?: string[]
 }
 
 export interface ReadingQuestion {

@@ -28,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Staff', href: '/staff', icon: 'ti-id-badge', roles: ['admin', 'owner'] },
   { label: 'Audit Log', href: '/audit-log', icon: 'ti-shield-check', roles: ['admin', 'owner'] },
   { label: 'Reports', href: '/reports', icon: 'ti-chart-bar', roles: ['admin', 'owner', 'accountant'] },
+  { label: 'Exams', href: '/admin-exams', icon: 'ti-writing', roles: ['admin', 'owner', 'examCoordinator', 'teacher'] },
 ]
 
 export default function ManagementSidebar() {

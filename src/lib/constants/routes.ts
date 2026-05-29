@@ -24,9 +24,10 @@ export const ROUTES = {
   },
 
   examination: {
-    exams:    '/exams',
-    results:  '/results',
-    schedule: '/schedule',
+    exams:       '/exams',
+    adminExams:  '/admin-exams',
+    results:     '/results',
+    schedule:    '/schedule',
   },
 
   business: {

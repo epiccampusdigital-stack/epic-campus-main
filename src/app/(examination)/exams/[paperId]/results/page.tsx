@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { doc, getDoc } from 'firebase/firestore'
 import ResultCard, { GradeBadge } from '@/components/exam/ResultCard'
+import Leaderboard from '@/components/exam/Leaderboard'
+import { useExamPortal } from '@/components/exam/ExamContext'
 import {
   fetchListeningQuestions,
   fetchReadingQuestions,
@@ -23,6 +25,7 @@ export default function ExamResultsPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { user, student } = useExamPortal()
   const paperId = String(params.paperId ?? '')
   const attemptId = searchParams.get('attemptId')
   const [attempt, setAttempt] = useState<ExamAttempt | null>(null)
@@ -202,6 +205,16 @@ export default function ExamResultsPage() {
             All exams
           </Link>
         </div>
+      </div>
+
+      <div className="mt-6">
+        <Leaderboard
+          paperId={paperId}
+          currentStudentId={
+            user.role === 'student' ? student?.id ?? user.uid : undefined
+          }
+          title="Paper leaderboard"
+        />
       </div>
     </div>
   )

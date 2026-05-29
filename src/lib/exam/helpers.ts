@@ -7,6 +7,9 @@ import {
   setDoc,
   updateDoc,
   writeBatch,
+  deleteDoc,
+  query,
+  where,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import {
@@ -21,10 +24,15 @@ import {
 import type {
   ExamAttempt,
   ExamPaper,
+  ExamPaperLanguage,
+  ExamPaperLevel,
+  ExamPaperStatus,
   ExamSection,
   ListeningQuestion,
   ReadingQuestion,
   SpeakingPrompt,
+  SpeakingSubmission,
+  WritingSubmission,
   WritingTask,
 } from '@/types'
 
@@ -145,6 +153,10 @@ export async function fetchExamPapers(): Promise<ExamPaper[]> {
         listeningMinutes: Number(data.listeningMinutes ?? fallback?.listeningMinutes ?? 30),
         writingMinutes: Number(data.writingMinutes ?? fallback?.writingMinutes ?? 45),
         speakingMinutes: Number(data.speakingMinutes ?? fallback?.speakingMinutes ?? 15),
+        language: data.language as ExamPaper['language'] | undefined,
+        courseIds: Array.isArray(data.courseIds)
+          ? (data.courseIds as string[])
+          : fallback?.courseIds,
       }
     })
   } catch {
@@ -343,7 +355,230 @@ export function getLevelBadgeColor(level: string): string {
       return 'bg-amber-100 text-amber-800 border-amber-200'
     case 'B1':
       return 'bg-[#0B3D6B]/10 text-[#0B3D6B] border-[#0B3D6B]/20'
+    case 'N5':
+      return 'bg-violet-100 text-violet-800 border-violet-200'
+    case 'N4':
+      return 'bg-indigo-100 text-indigo-800 border-indigo-200'
     default:
       return 'bg-[#F5F7FB] text-[#5A6A7A] border-[#DDE3EC]'
   }
+}
+
+export function codeToPaperId(code: string): string {
+  return code.trim().toLowerCase()
+}
+
+export async function countPaperQuestions(paperId: string): Promise<number> {
+  const [r, l, w, s] = await Promise.all([
+    getDocs(collection(db, 'examPapers', paperId, 'readingQuestions')),
+    getDocs(collection(db, 'examPapers', paperId, 'listeningQuestions')),
+    getDocs(collection(db, 'examPapers', paperId, 'writingTasks')),
+    getDocs(collection(db, 'examPapers', paperId, 'speakingPrompts')),
+  ])
+  return r.size + l.size + w.size + s.size
+}
+
+export async function saveExamPaper(
+  paper: ExamPaper & { description?: string },
+): Promise<void> {
+  await setDoc(doc(db, 'examPapers', paper.id), {
+    id: paper.id,
+    code: paper.code,
+    title: paper.title,
+    level: paper.level,
+    description: paper.description ?? '',
+    status: paper.status,
+    readingCount: paper.readingCount,
+    listeningCount: paper.listeningCount,
+    readingMinutes: paper.readingMinutes,
+    listeningMinutes: paper.listeningMinutes,
+    writingMinutes: paper.writingMinutes,
+    speakingMinutes: paper.speakingMinutes,
+    language: paper.language ?? 'bilingual',
+    courseIds: paper.courseIds ?? ['japan-ssw'],
+  })
+}
+
+export async function deleteExamPaper(paperId: string): Promise<void> {
+  const subs = ['readingQuestions', 'listeningQuestions', 'writingTasks', 'speakingPrompts']
+  for (const sub of subs) {
+    const snap = await getDocs(collection(db, 'examPapers', paperId, sub))
+    const batch = writeBatch(db)
+    snap.docs.forEach((d) => batch.delete(d.ref))
+    if (snap.size > 0) await batch.commit()
+  }
+  await deleteDoc(doc(db, 'examPapers', paperId))
+}
+
+export async function togglePaperStatus(paperId: string): Promise<ExamPaperStatus> {
+  const ref = doc(db, 'examPapers', paperId)
+  const snap = await getDoc(ref)
+  const current = (snap.data()?.status as ExamPaperStatus) ?? 'draft'
+  const next: ExamPaperStatus = current === 'active' ? 'draft' : 'active'
+  await updateDoc(ref, { status: next })
+  return next
+}
+
+export interface LeaderboardEntry {
+  rank: number
+  attemptId: string
+  studentId: string
+  studentName: string
+  totalScore: number
+  grade: string
+  date: string
+  isCurrentStudent: boolean
+}
+
+export async function fetchLeaderboard(
+  paperId: string,
+  limit = 10,
+  currentStudentId?: string,
+): Promise<LeaderboardEntry[]> {
+  const snap = await getDocs(
+    query(
+      collection(db, 'examAttempts'),
+      where('paperId', '==', paperId),
+      where('status', '==', 'completed'),
+    ),
+  )
+  const sorted = snap.docs
+    .map((d) => parseAttempt(d.id, d.data() as Record<string, unknown>))
+    .filter((a) => a.totalScore != null)
+    .sort((a, b) => (b.totalScore ?? 0) - (a.totalScore ?? 0))
+    .slice(0, limit)
+
+  return sorted.map((a, i) => ({
+    rank: i + 1,
+    attemptId: a.id,
+    studentId: a.studentId,
+    studentName: a.studentName,
+    totalScore: a.totalScore ?? 0,
+    grade: a.grade ?? 'D',
+    date: a.startedAt,
+    isCurrentStudent: currentStudentId != null && a.studentId === currentStudentId,
+  }))
+}
+
+export async function fetchWritingSubmissions(
+  attemptId: string,
+): Promise<WritingSubmission[]> {
+  const snap = await getDocs(
+    collection(db, 'examAttempts', attemptId, 'writingSubmissions'),
+  )
+  return snap.docs
+    .map((d) => ({ ...d.data() }) as WritingSubmission)
+    .sort((a, b) => a.taskNumber - b.taskNumber)
+}
+
+export async function fetchSpeakingSubmissions(
+  attemptId: string,
+): Promise<(SpeakingSubmission & { id: string })[]> {
+  const snap = await getDocs(
+    collection(db, 'examAttempts', attemptId, 'speakingSubmissions'),
+  )
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }) as SpeakingSubmission & { id: string })
+    .sort((a, b) => a.partNumber - b.partNumber)
+}
+
+export interface ExamImportPayload {
+  code: string
+  title: string
+  level: ExamPaperLevel
+  language?: ExamPaperLanguage
+  courseIds?: string[]
+  description?: string
+  timeLimits?: {
+    reading?: number
+    listening?: number
+    writing?: number
+    speaking?: number
+  }
+  readingQuestions?: ImportQuestionGroup[]
+  listeningQuestions?: ImportListeningGroup[]
+  writingTasks?: Omit<WritingTask, 'id' | 'timeMinutes'>[]
+  speakingPrompts?: Omit<SpeakingPrompt, 'id'>[]
+}
+
+interface ImportQuestionGroup {
+  groupType: string
+  groupInstruction?: string
+  audioUrl?: string | null
+  questions: {
+    questionNumber: number
+    passageText?: string
+    questionText: string
+    options?: string[]
+    correctAnswer: string
+    explanation?: string
+  }[]
+}
+
+interface ImportListeningGroup extends ImportQuestionGroup {
+  audioUrl?: string | null
+}
+
+export async function importExamPaper(data: ExamImportPayload): Promise<string> {
+  const paperId = codeToPaperId(data.code)
+  const readingFlat =
+    data.readingQuestions?.flatMap((g) =>
+      g.questions.map((q) => ({
+        questionNumber: q.questionNumber,
+        passageText: q.passageText ?? '',
+        questionText: q.questionText,
+        options: q.options ?? [],
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation,
+      })),
+    ) ?? []
+  const listeningFlat =
+    data.listeningQuestions?.flatMap((g) =>
+      g.questions.map((q) => ({
+        questionNumber: q.questionNumber,
+        audioUrl: g.audioUrl ?? null,
+        questionText: q.questionText,
+        options: q.options ?? [],
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation,
+      })),
+    ) ?? []
+
+  const paper: ExamPaper = {
+    id: paperId,
+    code: data.code,
+    title: data.title,
+    level: data.level,
+    description: data.description ?? '',
+    status: 'draft',
+    readingCount: readingFlat.length,
+    listeningCount: listeningFlat.length,
+    readingMinutes: data.timeLimits?.reading ?? 60,
+    listeningMinutes: data.timeLimits?.listening ?? 30,
+    writingMinutes: data.timeLimits?.writing ?? 45,
+    speakingMinutes: data.timeLimits?.speaking ?? 15,
+    language: data.language ?? 'bilingual',
+    courseIds: data.courseIds ?? ['japan-ssw'],
+  }
+
+  await saveExamPaper(paper)
+
+  const batch = writeBatch(db)
+  withIds(readingFlat, 'reading').forEach((q) => {
+    batch.set(doc(db, 'examPapers', paperId, 'readingQuestions', q.id), q)
+  })
+  withIds(listeningFlat, 'listening').forEach((q) => {
+    batch.set(doc(db, 'examPapers', paperId, 'listeningQuestions', q.id), q)
+  })
+  withIds(data.writingTasks ?? [], 'writing').forEach((q) => {
+    batch.set(doc(db, 'examPapers', paperId, 'writingTasks', q.id), {
+      ...q,
+      timeMinutes: data.timeLimits?.writing ?? 45,
+    })
+  })
+  withIds(data.speakingPrompts ?? [], 'speaking').forEach((q) => {
+    batch.set(doc(db, 'examPapers', paperId, 'speakingPrompts', q.id), q)
+  })
+  await batch.commit()
+  return paperId
 }

@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation'
 import { onAuthStateChanged } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
 import * as XLSX from 'xlsx'
+import AttemptDetailPanel from '@/components/exam/AttemptDetailPanel'
 import {
   fetchAllAttempts,
   fetchExamPapers,
   getGradeColor,
-  updateSpeakingScore,
 } from '@/lib/exam/helpers'
 import { EXAM_ADMIN_ROLES } from '@/lib/constants/roles'
 import { auth, db } from '@/lib/firebase/client'
@@ -25,8 +25,15 @@ export default function AdminResultsPage() {
   const [gradeFilter, setGradeFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [selected, setSelected] = useState<ExamAttempt | null>(null)
-  const [speakingInput, setSpeakingInput] = useState('')
-  const [saving, setSaving] = useState(false)
+
+  const loadData = async () => {
+    const [allAttempts, allPapers] = await Promise.all([
+      fetchAllAttempts(),
+      fetchExamPapers(),
+    ])
+    setAttempts(allAttempts)
+    setPapers(allPapers)
+  }
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -41,12 +48,7 @@ export default function AdminResultsPage() {
         return
       }
       setAuthorized(true)
-      const [allAttempts, allPapers] = await Promise.all([
-        fetchAllAttempts(),
-        fetchExamPapers(),
-      ])
-      setAttempts(allAttempts)
-      setPapers(allPapers)
+      await loadData()
       setLoading(false)
     })
     return () => unsubscribe()
@@ -58,12 +60,18 @@ export default function AdminResultsPage() {
       if (gradeFilter && a.grade !== gradeFilter) return false
       if (statusFilter === 'pending_speaking' && a.speakingScore != null) return false
       if (statusFilter === 'completed' && a.status !== 'completed') return false
+      if (
+        statusFilter &&
+        !['pending_speaking', 'completed'].includes(statusFilter) &&
+        a.markingStatus !== statusFilter
+      ) {
+        return false
+      }
       return true
     })
   }, [attempts, gradeFilter, paperFilter, statusFilter])
 
-  const paperTitle = (id: string) =>
-    papers.find((p) => p.id === id)?.title ?? id
+  const paperTitle = (id: string) => papers.find((p) => p.id === id)?.title ?? id
 
   const handleExport = () => {
     const rows = filtered.map((a) => ({
@@ -76,27 +84,11 @@ export default function AdminResultsPage() {
       Speaking: a.speakingScore ?? 'Pending',
       Total: a.totalScore ?? '',
       Grade: a.grade ?? '',
-      Status: a.status,
+      Status: a.markingStatus,
     }))
     const wb = XLSX.utils.book_new()
-    const sheet = XLSX.utils.json_to_sheet(rows)
-    XLSX.utils.book_append_sheet(wb, sheet, 'Exam Results')
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Exam Results')
     XLSX.writeFile(wb, 'epic-campus-exam-results.xlsx')
-  }
-
-  const handleSaveSpeaking = async () => {
-    if (!selected || saving) return
-    const score = Number(speakingInput)
-    if (Number.isNaN(score) || score < 0 || score > 100) return
-    setSaving(true)
-    try {
-      await updateSpeakingScore(selected.id, score)
-      const updated = await fetchAllAttempts()
-      setAttempts(updated)
-      setSelected({ ...selected, speakingScore: score })
-    } finally {
-      setSaving(false)
-    }
   }
 
   if (loading || !authorized) {
@@ -115,7 +107,7 @@ export default function AdminResultsPage() {
             Exam Results — Admin
           </h1>
           <p className="mt-1 text-sm text-[#5A6A7A]">
-            All student attempts · filter and export
+            All student attempts · filter, review, and export
           </p>
         </div>
         <button
@@ -160,6 +152,8 @@ export default function AdminResultsPage() {
           <option value="">All status</option>
           <option value="completed">Completed</option>
           <option value="pending_speaking">Pending speaking review</option>
+          <option value="partial">Partial marking</option>
+          <option value="pending_review">Pending review</option>
         </select>
       </div>
 
@@ -185,10 +179,7 @@ export default function AdminResultsPage() {
               return (
                 <tr
                   key={a.id}
-                  onClick={() => {
-                    setSelected(a)
-                    setSpeakingInput(a.speakingScore != null ? String(a.speakingScore) : '')
-                  }}
+                  onClick={() => setSelected(a)}
                   className={`cursor-pointer border-b border-[#DDE3EC] hover:bg-[#F5F7FB] ${
                     pendingSpeaking ? 'bg-amber-50/60' : ''
                   }`}
@@ -205,7 +196,9 @@ export default function AdminResultsPage() {
                     {a.speakingScore != null ? (
                       a.speakingScore
                     ) : (
-                      <span className="text-amber-700">Pending</span>
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                        Pending
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-3 font-semibold">{a.totalScore ?? '—'}</td>
@@ -218,7 +211,7 @@ export default function AdminResultsPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 capitalize">{a.status.replace('_', ' ')}</td>
+                  <td className="px-4 py-3 capitalize">{a.markingStatus.replace('_', ' ')}</td>
                 </tr>
               )
             })}
@@ -227,58 +220,15 @@ export default function AdminResultsPage() {
       </div>
 
       {selected && (
-        <div className="mt-6 rounded-xl border border-[#DDE3EC] bg-white p-6">
-          <h2 className="font-jakarta font-bold text-[#0B3D6B]">Attempt detail</h2>
-          <p className="mt-1 text-sm text-[#5A6A7A]">
-            {selected.studentName} · {paperTitle(selected.paperId)} ·{' '}
-            {new Date(selected.startedAt).toLocaleString()}
-          </p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-4">
-            <div>
-              <p className="text-xs text-[#5A6A7A]">Reading</p>
-              <p className="font-bold">{selected.readingScore ?? '—'}%</p>
-            </div>
-            <div>
-              <p className="text-xs text-[#5A6A7A]">Listening</p>
-              <p className="font-bold">{selected.listeningScore ?? '—'}%</p>
-            </div>
-            <div>
-              <p className="text-xs text-[#5A6A7A]">Writing</p>
-              <p className="font-bold">{selected.writingScore ?? '—'}%</p>
-            </div>
-            <div>
-              <p className="text-xs text-[#5A6A7A]">Speaking</p>
-              <p className="font-bold">
-                {selected.speakingScore != null ? `${selected.speakingScore}%` : 'Pending'}
-              </p>
-            </div>
-          </div>
-          {selected.speakingScore == null && (
-            <div className="mt-4 flex flex-wrap items-end gap-3">
-              <div>
-                <label className="text-xs font-medium text-[#5A6A7A]">
-                  Mark speaking score (0–100)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={speakingInput}
-                  onChange={(e) => setSpeakingInput(e.target.value)}
-                  className="mt-1 block w-32 rounded-lg border border-[#DDE3EC] px-3 py-2"
-                />
-              </div>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={handleSaveSpeaking}
-                className="rounded-lg bg-[#E8A020] px-4 py-2 text-sm font-bold text-[#0B3D6B] disabled:opacity-60"
-              >
-                {saving ? 'Saving…' : 'Save speaking score'}
-              </button>
-            </div>
-          )}
-        </div>
+        <AttemptDetailPanel
+          attempt={selected}
+          paperTitle={paperTitle(selected.paperId)}
+          onClose={() => setSelected(null)}
+          onUpdated={async () => {
+            await loadData()
+            setSelected(null)
+          }}
+        />
       )}
     </div>
   )
