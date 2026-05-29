@@ -15,8 +15,12 @@ import PaymentTable, {
   PaymentTableEmpty,
   PaymentTableMeta,
 } from '@/components/payments/PaymentTable'
-import ReceiptModal from '@/components/payments/ReceiptModal'
+import dynamic from 'next/dynamic'
 import type { CourseId, Payment, PaymentMethod, PaymentStatus, Student } from '@/types'
+
+const ReceiptModal = dynamic(() => import('@/components/payments/ReceiptModal'), {
+  ssr: false,
+})
 
 const PAGE_SIZE = 10
 

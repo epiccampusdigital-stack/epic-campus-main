@@ -7,6 +7,7 @@ import {
   getMethodLabel,
   getTypeLabel,
 } from '@/lib/payments/helpers'
+import { downloadReceiptPdf } from '@/lib/payments/downloadReceiptPdf'
 import type { Payment } from '@/types'
 
 interface ReceiptModalProps {
@@ -32,22 +33,12 @@ export default function ReceiptModal({ payment, open, onClose }: ReceiptModalPro
 
   async function handleDownloadPdf() {
     if (!receiptRef.current || !payment) return
-    const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-      import('html2canvas'),
-      import('jspdf'),
-    ])
-    const canvas = await html2canvas(receiptRef.current, {
-      scale: 2,
-      backgroundColor: '#ffffff',
-    })
-    const imgData = canvas.toDataURL('image/png')
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' })
-    const pageWidth = pdf.internal.pageSize.getWidth()
-    const pageHeight = pdf.internal.pageSize.getHeight()
-    const imgWidth = pageWidth - 20
-    const imgHeight = (canvas.height * imgWidth) / canvas.width
-    pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, Math.min(imgHeight, pageHeight - 20))
-    pdf.save(`${payment.receiptNumber}.pdf`)
+    try {
+      await downloadReceiptPdf(receiptRef.current, `${payment.receiptNumber}.pdf`)
+    } catch (err) {
+      console.error('[ReceiptModal] PDF download failed:', err)
+      window.print()
+    }
   }
 
   return (
@@ -192,24 +183,6 @@ export default function ReceiptModal({ payment, open, onClose }: ReceiptModalPro
           </div>
         </div>
       </div>
-
-      <style jsx global>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          #epic-receipt,
-          #epic-receipt * {
-            visibility: visible;
-          }
-          #epic-receipt {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-          }
-        }
-      `}</style>
     </>
   )
 }

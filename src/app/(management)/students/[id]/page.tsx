@@ -14,7 +14,6 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { COURSE_MAP } from '@/lib/constants/courses'
-import { formatLKR } from '@/lib/utils/formatCurrency'
 import { parsePayment, formatAmount } from '@/lib/payments/helpers'
 import StudentForm from '@/components/students/StudentForm'
 import {
