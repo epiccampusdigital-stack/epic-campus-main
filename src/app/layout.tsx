@@ -17,8 +17,9 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'Epic Campus',
-  description: 'Epic Campus Business System — We Create Your Future',
+  title: 'Epic Campus — We Create Your Future',
+  description:
+    'Epic Campus opens doors to Japan, Korea, China and beyond. Study, work, and build your global career from Sri Lanka since 2011.',
 }
 
 export default function RootLayout({
