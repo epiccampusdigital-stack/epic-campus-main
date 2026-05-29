@@ -3,24 +3,28 @@
 import { createContext, useContext } from 'react'
 import type { EpicUser, Student } from '@/types'
 
+export type StudentPortalStatus =
+  | 'idle'
+  | 'loading'
+  | 'ready'
+  | 'profile_unavailable'
+
 interface StudentContextValue {
   user: EpicUser | null
   student: Student | null
-  loading: boolean
+  status: StudentPortalStatus
   sidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
   refreshStudent: () => void
-  setRefreshStudent: (fn: () => void) => void
 }
 
 export const StudentContext = createContext<StudentContextValue>({
   user: null,
   student: null,
-  loading: true,
+  status: 'idle',
   sidebarOpen: false,
   setSidebarOpen: () => {},
   refreshStudent: () => {},
-  setRefreshStudent: () => {},
 })
 
 export function useStudentPortal() {
