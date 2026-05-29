@@ -1,4 +1,4 @@
-name: Deploy to Firebase Hosting
+﻿name: Deploy to Firebase Hosting
 
 on:
   push:
@@ -33,9 +33,4 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_EPIC_CAMPUS }}
-          channelId: live
-          projectId: epic-campus
+        run: npx firebase deploy --only hosting --token "${{ secrets.FIREBASE_TOKEN }}" --non-interactive
