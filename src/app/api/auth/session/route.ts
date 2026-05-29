@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       err instanceof Error ? err.message : 'Token verification failed'
     console.error('[api/auth/session POST]', message)
 
-    if (message.includes('Missing Firebase Admin credentials')) {
+    if (message.includes('Firebase Admin credentials missing')) {
       return NextResponse.json(
         { error: 'Server misconfigured: Firebase Admin credentials missing' },
         { status: 500 },
