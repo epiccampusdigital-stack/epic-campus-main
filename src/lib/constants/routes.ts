@@ -4,6 +4,7 @@ export const ROUTES = {
   management: {
     dashboard:  '/dashboard',
     students:   '/students',
+    crm:        '/crm',
     payments:   '/payments',
     attendance: '/attendance',
     schedule:   '/schedule',

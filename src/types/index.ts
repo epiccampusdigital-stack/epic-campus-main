@@ -177,15 +177,46 @@ export type AuditAction =
 export interface Lead {
   id: string
   name: string
-  mobile: string
-  courseInterest: CourseId
-  source: 'walk-in' | 'referral' | 'social' | 'agent' | 'website'
-  agentId?: string
-  status: 'new' | 'contacted' | 'enrolled' | 'lost'
-  branchId: string
+  phone: string
+  email?: string
+  address?: string
+  courseId: CourseId
+  intakeDate?: string
+  budget?: string
+  educationLevel?: string
+  source: LeadSource
+  agentName?: string
+  commissionRate?: number
+  referralName?: string
+  status: LeadStatus
+  lastContact?: string
+  nextFollowUp?: string
+  inquiryDate?: string
   notes?: string
+  convertedToStudentId?: string
+  branchId: string
   createdAt: string
+  createdBy: string
 }
+
+export type LeadSource =
+  | 'walk-in'
+  | 'facebook'
+  | 'instagram'
+  | 'tiktok'
+  | 'whatsapp'
+  | 'referral'
+  | 'agent'
+  | 'website'
+  | 'other'
+
+export type LeadStatus =
+  | 'new'
+  | 'contacted'
+  | 'interested'
+  | 'applied'
+  | 'enrolled'
+  | 'lost'
 
 export type SessionType = 'class' | 'consultation' | 'exam'
 export type SessionStatus = 'scheduled' | 'completed' | 'cancelled'
