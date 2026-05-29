@@ -3,25 +3,33 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --font-jakarta: 'Plus Jakarta Sans', sans-serif;
+  --font-inter:   'Inter', sans-serif;
+  --navy:         #0B3D6B;
+  --navy-mid:     #0f4c81;
+  --navy-light:   #1a5fa8;
+  --gold:         #E8A020;
+  --gold-light:   #F5B942;
+  --bg:           #F5F7FB;
+  --white:        #FFFFFF;
+  --text-primary: #0D1B2A;
+  --text-muted:   #5A6A7A;
+  --border:       #DDE3EC;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter);
+  background: var(--bg);
+  color: var(--text-primary);
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-jakarta);
 }
+
+.font-jakarta { font-family: var(--font-jakarta); }
+.font-inter   { font-family: var(--font-inter); }

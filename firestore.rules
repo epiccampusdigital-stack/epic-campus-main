@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users collection — read own, write own on create
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow update: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Students — read/write own record, admin can read all
+    match /students/{studentId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == studentId ||
+        request.auth.token.role in ['admin', 'owner', 'reception', 'accountant', 'teacher']
+      );
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (
+        request.auth.uid == studentId ||
+        request.auth.token.role in ['admin', 'owner', 'reception']
+      );
+    }
+
+    // Payments — staff only
+    match /payments/{paymentId} {
+      allow read: if request.auth != null && (
+        request.auth.token.role in ['admin', 'owner', 'accountant', 'reception'] ||
+        resource.data.studentId == request.auth.uid
+      );
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'accountant', 'reception'];
+    }
+
+    // Audit log — admin/owner read only, server writes only
+    match /auditLog/{logId} {
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner'];
+      allow write: if false;
+    }
+
+    // Exams — staff read/write, students read only
+    match /exams/{examId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'teacher', 'examCoordinator'];
+    }
+
+    // Exam results — own results or staff
+    match /examResults/{resultId} {
+      allow read: if request.auth != null && (
+        resource.data.studentId == request.auth.uid ||
+        request.auth.token.role in ['admin', 'teacher', 'examCoordinator']
+      );
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'teacher', 'examCoordinator'];
+    }
+
+    // Leads — staff only
+    match /leads/{leadId} {
+      allow read, write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'reception'];
+    }
+  }
+}
