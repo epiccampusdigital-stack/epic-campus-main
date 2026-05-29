@@ -8,7 +8,7 @@ const PROGRAMS = [
   { label: 'Japan SSW', href: '/japan', flag: '🇯🇵' },
   { label: 'Korea D2/D4', href: '/korea', flag: '🇰🇷' },
   { label: 'China', href: '/china', flag: '🇨🇳' },
-  { label: 'IELTS', href: '/ielts', flag: '📝' },
+  { label: 'IELTS Program', href: 'https://epicielts.live', flag: '📝', external: true },
   { label: 'NVQ', href: '/nvq', flag: '🎓' },
 ]
 
@@ -82,16 +82,29 @@ export default function PublicNav() {
             {programsOpen && (
               <div className="absolute left-1/2 top-full -translate-x-1/2 pt-3">
                 <div className="min-w-[240px] rounded-2xl border border-gray-100 bg-white py-2 shadow-xl">
-                  {PROGRAMS.map((p) => (
-                    <Link
-                      key={p.href}
-                      href={p.href}
-                      className="flex items-center gap-3 px-5 py-3 text-sm text-gray-700 transition-colors hover:bg-[#F5F7FB]"
-                    >
-                      <span className="text-xl">{p.flag}</span>
-                      {p.label}
-                    </Link>
-                  ))}
+                  {PROGRAMS.map((p) =>
+                    'external' in p && p.external ? (
+                      <a
+                        key={p.href}
+                        href={p.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 px-5 py-3 text-sm text-gray-700 transition-colors hover:bg-[#F5F7FB]"
+                      >
+                        <span className="text-xl">{p.flag}</span>
+                        {p.label}
+                      </a>
+                    ) : (
+                      <Link
+                        key={p.href}
+                        href={p.href}
+                        className="flex items-center gap-3 px-5 py-3 text-sm text-gray-700 transition-colors hover:bg-[#F5F7FB]"
+                      >
+                        <span className="text-xl">{p.flag}</span>
+                        {p.label}
+                      </Link>
+                    )
+                  )}
                 </div>
               </div>
             )}
@@ -144,16 +157,29 @@ export default function PublicNav() {
             <p className="px-4 pt-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
               Programs
             </p>
-            {PROGRAMS.map((p) => (
-              <Link
-                key={p.href}
-                href={p.href}
-                className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-gray-800 hover:bg-[#F5F7FB]"
-              >
-                <span className="text-xl">{p.flag}</span>
-                {p.label}
-              </Link>
-            ))}
+            {PROGRAMS.map((p) =>
+              'external' in p && p.external ? (
+                <a
+                  key={p.href}
+                  href={p.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-gray-800 hover:bg-[#F5F7FB]"
+                >
+                  <span className="text-xl">{p.flag}</span>
+                  {p.label}
+                </a>
+              ) : (
+                <Link
+                  key={p.href}
+                  href={p.href}
+                  className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-gray-800 hover:bg-[#F5F7FB]"
+                >
+                  <span className="text-xl">{p.flag}</span>
+                  {p.label}
+                </Link>
+              )
+            )}
             <Link
               href="/login"
               className="mt-4 block rounded-full bg-[#0B3D6B] px-6 py-3.5 text-center text-sm font-semibold text-white shadow-md"
