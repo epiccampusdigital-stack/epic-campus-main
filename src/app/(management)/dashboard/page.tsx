@@ -68,16 +68,19 @@ function startOfMonth(): Date {
 
 function parseStudent(id: string, data: Record<string, unknown>): Student {
   const created = toDate(data.createdAt)
+  const year = new Date().getFullYear()
   return {
     id,
-    uid: String(data.uid ?? id),
+    studentCode: String(data.studentCode ?? `EC-${year}-000`),
+    uid: data.uid ? String(data.uid) : undefined,
     name: String(data.name ?? ''),
     nic: String(data.nic ?? ''),
+    email: data.email ? String(data.email) : undefined,
+    mobile: String(data.mobile ?? ''),
     courseId: data.courseId as CourseId,
     batchId: String(data.batchId ?? ''),
     branchId: String(data.branchId ?? ''),
-    mobile: String(data.mobile ?? ''),
-    registrationFee: Number(data.registrationFee ?? 0),
+    registrationFee: Number(data.registrationFee ?? data.feeAmount ?? 0),
     status: (data.status as Student['status']) ?? 'pending',
     visaStatus: data.visaStatus as Student['visaStatus'],
     createdAt: created?.toISOString() ?? new Date().toISOString(),

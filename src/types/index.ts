@@ -14,18 +14,51 @@ export interface EpicUser {
 
 export interface Student {
   id: string
-  uid: string
+  studentCode: string
+  uid?: string
   name: string
   nic: string
+  email?: string
+  mobile: string
+  address?: string
+  dateOfBirth?: string
+  photoUrl?: string
   courseId: CourseId
   batchId: string
   branchId: string
-  mobile: string
+  enrollmentDate?: string
+  expectedCompletionDate?: string
+  feeAmount?: number
+  feeCurrency?: 'LKR' | 'USD'
   registrationFee: number
+  paymentStatus?: 'paid' | 'partial' | 'pending'
   status: 'active' | 'pending' | 'completed' | 'withdrawn'
   visaStatus?: 'not-started' | 'in-progress' | 'approved' | 'rejected'
+  notes?: string
   createdAt: string
   createdBy: string
+}
+
+export interface StudentDocument {
+  id: string
+  name: string
+  url: string
+  uploadedAt: string
+}
+
+export interface AttendanceRecord {
+  id: string
+  studentId: string
+  date: string
+  status: 'present' | 'absent' | 'late' | 'excused'
+  notes?: string
+}
+
+export interface VisaEvent {
+  id: string
+  status: Student['visaStatus']
+  date: string
+  notes?: string
 }
 
 export interface Payment {
