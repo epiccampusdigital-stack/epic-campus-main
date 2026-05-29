@@ -12,6 +12,32 @@ export interface EpicUser {
   createdAt: string
 }
 
+export type StaffRole = Exclude<Role, 'student'>
+export type StaffStatus = 'active' | 'pending' | 'suspended'
+export type SalaryType = 'fixed' | 'hourly' | 'commission'
+
+export interface StaffMember {
+  id: string
+  uid?: string
+  email: string
+  displayName: string
+  role: StaffRole
+  status: StaffStatus
+  phone: string
+  nic: string
+  dateOfBirth?: string
+  address?: string
+  photoUrl?: string
+  branchId: string
+  startDate?: string
+  salaryType: SalaryType
+  baseSalary: number
+  commissionRate?: number
+  createdAt: string
+  approvedBy?: string
+  approvedAt?: string
+}
+
 export interface Student {
   id: string
   studentCode: string
