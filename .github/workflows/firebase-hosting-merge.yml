@@ -8,19 +8,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          
       - name: Install dependencies
         run: npm ci
-      - name: Deploy to Firebase
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_EPIC_CAMPUS }}
-          channelId: live
-          projectId: epic-campus
+        
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+        
+      - name: Deploy to Firebase Hosting
+        run: firebase deploy --only hosting
         env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
           FB_PROJECT_ID: ${{ secrets.FB_PROJECT_ID }}
           FB_CLIENT_EMAIL: ${{ secrets.FB_CLIENT_EMAIL }}
           FB_PRIVATE_KEY: ${{ secrets.FB_PRIVATE_KEY }}
