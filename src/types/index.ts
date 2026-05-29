@@ -277,3 +277,104 @@ export interface PayrollRecord {
   processedAt?: string
   createdAt: string
 }
+
+export type ExamPaperLevel = 'A1' | 'A2' | 'B1' | 'A2-B1'
+export type ExamPaperStatus = 'active' | 'draft'
+export type ExamAttemptStatus = 'in_progress' | 'completed'
+export type ExamMarkingStatus = 'pending' | 'complete' | 'pending_review' | 'partial'
+export type ExamSection = 'reading' | 'listening' | 'writing' | 'speaking'
+
+export interface ExamPaper {
+  id: string
+  code: string
+  title: string
+  level: ExamPaperLevel
+  description: string
+  status: ExamPaperStatus
+  readingCount: number
+  listeningCount: number
+  readingMinutes: number
+  listeningMinutes: number
+  writingMinutes: number
+  speakingMinutes: number
+}
+
+export interface ReadingQuestion {
+  id: string
+  questionNumber: number
+  passageText: string
+  questionText: string
+  options: string[]
+  correctAnswer: string
+  explanation?: string
+}
+
+export interface ListeningQuestion {
+  id: string
+  questionNumber: number
+  audioUrl: string | null
+  questionText: string
+  options: string[]
+  correctAnswer: string
+  explanation?: string
+}
+
+export interface WritingTask {
+  id: string
+  taskNumber: number
+  prompt: string
+  minWords: number
+  timeMinutes: number
+}
+
+export interface SpeakingPrompt {
+  id: string
+  partNumber: number
+  prompt: string
+  prepTime: number
+  timeLimit: number
+}
+
+export interface ExamAttempt {
+  id: string
+  studentId: string
+  studentName: string
+  paperId: string
+  paperCode: string
+  startedAt: string
+  endedAt?: string
+  status: ExamAttemptStatus
+  readingScore?: number
+  listeningScore?: number
+  writingScore?: number
+  speakingScore?: number | null
+  totalScore?: number
+  grade?: string
+  markingStatus: ExamMarkingStatus
+  createdAt: string
+}
+
+export interface ExamAnswer {
+  questionId: string
+  studentAnswer: string
+  isCorrect?: boolean
+  section: ExamSection
+}
+
+export interface WritingSubmission {
+  taskNumber: number
+  response: string
+  wordCount: number
+  score?: number
+  feedback?: string
+  markingStatus: ExamMarkingStatus
+}
+
+export interface SpeakingSubmission {
+  partNumber: number
+  audioUrl?: string
+  transcription?: string
+  score?: number | null
+  feedback?: string
+  markingStatus: ExamMarkingStatus
+}
