@@ -7,6 +7,7 @@ export const ROUTES = {
     payments:   '/payments',
     attendance: '/attendance',
     schedule:   '/schedule',
+    payroll:    '/payroll',
     staff:      '/staff',
     auditLog:   '/audit-log',
     reports:    '/reports',

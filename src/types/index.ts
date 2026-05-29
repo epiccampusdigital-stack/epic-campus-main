@@ -214,3 +214,35 @@ export interface ScheduleSession {
   createdAt: string
   createdBy: string
 }
+
+export type PayrollStatus = 'paid' | 'pending' | 'processing'
+export type PayrollPaymentMethod = 'bank-transfer' | 'cash'
+
+export interface PayrollRecord {
+  id: string
+  payrollId: string
+  staffId: string
+  staffName: string
+  role: StaffRole
+  period: string
+  salaryType: SalaryType
+  baseSalary: number
+  hoursWorked?: number
+  hourlyRate?: number
+  salesAmount?: number
+  commissionRate?: number
+  commission: number
+  bonus: number
+  tax: number
+  advances: number
+  otherDeductions: number
+  deductions: number
+  netPay: number
+  status: PayrollStatus
+  paymentMethod: PayrollPaymentMethod
+  bankDetails?: string
+  notes?: string
+  processedBy: string
+  processedAt?: string
+  createdAt: string
+}

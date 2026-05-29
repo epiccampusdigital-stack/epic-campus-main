@@ -23,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Payments', href: '/payments', icon: 'ti-credit-card', roles: ['admin', 'owner', 'reception', 'accountant'] },
   { label: 'Attendance', href: '/attendance', icon: 'ti-calendar-check', roles: ['admin', 'owner', 'reception', 'teacher'] },
   { label: 'Schedule', href: '/schedule', icon: 'ti-calendar', roles: ['admin', 'owner', 'reception', 'teacher'] },
+  { label: 'Payroll', href: '/payroll', icon: 'ti-report-money', roles: ['admin', 'owner', 'accountant'] },
   { label: 'Staff', href: '/staff', icon: 'ti-id-badge', roles: ['admin', 'owner'] },
   { label: 'Audit Log', href: '/audit-log', icon: 'ti-shield-check', roles: ['admin', 'owner'] },
   { label: 'Reports', href: '/reports', icon: 'ti-chart-bar', roles: ['admin', 'owner', 'accountant'] },
