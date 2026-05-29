@@ -39,7 +39,7 @@ export const metadata: Metadata = {
       "Study in Korea, work in Japan, or earn your IELTS score with EPIC Campus — Sri Lanka's most trusted overseas education institute since 2011.",
     images: [
       {
-        url: '/og-image.png',
+        url: 'https://epiccampus.live/og-image.png',
         width: 1200,
         height: 630,
         alt: 'EPIC Campus — We Create Your Future',
@@ -51,10 +51,11 @@ export const metadata: Metadata = {
     title: 'EPIC Campus | Your Future Has No Limit',
     description:
       "Study in Korea, work in Japan, or earn your IELTS score with EPIC Campus — Sri Lanka's most trusted overseas education institute since 2011.",
-    images: ['/og-image.png'],
+    images: ['https://epiccampus.live/og-image.png'],
   },
   icons: {
-    icon: [{ url: '/favicon.ico' }, { url: '/favicon.png', type: 'image/png' }],
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
     apple: '/favicon.png',
   },
   robots: {

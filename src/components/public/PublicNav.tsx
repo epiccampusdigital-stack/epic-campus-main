@@ -134,14 +134,17 @@ export default function PublicNav() {
           </Link>
         </div>
 
-        <button
-          type="button"
-          className="rounded-lg p-2 text-[#0B3D6B] lg:hidden"
-          onClick={() => setMobileOpen(!mobileOpen)}
-          aria-label="Toggle menu"
-        >
-          <span className={`ti ${mobileOpen ? 'ti-x' : 'ti-menu-2'} text-2xl`} />
-        </button>
+        <div className="flex items-center gap-2 lg:hidden">
+          <ThemeToggle />
+          <button
+            type="button"
+            className="rounded-lg p-2 text-[#0B3D6B]"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label="Toggle menu"
+          >
+            <span className={`ti ${mobileOpen ? 'ti-x' : 'ti-menu-2'} text-2xl`} />
+          </button>
+        </div>
       </div>
 
       {mobileOpen && (
