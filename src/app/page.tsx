@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import PublicNav from '@/components/public/PublicNav'
 import PublicFooter from '@/components/public/PublicFooter'
+import OnlineTradingCard from '@/components/public/OnlineTradingCard'
 
 function SectionTitle({
   title,
@@ -42,7 +43,6 @@ const PROGRAMS = [
   {
     flag: '🇯🇵',
     country: 'Japan',
-    borderColor: '#DC2626',
     title: 'Japan SSW',
     description:
       'Work in Japan with the Specified Skilled Worker visa. No degree required. High-demand industries.',
@@ -52,7 +52,6 @@ const PROGRAMS = [
   {
     flag: '🇰🇷',
     country: 'Korea',
-    borderColor: '#2563EB',
     title: 'Korea D2/D4',
     description:
       'Study at Korean universities with scholarship opportunities. Available after O/L or A/L.',
@@ -62,7 +61,6 @@ const PROGRAMS = [
   {
     flag: '🇨🇳',
     country: 'China',
-    borderColor: '#DC2626',
     title: 'China Programs',
     description:
       'World-class education with full & partial scholarships. Medicine, IT, Business programs available.',
@@ -70,18 +68,16 @@ const PROGRAMS = [
     href: '/china',
   },
   {
-    flag: '📝',
+    flag: '🎓',
     country: 'English',
-    borderColor: '#7C3AED',
     title: 'IELTS Residential',
     description: 'Intensive 10-day residential IELTS program. Target band 6.0 to 7.0+',
     tags: ['Residential', 'Fast-track', 'Expert trainers'],
     href: '/ielts',
   },
   {
-    flag: '🎓',
+    flag: '📜',
     country: 'Sri Lanka',
-    borderColor: '#16A34A',
     title: 'NVQ Qualifications',
     description:
       'Nationally recognized vocational qualifications. IT, Hospitality, Caregiving, Construction.',
@@ -238,34 +234,25 @@ export default function HomePage() {
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <SectionTitle
             title="Choose Your Path"
-            subtitle="Five proven pathways to study and work abroad — each backed by Epic Campus training and visa support."
+            subtitle="Six proven pathways to study and work abroad — each backed by Epic Campus training and visa support."
           />
-          <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-16 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {PROGRAMS.map((p) => (
-              <article
+              <div
                 key={p.href}
-                style={{ borderTopColor: p.borderColor }}
-                className="group flex flex-col overflow-hidden rounded-2xl border border-gray-100 border-t-4 bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+                className="flex flex-col rounded-2xl border border-white/10 bg-[#1a2744] p-8 transition-all duration-300 hover:-translate-y-1 hover:border-[#E8A020]/50 hover:shadow-lg"
               >
-                <div className="text-center">
-                  <span className="text-5xl leading-none" role="img" aria-label={p.country}>
-                    {p.flag}
-                  </span>
-                  <p className="mt-3 text-xs font-medium uppercase tracking-widest text-gray-400">
-                    {p.country}
-                  </p>
-                  <h3 className="mt-1 font-jakarta text-xl font-bold text-[#0B3D6B]">
-                    {p.title}
-                  </h3>
-                </div>
-                <p className="mt-4 flex-1 text-center text-sm leading-relaxed text-gray-600">
-                  {p.description}
+                <span className="mb-4 block text-center text-5xl">{p.flag}</span>
+                <p className="mb-1 text-center text-xs uppercase tracking-widest text-gray-400">
+                  {p.country}
                 </p>
-                <div className="mt-6 flex flex-wrap justify-center gap-2">
+                <h3 className="mb-3 text-center text-xl font-bold text-white">{p.title}</h3>
+                <p className="flex-1 text-center text-sm text-gray-300">{p.description}</p>
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
                   {p.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600"
+                      className="rounded-full bg-white/10 px-3 py-1 text-xs text-gray-300"
                     >
                       {tag}
                     </span>
@@ -273,13 +260,13 @@ export default function HomePage() {
                 </div>
                 <Link
                   href={p.href}
-                  className="mt-6 inline-flex items-center justify-center gap-1 text-sm font-semibold text-[#E8A020] transition-colors group-hover:text-[#d4911c]"
+                  className="mt-6 text-center text-sm font-semibold text-[#E8A020] transition-colors hover:text-[#d4911c]"
                 >
-                  Learn More
-                  <span className="transition-transform group-hover:translate-x-1">→</span>
+                  Learn More →
                 </Link>
-              </article>
+              </div>
             ))}
+            <OnlineTradingCard />
           </div>
         </div>
       </section>

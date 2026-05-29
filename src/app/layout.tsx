@@ -18,9 +18,47 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'Epic Campus — We Create Your Future',
+  title: 'EPIC Campus | We Create Your Future',
   description:
-    'Epic Campus opens doors to Japan, Korea, China and beyond. Study, work, and build your global career from Sri Lanka since 2011.',
+    "EPIC Campus is Sri Lanka's leading overseas education and employment institute. Work in Japan via SSW visa, study in Korea or China with full scholarships, achieve your IELTS target score, or earn government-approved NVQ qualifications. Founded in 2011. 1,500+ students placed. 98% success rate.",
+  keywords:
+    'EPIC Campus, Sri Lanka, Japan SSW visa, Korea study, China scholarship, IELTS, NVQ, overseas education, study abroad Sri Lanka, work in Japan',
+  authors: [{ name: 'EPIC Campus' }],
+  creator: 'EPIC Campus',
+  publisher: 'EPIC Campus',
+  metadataBase: new URL('https://epiccampus.live'),
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://epiccampus.live',
+    siteName: 'EPIC Campus',
+    title: 'EPIC Campus | Your Future Has No Limit',
+    description:
+      "Study in Korea, work in Japan, or earn your IELTS score with EPIC Campus — Sri Lanka's most trusted overseas education institute since 2011.",
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'EPIC Campus — We Create Your Future',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'EPIC Campus | Your Future Has No Limit',
+    description:
+      "Study in Korea, work in Japan, or earn your IELTS score with EPIC Campus — Sri Lanka's most trusted overseas education institute since 2011.",
+    images: ['/og-image.png'],
+  },
+  icons: {
+    icon: [{ url: '/favicon.ico' }, { url: '/favicon.png', type: 'image/png' }],
+    apple: '/favicon.png',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 }
 
 export default function RootLayout({

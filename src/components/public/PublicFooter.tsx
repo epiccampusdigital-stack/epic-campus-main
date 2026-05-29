@@ -9,9 +9,21 @@ const PROGRAMS = [
 ]
 
 const SOCIAL = [
-  { label: 'Facebook', href: 'https://facebook.com', icon: 'ti-brand-facebook' },
-  { label: 'Instagram', href: 'https://instagram.com', icon: 'ti-brand-instagram' },
-  { label: 'TikTok', href: 'https://tiktok.com', icon: 'ti-brand-tiktok' },
+  {
+    label: 'Facebook',
+    href: 'https://www.facebook.com/epicschoolofcomputing',
+    icon: 'ti-brand-facebook',
+  },
+  {
+    label: 'Instagram',
+    href: 'https://www.instagram.com/epiccampusdigital/',
+    icon: 'ti-brand-instagram',
+  },
+  {
+    label: 'TikTok',
+    href: 'https://www.tiktok.com/@epic_campus',
+    icon: 'ti-brand-tiktok',
+  },
 ]
 
 export default function PublicFooter() {

@@ -97,3 +97,61 @@ h1, h2, h3, h4, h5, h6 {
 .dark .shadow-sm {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
 }
+
+/* Fix blue text on dark backgrounds */
+.dark .text-\[#0B3D6B\] {
+  color: #e2e8f0 !important;
+}
+.dark .text-\[#1A6BAD\] {
+  color: #93c5fd !important;
+}
+.dark h1,
+.dark h2,
+.dark h3 {
+  color: #f1f5f9 !important;
+}
+.dark p {
+  color: #cbd5e1 !important;
+}
+.dark .text-blue-600,
+.dark .text-blue-700,
+.dark .text-blue-800,
+.dark .text-blue-900 {
+  color: #93c5fd !important;
+}
+.dark .text-gray-800 {
+  color: #e2e8f0 !important;
+}
+.dark .text-gray-700 {
+  color: #cbd5e1 !important;
+}
+.dark nav a {
+  color: #e2e8f0 !important;
+}
+.dark nav a:hover {
+  color: #E8A020 !important;
+}
+/* Keep gold text gold in dark mode */
+.dark .text-\[#E8A020\] {
+  color: #E8A020 !important;
+}
+/* Cards in dark mode */
+.dark .border-gray-200 {
+  border-color: #334155 !important;
+}
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-color: #475569 !important;
+}
+/* Navbar dark mode */
+.dark header {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
+/* Stats bar dark mode */
+.dark .shadow-xl {
+  background-color: #1e293b !important;
+}
