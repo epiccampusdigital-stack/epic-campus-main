@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import ThemeToggle from '@/components/ui/ThemeToggle'
 
 const PROGRAMS = [
   { label: 'Japan SSW', href: '/japan', flag: '🇯🇵' },
@@ -123,7 +124,8 @@ export default function PublicNav() {
           ))}
         </nav>
 
-        <div className="hidden lg:block">
+        <div className="hidden items-center gap-2 lg:flex">
+          <ThemeToggle />
           <Link
             href="/login"
             className="inline-flex items-center rounded-full bg-[#0B3D6B] px-7 py-3 text-sm font-semibold text-white shadow-md transition-all hover:bg-[#0a3460] hover:shadow-lg"

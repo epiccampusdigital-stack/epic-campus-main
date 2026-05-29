@@ -1,6 +1,7 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import { Plus_Jakarta_Sans, Inter } from 'next/font/google'
+import ChatBotRoot from '@/components/public/ChatBotRoot'
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -37,6 +38,7 @@ export default function RootLayout({
       </head>
       <body className="font-inter antialiased bg-[#F5F7FB]">
         {children}
+        <ChatBotRoot />
       </body>
     </html>
   )

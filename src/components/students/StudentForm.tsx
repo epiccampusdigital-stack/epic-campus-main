@@ -253,6 +253,22 @@ export default function StudentForm({
 
       if (isEdit) {
         await updateDoc(doc(db, 'students', studentDocId), payload)
+        if (
+          student &&
+          student.visaStatus !== form.visaStatus &&
+          form.mobile.trim()
+        ) {
+          void fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'visa',
+              phone: form.mobile.trim(),
+              name: form.name.trim(),
+              data: { status: form.visaStatus },
+            }),
+          })
+        }
         await logAuditEvent({
           userId: user.uid,
           userEmail: user.email,
@@ -288,6 +304,19 @@ export default function StudentForm({
             form.mobile.trim(),
             `Welcome to Epic Campus! Your student ID is ${studentCode}. We will contact you shortly.`,
           )
+          void fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'enrollment',
+              phone: form.mobile.trim(),
+              name: form.name.trim(),
+              data: {
+                program:
+                  COURSES.find((c) => c.id === form.courseId)?.label ?? form.courseId,
+              },
+            }),
+          })
         }
 
         await logAuditEvent({

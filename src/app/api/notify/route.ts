@@ -1,0 +1,37 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { sendWhatsApp, MESSAGES } from '@/lib/twilio'
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const { type, phone, name, data } = body
+
+    if (!phone || !name || !type) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    let message = ''
+    switch (type) {
+      case 'payment':
+        message = MESSAGES.paymentReceived(name, data?.amount || 'an amount')
+        break
+      case 'exam':
+        message = MESSAGES.examResult(name, data?.paper || 'your', data?.score || 'N/A')
+        break
+      case 'visa':
+        message = MESSAGES.visaUpdate(name, data?.status || 'updated')
+        break
+      case 'enrollment':
+        message = MESSAGES.enrollmentConfirmed(name, data?.program || 'your program')
+        break
+      default:
+        return NextResponse.json({ error: 'Unknown notification type' }, { status: 400 })
+    }
+
+    const sent = await sendWhatsApp(phone, message)
+    return NextResponse.json({ success: true, sent })
+  } catch (err) {
+    console.error('[notify API]', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}

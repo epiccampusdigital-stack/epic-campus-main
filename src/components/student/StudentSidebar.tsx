@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { signOut } from 'firebase/auth'
-import { auth } from '@/lib/firebase/client'
+import { auth, db } from '@/lib/firebase/client'
 import { COURSE_MAP } from '@/lib/constants/courses'
 import { getCourseBadge } from '@/lib/student/portal'
 import { logAuditEvent } from '@/lib/audit/helpers'
@@ -13,10 +14,13 @@ import { useStudentPortal } from '@/components/student/StudentContext'
 const BASE_NAV_ITEMS = [
   { label: 'My Dashboard', href: '/my-dashboard', icon: 'ti-layout-dashboard' },
   { label: 'My Payments', href: '/my-payments', icon: 'ti-credit-card' },
+  { label: 'Pay Online', href: '/student/payments', icon: 'ti-wallet' },
   { label: 'My Results', href: '/my-results', icon: 'ti-certificate' },
   { label: 'My Materials', href: '/my-materials', icon: 'ti-books' },
+  { label: 'Messages', href: '/student/messages', icon: 'ti-message' },
+  { label: 'AI Study Assistant', href: '/student/assistant', icon: 'ti-robot' },
   { label: 'Book Consultation', href: '/my-schedule', icon: 'ti-calendar' },
-  { label: 'My Visa', href: '/my-visa', icon: 'ti-plane' },
+  { label: 'My Visa', href: '/student/visa', icon: 'ti-plane' },
 ]
 
 const EXAM_NAV_ITEM = { label: 'Take Exam', href: '/exams', icon: 'ti-pencil' }
@@ -26,8 +30,25 @@ export default function StudentSidebar() {
   const router = useRouter()
   const { user, student, sidebarOpen, setSidebarOpen } = useStudentPortal()
   const [mounted, setMounted] = useState(false)
+  const [unreadMessages, setUnreadMessages] = useState(0)
 
   useEffect(() => setMounted(true), [])
+
+  useEffect(() => {
+    if (!student) return
+    const q = query(
+      collection(db, 'messageThreads'),
+      where('studentId', '==', student.id),
+    )
+    const unsub = onSnapshot(q, (snap) => {
+      const total = snap.docs.reduce(
+        (sum, d) => sum + (Number(d.data().unreadByStudent) || 0),
+        0,
+      )
+      setUnreadMessages(total)
+    })
+    return () => unsub()
+  }, [student])
 
   async function handleLogout() {
     if (user) {
@@ -91,6 +112,11 @@ export default function StudentSidebar() {
             >
               <span className={`ti ${item.icon} text-lg leading-none`} aria-hidden="true" />
               {item.label}
+              {item.href === '/student/messages' && unreadMessages > 0 && (
+                <span className="ml-auto rounded-full bg-[#E8A020] px-2 py-0.5 text-xs font-bold text-[#0B3D6B]">
+                  {unreadMessages}
+                </span>
+              )}
             </Link>
           )
         })}

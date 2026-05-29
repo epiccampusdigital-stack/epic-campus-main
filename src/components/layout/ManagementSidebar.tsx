@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
 import { signOut } from 'firebase/auth'
-import { auth } from '@/lib/firebase/client'
+import { auth, db } from '@/lib/firebase/client'
 import { ROLE_LABELS } from '@/lib/constants/roles'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { logAuditEvent } from '@/lib/audit/helpers'
+import ThemeToggle from '@/components/ui/ThemeToggle'
 import type { Role } from '@/types'
 
 interface NavItem {
@@ -28,6 +30,9 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Staff', href: '/staff', icon: 'ti-id-badge', roles: ['admin', 'owner'] },
   { label: 'Audit Log', href: '/audit-log', icon: 'ti-shield-check', roles: ['admin', 'owner'] },
   { label: 'Reports', href: '/reports', icon: 'ti-chart-bar', roles: ['admin', 'owner', 'accountant'] },
+  { label: 'Analytics', href: '/admin/analytics', icon: 'ti-chart-dots', roles: ['admin', 'owner'] },
+  { label: 'Visa Tracker', href: '/admin/visa', icon: 'ti-plane', roles: ['admin', 'owner', 'reception'] },
+  { label: 'Messages', href: '/admin/messages', icon: 'ti-message', roles: ['admin', 'owner', 'reception', 'teacher'] },
   { label: 'Exams', href: '/admin-exams', icon: 'ti-writing', roles: ['admin', 'owner', 'examCoordinator', 'teacher'] },
 ]
 
@@ -36,8 +41,21 @@ export default function ManagementSidebar() {
   const router = useRouter()
   const { user, sidebarOpen, setSidebarOpen } = useManagement()
   const [mounted, setMounted] = useState(false)
+  const [unreadMessages, setUnreadMessages] = useState(0)
 
   useEffect(() => setMounted(true), [])
+
+  useEffect(() => {
+    const q = query(collection(db, 'messageThreads'), orderBy('lastMessageAt', 'desc'))
+    const unsub = onSnapshot(q, (snap) => {
+      const total = snap.docs.reduce(
+        (sum, d) => sum + (Number(d.data().unreadByAdmin) || 0),
+        0,
+      )
+      setUnreadMessages(total)
+    })
+    return () => unsub()
+  }, [])
 
   const visibleItems = NAV_ITEMS.filter(
     (item) => user && item.roles.includes(user.role)
@@ -97,6 +115,11 @@ export default function ManagementSidebar() {
             >
               <span className={`ti ${item.icon} text-lg leading-none`} aria-hidden="true" />
               {item.label}
+              {item.href === '/admin/messages' && unreadMessages > 0 && (
+                <span className="ml-auto rounded-full bg-[#E8A020] px-2 py-0.5 text-xs font-bold text-[#0B3D6B]">
+                  {unreadMessages}
+                </span>
+              )}
             </Link>
           )
         })}
@@ -113,6 +136,9 @@ export default function ManagementSidebar() {
             </span>
           </div>
         )}
+        <div className="mb-3 flex justify-center">
+          <ThemeToggle />
+        </div>
         <button
           type="button"
           onClick={handleLogout}

@@ -98,6 +98,33 @@ export interface VisaEvent {
   notes?: string
 }
 
+export type VisaApplicationStatus =
+  | 'documents'
+  | 'submitted'
+  | 'processing'
+  | 'approved'
+  | 'rejected'
+
+export interface VisaDocumentItem {
+  name: string
+  uploaded: boolean
+  verified: boolean
+}
+
+export interface VisaApplication {
+  id: string
+  studentId: string
+  studentName: string
+  program: string
+  visaType: string
+  status: VisaApplicationStatus
+  documents: VisaDocumentItem[]
+  submittedAt?: string
+  updatedAt: string
+  notes: string
+  whatsappPhone?: string
+}
+
 export type PaymentType = 'tuition' | 'registration' | 'exam' | 'visa' | 'other'
 export type PaymentMethod = 'cash' | 'bank-transfer' | 'stripe'
 export type PaymentStatus = 'paid' | 'partial' | 'pending' | 'cancelled'

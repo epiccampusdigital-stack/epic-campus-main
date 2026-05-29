@@ -188,6 +188,16 @@ export default function PaymentForm({
             formatAmount(amount, form.currency),
             receiptNumber,
           )
+          void fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'payment',
+              phone: selectedStudent.mobile,
+              name: selectedStudent.name,
+              data: { amount: formatAmount(amount, form.currency) },
+            }),
+          })
         }
 
         await logAuditEvent({
