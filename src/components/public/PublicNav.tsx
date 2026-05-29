@@ -37,25 +37,30 @@ export default function PublicNav() {
 
   return (
     <header
-      className={`sticky top-0 z-50 bg-white transition-shadow ${
-        scrolled ? 'shadow-md' : 'shadow-sm'
+      className={`sticky top-0 z-50 border-b bg-white transition-all duration-300 ${
+        scrolled
+          ? 'border-gray-200 shadow-md'
+          : 'border-gray-100 shadow-sm'
       }`}
     >
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        <Link href="/" className="flex shrink-0 items-center gap-2">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+        <Link href="/" className="group flex shrink-0 items-center gap-1.5">
+          <span className="text-2xl transition-transform group-hover:scale-110" aria-hidden="true">
+            🎓
+          </span>
           <span className="font-jakarta text-xl font-bold tracking-tight">
             <span className="text-[#1A6BAD]">EPIC</span>{' '}
             <span className="text-[#0B3D6B]">Campus</span>
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-8 lg:flex">
+        <nav className="hidden items-center gap-10 lg:flex">
           {NAV_LINKS.slice(0, 1).map((link) => (
             <Link
               key={link.href}
               href={link.href}
               className={`text-sm font-medium transition-colors hover:text-[#0B3D6B] ${
-                pathname === link.href ? 'text-[#0B3D6B]' : 'text-[#5A6A7A]'
+                pathname === link.href ? 'text-[#0B3D6B]' : 'text-gray-500'
               }`}
             >
               {link.label}
@@ -69,21 +74,21 @@ export default function PublicNav() {
           >
             <button
               type="button"
-              className="flex items-center gap-1 text-sm font-medium text-[#5A6A7A] transition-colors hover:text-[#0B3D6B]"
+              className="flex items-center gap-1 text-sm font-medium text-gray-500 transition-colors hover:text-[#0B3D6B]"
             >
               Programs
               <span className="ti ti-chevron-down text-xs" />
             </button>
             {programsOpen && (
-              <div className="absolute left-0 top-full pt-2">
-                <div className="min-w-[220px] rounded-xl border border-[#DDE3EC] bg-white py-2 shadow-lg">
+              <div className="absolute left-1/2 top-full -translate-x-1/2 pt-3">
+                <div className="min-w-[240px] rounded-2xl border border-gray-100 bg-white py-2 shadow-xl">
                   {PROGRAMS.map((p) => (
                     <Link
                       key={p.href}
                       href={p.href}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-[#0D1B2A] hover:bg-[#F5F7FB]"
+                      className="flex items-center gap-3 px-5 py-3 text-sm text-gray-700 transition-colors hover:bg-[#F5F7FB]"
                     >
-                      <span>{p.flag}</span>
+                      <span className="text-xl">{p.flag}</span>
                       {p.label}
                     </Link>
                   ))}
@@ -97,7 +102,7 @@ export default function PublicNav() {
               key={link.href}
               href={link.href}
               className={`text-sm font-medium transition-colors hover:text-[#0B3D6B] ${
-                pathname === link.href ? 'text-[#0B3D6B]' : 'text-[#5A6A7A]'
+                pathname === link.href ? 'text-[#0B3D6B]' : 'text-gray-500'
               }`}
             >
               {link.label}
@@ -108,9 +113,9 @@ export default function PublicNav() {
         <div className="hidden lg:block">
           <Link
             href="/login"
-            className="rounded-lg bg-[#0B3D6B] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0a3560]"
+            className="inline-flex items-center rounded-full bg-[#0B3D6B] px-7 py-3 text-sm font-semibold text-white shadow-md transition-all hover:bg-[#0a3460] hover:shadow-lg"
           >
-            Login
+            Login to Portal
           </Link>
         </div>
 
@@ -125,35 +130,35 @@ export default function PublicNav() {
       </div>
 
       {mobileOpen && (
-        <div className="border-t border-[#DDE3EC] bg-white px-4 py-4 lg:hidden">
+        <div className="border-t border-gray-100 bg-white px-4 py-5 lg:hidden">
           <div className="space-y-1">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="block rounded-lg px-3 py-2.5 text-sm font-medium text-[#0D1B2A] hover:bg-[#F5F7FB]"
+                className="block rounded-xl px-4 py-3 text-sm font-medium text-gray-800 hover:bg-[#F5F7FB]"
               >
                 {link.label}
               </Link>
             ))}
-            <p className="px-3 pt-3 text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]">
+            <p className="px-4 pt-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
               Programs
             </p>
             {PROGRAMS.map((p) => (
               <Link
                 key={p.href}
                 href={p.href}
-                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-[#0D1B2A] hover:bg-[#F5F7FB]"
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-gray-800 hover:bg-[#F5F7FB]"
               >
-                <span>{p.flag}</span>
+                <span className="text-xl">{p.flag}</span>
                 {p.label}
               </Link>
             ))}
             <Link
               href="/login"
-              className="mt-3 block rounded-lg bg-[#0B3D6B] px-4 py-2.5 text-center text-sm font-semibold text-white"
+              className="mt-4 block rounded-full bg-[#0B3D6B] px-6 py-3.5 text-center text-sm font-semibold text-white shadow-md"
             >
-              Login
+              Login to Portal
             </Link>
           </div>
         </div>

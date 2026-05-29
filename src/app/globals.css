@@ -34,6 +34,17 @@ h1, h2, h3, h4, h5, h6 {
 .font-jakarta { font-family: var(--font-jakarta); }
 .font-inter   { font-family: var(--font-inter); }
 
+@keyframes hero-gradient {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.hero-gradient-animated {
+  background: linear-gradient(-45deg, #0B3D6B, #1A6BAD, #0f4c81, #0B3D6B);
+  background-size: 400% 400%;
+  animation: hero-gradient 14s ease infinite;
+}
+
 @media print {
   body * {
     visibility: hidden;
