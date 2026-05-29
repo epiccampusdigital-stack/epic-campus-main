@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { formatLKR } from '@/lib/utils/formatCurrency'
+import { parsePayment, getStatusColor } from '@/lib/payments/helpers'
 import { COURSE_MAP } from '@/lib/constants/courses'
 import type { CourseId, Payment, Student } from '@/types'
 
@@ -37,10 +38,10 @@ const STATUS_STYLES: Record<Student['status'], string> = {
 }
 
 const PAYMENT_STATUS_STYLES: Record<Payment['status'], string> = {
-  paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  partial: 'bg-amber-50 text-amber-700 border-amber-200',
-  pending: 'bg-orange-50 text-orange-700 border-orange-200',
-  cancelled: 'bg-red-50 text-red-700 border-red-200',
+  paid: getStatusColor('paid'),
+  partial: getStatusColor('partial'),
+  pending: getStatusColor('pending'),
+  cancelled: getStatusColor('cancelled'),
 }
 
 function toDate(value: unknown): Date | null {
@@ -83,24 +84,6 @@ function parseStudent(id: string, data: Record<string, unknown>): Student {
     registrationFee: Number(data.registrationFee ?? data.feeAmount ?? 0),
     status: (data.status as Student['status']) ?? 'pending',
     visaStatus: data.visaStatus as Student['visaStatus'],
-    createdAt: created?.toISOString() ?? new Date().toISOString(),
-    createdBy: String(data.createdBy ?? ''),
-  }
-}
-
-function parsePayment(id: string, data: Record<string, unknown>): Payment {
-  const created = toDate(data.createdAt)
-  return {
-    id,
-    studentId: String(data.studentId ?? ''),
-    studentName: String(data.studentName ?? ''),
-    amount: Number(data.amount ?? 0),
-    type: (data.type as Payment['type']) ?? 'other',
-    status: (data.status as Payment['status']) ?? 'pending',
-    method: (data.method as Payment['method']) ?? 'cash',
-    receiptNo: String(data.receiptNo ?? ''),
-    notes: data.notes ? String(data.notes) : undefined,
-    branchId: String(data.branchId ?? ''),
     createdAt: created?.toISOString() ?? new Date().toISOString(),
     createdBy: String(data.createdBy ?? ''),
   }
@@ -408,7 +391,7 @@ export default function DashboardPage() {
                 <tbody>
                   {recentPayments.map((payment) => (
                     <tr key={payment.id} className="border-b border-[#DDE3EC] last:border-0">
-                      <td className="px-5 py-3 font-medium text-[#0D1B2A]">{payment.receiptNo || '—'}</td>
+                      <td className="px-5 py-3 font-medium text-[#0D1B2A]">{payment.receiptNumber || '—'}</td>
                       <td className="px-5 py-3 text-[#0D1B2A]">{payment.studentName}</td>
                       <td className="px-5 py-3 font-medium text-[#0B3D6B]">{formatLKR(payment.amount)}</td>
                       <td className="px-5 py-3 capitalize text-[#5A6A7A]">{payment.type}</td>

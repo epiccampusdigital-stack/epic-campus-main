@@ -61,15 +61,28 @@ export interface VisaEvent {
   notes?: string
 }
 
+export type PaymentType = 'tuition' | 'registration' | 'exam' | 'visa' | 'other'
+export type PaymentMethod = 'cash' | 'bank-transfer' | 'stripe'
+export type PaymentStatus = 'paid' | 'partial' | 'pending' | 'cancelled'
+
 export interface Payment {
   id: string
+  receiptNumber: string
+  /** @deprecated use receiptNumber — kept for backward compatibility */
+  receiptNo: string
   studentId: string
   studentName: string
+  studentCode?: string
+  courseId?: CourseId
+  courseName?: string
   amount: number
-  type: 'registration' | 'course' | 'hostel' | 'exam' | 'other'
-  method: 'cash' | 'bank-transfer' | 'online' | 'cheque'
-  status: 'paid' | 'partial' | 'pending' | 'cancelled'
-  receiptNo: string
+  currency: 'LKR' | 'USD'
+  type: PaymentType
+  method: PaymentMethod
+  bankReference?: string
+  stripeId?: string
+  status: PaymentStatus
+  paymentDate: string
   notes?: string
   branchId: string
   createdAt: string

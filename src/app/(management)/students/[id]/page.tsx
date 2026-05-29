@@ -15,6 +15,7 @@ import {
 import { db } from '@/lib/firebase/client'
 import { COURSE_MAP } from '@/lib/constants/courses'
 import { formatLKR } from '@/lib/utils/formatCurrency'
+import { parsePayment, formatAmount } from '@/lib/payments/helpers'
 import StudentForm from '@/components/students/StudentForm'
 import {
   parseStudent,
@@ -36,23 +37,6 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'documents', label: 'Documents', icon: 'ti-files' },
   { id: 'visa', label: 'Visa', icon: 'ti-plane' },
 ]
-
-function parsePayment(id: string, data: Record<string, unknown>): Payment {
-  return {
-    id,
-    studentId: String(data.studentId ?? ''),
-    studentName: String(data.studentName ?? ''),
-    amount: Number(data.amount ?? 0),
-    type: (data.type as Payment['type']) ?? 'other',
-    method: (data.method as Payment['method']) ?? 'cash',
-    status: (data.status as Payment['status']) ?? 'pending',
-    receiptNo: String(data.receiptNo ?? ''),
-    notes: data.notes ? String(data.notes) : undefined,
-    branchId: String(data.branchId ?? ''),
-    createdAt: String(data.createdAt ?? new Date().toISOString()),
-    createdBy: String(data.createdBy ?? ''),
-  }
-}
 
 function parseExamResult(id: string, data: Record<string, unknown>): ExamResult {
   return {
@@ -346,9 +330,9 @@ export default function StudentProfilePage() {
                   <tbody className="divide-y divide-[#DDE3EC]">
                     {payments.map((p) => (
                       <tr key={p.id}>
-                        <td className="py-3 pr-4 font-medium">{p.receiptNo || p.id.slice(0, 8)}</td>
+                        <td className="py-3 pr-4 font-medium">{p.receiptNumber || p.id.slice(0, 8)}</td>
                         <td className="py-3 pr-4 capitalize text-[#5A6A7A]">{p.type}</td>
-                        <td className="py-3 pr-4 font-medium">{formatLKR(p.amount)}</td>
+                        <td className="py-3 pr-4 font-medium">{formatAmount(p.amount, p.currency)}</td>
                         <td className="py-3 pr-4 capitalize text-[#5A6A7A]">{p.method.replace('-', ' ')}</td>
                         <td className="py-3">
                           <span className="capitalize">{p.status}</span>
