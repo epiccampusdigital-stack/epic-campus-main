@@ -46,12 +46,23 @@ export interface StudentDocument {
   uploadedAt: string
 }
 
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused'
+
 export interface AttendanceRecord {
   id: string
   studentId: string
+  studentName: string
+  studentCode: string
+  courseId: CourseId
+  courseName: string
+  batchName: string
   date: string
-  status: 'present' | 'absent' | 'late' | 'excused'
+  status: AttendanceStatus
+  sessionStart: string
+  sessionEnd: string
   notes?: string
+  markedBy: string
+  createdAt: string
 }
 
 export interface VisaEvent {

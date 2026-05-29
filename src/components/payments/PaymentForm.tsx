@@ -11,7 +11,6 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { COURSE_MAP } from '@/lib/constants/courses'
-import { parseStudent } from '@/lib/students/helpers'
 import {
   generateReceiptNumber,
   sendPaymentWhatsApp,

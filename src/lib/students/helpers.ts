@@ -73,7 +73,7 @@ export async function sendCredentialsEmail(
   name: string,
   password: string,
 ): Promise<void> {
-  console.info('[Email placeholder]', { email, name, password: '***' })
+  console.info('[Email placeholder]', { email, name, hasPassword: Boolean(password) })
 }
 
 export const STATUS_STYLES: Record<Student['status'], string> = {

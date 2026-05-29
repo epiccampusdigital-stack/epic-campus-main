@@ -15,6 +15,7 @@ import {
 import { db } from '@/lib/firebase/client'
 import { COURSE_MAP } from '@/lib/constants/courses'
 import { parsePayment, formatAmount } from '@/lib/payments/helpers'
+import { parseAttendance } from '@/lib/attendance/helpers'
 import StudentForm from '@/components/students/StudentForm'
 import {
   parseStudent,
@@ -115,13 +116,9 @@ export default function StudentProfilePage() {
         ),
       )
       setAttendance(
-        attendanceSnap.docs.map((d) => ({
-          id: d.id,
-          studentId,
-          date: String(d.data().date ?? ''),
-          status: (d.data().status as AttendanceRecord['status']) ?? 'present',
-          notes: d.data().notes ? String(d.data().notes) : undefined,
-        })),
+        attendanceSnap.docs.map((d) =>
+          parseAttendance(d.id, d.data() as Record<string, unknown>),
+        ),
       )
       setExamResults(
         examsSnap.docs.map((d) =>
