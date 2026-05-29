@@ -153,15 +153,26 @@ export interface ExamResult {
 
 export interface AuditLog {
   id: string
-  module: 'students' | 'payments' | 'exams' | 'auth' | 'staff' | 'crm'
-  action: string
-  targetId: string
-  details: string
   userId: string
+  userEmail: string
   userRole: Role
-  branchId?: string
-  timestamp: string
+  action: AuditAction | string
+  entityType: string
+  entityId: string
+  details: string
+  ipAddress?: string
+  createdAt: string
 }
+
+export type AuditAction =
+  | 'created'
+  | 'updated'
+  | 'deleted'
+  | 'approved'
+  | 'login'
+  | 'logout'
+  | 'payment_recorded'
+  | 'student_registered'
 
 export interface Lead {
   id: string

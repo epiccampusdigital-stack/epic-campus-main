@@ -1,24 +1,28 @@
 import { adminDb } from '@/lib/firebase/admin'
 import { FieldValue } from 'firebase-admin/firestore'
-import type { AuditLog, Role } from '@/types'
+import type { Role } from '@/types'
 
 interface CreateAuditLogParams {
-  module:   AuditLog['module']
-  action:   string
-  targetId: string
-  details:  string
-  userId:   string
+  userId: string
+  userEmail: string
   userRole: Role
-  branchId?: string
+  action: string
+  entityType: string
+  entityId: string
+  details: string
+  ipAddress?: string
 }
 
+/** Server-side audit logger (Admin SDK) */
 export async function createAuditLog(params: CreateAuditLogParams): Promise<void> {
   try {
     await adminDb.collection('auditLog').add({
       ...params,
-      timestamp: FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     })
   } catch (error) {
     console.error('Audit log failed:', error)
   }
 }
+
+export { logAuditEvent } from '@/lib/audit/helpers'

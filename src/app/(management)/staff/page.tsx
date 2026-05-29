@@ -9,6 +9,7 @@ import {
   parseStaff,
 } from '@/lib/staff/helpers'
 import { sendCredentialsEmail } from '@/lib/students/helpers'
+import { logAuditEvent } from '@/lib/audit/helpers'
 import StaffForm from '@/components/staff/StaffForm'
 import StaffTable, {
   PendingStaffBanner,
@@ -152,6 +153,16 @@ export default function StaffPage() {
       if (data.password && member.email) {
         await sendCredentialsEmail(member.email, member.displayName, data.password)
       }
+
+      await logAuditEvent({
+        userId: user.uid,
+        userEmail: user.email,
+        userRole: user.role,
+        action: 'approved',
+        entityType: 'staff',
+        entityId: data.uid ?? member.id,
+        details: `Approved staff member ${member.displayName}`,
+      })
 
       await loadStaff()
     } catch (err) {

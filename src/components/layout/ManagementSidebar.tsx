@@ -7,6 +7,7 @@ import { signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase/client'
 import { ROLE_LABELS } from '@/lib/constants/roles'
 import { useManagement } from '@/components/layout/ManagementContext'
+import { logAuditEvent } from '@/lib/audit/helpers'
 import type { Role } from '@/types'
 
 interface NavItem {
@@ -39,6 +40,17 @@ export default function ManagementSidebar() {
   )
 
   async function handleLogout() {
+    if (user) {
+      await logAuditEvent({
+        userId: user.uid,
+        userEmail: user.email,
+        userRole: user.role,
+        action: 'logout',
+        entityType: 'auth',
+        entityId: user.uid,
+        details: 'User signed out',
+      })
+    }
     await fetch('/api/auth/session', { method: 'DELETE' })
     await signOut(auth)
     router.replace('/login')

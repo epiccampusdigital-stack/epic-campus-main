@@ -12,6 +12,7 @@ import { db } from '@/lib/firebase/client'
 import { COURSE_MAP, COURSES } from '@/lib/constants/courses'
 import { todayISO } from '@/lib/attendance/helpers'
 import { useManagement } from '@/components/layout/ManagementContext'
+import { logAuditEvent } from '@/lib/audit/helpers'
 import type {
   AttendanceRecord,
   AttendanceStatus,
@@ -182,6 +183,15 @@ export default function AttendanceForm({
           notes: entry.notes.trim() || null,
           updatedAt: serverTimestamp(),
         })
+        await logAuditEvent({
+          userId: user.uid,
+          userEmail: user.email,
+          userRole: user.role,
+          action: 'updated',
+          entityType: 'attendance',
+          entityId: record.id,
+          details: `Updated attendance for ${record.studentName}`,
+        })
       } else {
         await Promise.all(
           selectedEntries.map(async (entry) => {
@@ -206,6 +216,15 @@ export default function AttendanceForm({
             })
           }),
         )
+        await logAuditEvent({
+          userId: user.uid,
+          userEmail: user.email,
+          userRole: user.role,
+          action: 'created',
+          entityType: 'attendance',
+          entityId: batchName,
+          details: `Marked attendance for ${selectedEntries.length} students in ${batchName}`,
+        })
       }
 
       onSaved()

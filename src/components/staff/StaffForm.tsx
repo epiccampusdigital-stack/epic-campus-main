@@ -18,6 +18,7 @@ import {
 } from '@/lib/staff/helpers'
 import { generateTempPassword, sendCredentialsEmail } from '@/lib/students/helpers'
 import { useManagement } from '@/components/layout/ManagementContext'
+import { logAuditEvent } from '@/lib/audit/helpers'
 import type { SalaryType, StaffMember, StaffRole, StaffStatus } from '@/types'
 
 export interface StaffFormValues {
@@ -237,6 +238,16 @@ export default function StaffForm({
           `Welcome to Epic Campus! Your staff profile has been ${form.status === 'active' ? 'created' : 'submitted for approval'}.`,
         )
       }
+
+      await logAuditEvent({
+        userId: user.uid,
+        userEmail: user.email,
+        userRole: user.role,
+        action: isEdit ? 'updated' : 'created',
+        entityType: 'staff',
+        entityId: staff?.id ?? staffDocId,
+        details: `${isEdit ? 'Updated' : 'Added'} staff member ${form.displayName.trim()}`,
+      })
 
       onSaved()
       onClose()

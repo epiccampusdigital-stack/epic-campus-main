@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
 import { auth, googleProvider, db } from '@/lib/firebase/client'
+import { logAuditEvent } from '@/lib/audit/helpers'
 import type { Role } from '@/types'
 import {
   AuthPageBackground,
@@ -88,6 +89,16 @@ async function completeSignIn(user: User): Promise<string> {
     const role: Role | string = userDoc.exists()
       ? (userDoc.data().role as Role)
       : 'student'
+
+    await logAuditEvent({
+      userId: user.uid,
+      userEmail: user.email ?? userDoc.data()?.email ?? '',
+      userRole: (role as Role) ?? 'student',
+      action: 'login',
+      entityType: 'auth',
+      entityId: user.uid,
+      details: 'User signed in',
+    })
 
     return getRedirectPath(role)
   } catch (err) {

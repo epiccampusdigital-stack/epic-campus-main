@@ -19,6 +19,7 @@ import {
   sendCredentialsEmail,
 } from '@/lib/students/helpers'
 import { useManagement } from '@/components/layout/ManagementContext'
+import { logAuditEvent } from '@/lib/audit/helpers'
 import type { CourseId, Student } from '@/types'
 
 export interface StudentFormValues {
@@ -252,6 +253,15 @@ export default function StudentForm({
 
       if (isEdit) {
         await updateDoc(doc(db, 'students', studentDocId), payload)
+        await logAuditEvent({
+          userId: user.uid,
+          userEmail: user.email,
+          userRole: user.role,
+          action: 'updated',
+          entityType: 'student',
+          entityId: studentDocId,
+          details: `Updated student ${form.name.trim()}`,
+        })
       } else {
         const allSnap = await getDocs(collection(db, 'students'))
         const studentCode = await generateStudentCode(allSnap.size)
@@ -279,6 +289,16 @@ export default function StudentForm({
             `Welcome to Epic Campus! Your student ID is ${studentCode}. We will contact you shortly.`,
           )
         }
+
+        await logAuditEvent({
+          userId: user.uid,
+          userEmail: user.email,
+          userRole: user.role,
+          action: 'student_registered',
+          entityType: 'student',
+          entityId: studentDocId,
+          details: `Registered ${form.name.trim()} (${studentCode})`,
+        })
       }
 
       onSaved()

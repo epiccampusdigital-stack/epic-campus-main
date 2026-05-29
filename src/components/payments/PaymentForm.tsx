@@ -17,6 +17,7 @@ import {
   formatAmount,
 } from '@/lib/payments/helpers'
 import { useManagement } from '@/components/layout/ManagementContext'
+import { logAuditEvent } from '@/lib/audit/helpers'
 import type { Payment, PaymentMethod, PaymentStatus, PaymentType, Student } from '@/types'
 
 export interface PaymentFormValues {
@@ -156,6 +157,15 @@ export default function PaymentForm({
 
       if (isEdit) {
         await updateDoc(doc(db, 'payments', paymentDocId), payload)
+        await logAuditEvent({
+          userId: user.uid,
+          userEmail: user.email,
+          userRole: user.role,
+          action: 'updated',
+          entityType: 'payment',
+          entityId: paymentDocId,
+          details: `Updated payment for ${selectedStudent.name}`,
+        })
       } else {
         const allSnap = await getDocs(collection(db, 'payments'))
         const receiptNumber = await generateReceiptNumber(allSnap.size)
@@ -179,6 +189,16 @@ export default function PaymentForm({
             receiptNumber,
           )
         }
+
+        await logAuditEvent({
+          userId: user.uid,
+          userEmail: user.email,
+          userRole: user.role,
+          action: 'payment_recorded',
+          entityType: 'payment',
+          entityId: paymentDocId,
+          details: `Recorded ${receiptNumber} — ${formatAmount(amount, form.currency)} from ${selectedStudent.name}`,
+        })
       }
 
       onSaved()
