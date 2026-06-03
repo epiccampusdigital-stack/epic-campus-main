@@ -1,5 +1,11 @@
 import * as XLSX from 'xlsx'
 import { COURSE_MAP, COURSES } from '@/lib/constants/courses'
+import {
+  CATEGORY_LABELS,
+  sumByCategory,
+  type UtilityBill,
+  type UtilityBillCategory,
+} from '@/lib/utility-bills/helpers'
 import type { AttendanceRecord, CourseId, Payment, Student } from '@/types'
 
 export type ReportPeriod = 'daily' | 'weekly' | 'monthly'
@@ -242,6 +248,41 @@ export function formatUSD(amount: number): string {
     currency: 'USD',
     maximumFractionDigits: 0,
   }).format(amount)
+}
+
+export interface UtilityExpenseRow {
+  category: UtilityBillCategory
+  label: string
+  amount: number
+}
+
+export function computeUtilityExpenses(
+  bills: UtilityBill[],
+  period: ReportPeriod,
+  ref = new Date(),
+): UtilityExpenseRow[] {
+  const totals: Record<UtilityBillCategory, number> = {
+    electricity: 0,
+    water: 0,
+    internet: 0,
+    other: 0,
+  }
+
+  for (const bill of bills) {
+    if (!isInPeriod(bill.billDate, period, ref)) continue
+    totals[bill.category] += bill.amount
+  }
+
+  return (Object.keys(totals) as UtilityBillCategory[]).map((category) => ({
+    category,
+    label: CATEGORY_LABELS[category],
+    amount: totals[category],
+  }))
+}
+
+export function getUtilityTotalForMonth(bills: UtilityBill[], month: string): number {
+  const totals = sumByCategory(bills, month)
+  return totals.electricity + totals.water + totals.internet + totals.other
 }
 
 export interface ExcelReportData {

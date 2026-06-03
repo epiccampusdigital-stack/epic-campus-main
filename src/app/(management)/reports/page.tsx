@@ -7,10 +7,12 @@ import { db } from '@/lib/firebase/client'
 import { parseAttendance } from '@/lib/attendance/helpers'
 import { parsePayment } from '@/lib/payments/helpers'
 import { parseStudent } from '@/lib/students/helpers'
+import { parseUtilityBill } from '@/lib/utility-bills/helpers'
 import {
   computeAttendanceSummary,
   computeCoursePerformance,
   computeRevenueStats,
+  computeUtilityExpenses,
   formatLKR,
   formatUSD,
   generateExcelReport,
@@ -20,6 +22,7 @@ import {
   type ReportPeriod,
 } from '@/lib/reports/helpers'
 import type { AttendanceRecord, Payment, Student } from '@/types'
+import type { UtilityBill } from '@/lib/utility-bills/helpers'
 
 const RevenueChart = dynamic(() => import('@/components/reports/RevenueChart'), {
   ssr: false,
@@ -71,15 +74,17 @@ export default function ReportsPage() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
+  const [utilityBills, setUtilityBills] = useState<UtilityBill[]>([])
   const [loading, setLoading] = useState(true)
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [paymentsSnap, studentsSnap, attendanceSnap] = await Promise.all([
+      const [paymentsSnap, studentsSnap, attendanceSnap, utilitySnap] = await Promise.all([
         getDocs(collection(db, 'payments')),
         getDocs(collection(db, 'students')),
         getDocs(collection(db, 'attendance')),
+        getDocs(collection(db, 'utilityBills')).catch(() => ({ docs: [] })),
       ])
       setPayments(
         paymentsSnap.docs.map((d) =>
@@ -94,6 +99,11 @@ export default function ReportsPage() {
       setAttendance(
         attendanceSnap.docs.map((d) =>
           parseAttendance(d.id, d.data() as Record<string, unknown>),
+        ),
+      )
+      setUtilityBills(
+        utilitySnap.docs.map((d) =>
+          parseUtilityBill(d.id, d.data() as Record<string, unknown>),
         ),
       )
     } catch (err) {
@@ -127,6 +137,16 @@ export default function ReportsPage() {
   const coursePerformance = useMemo(
     () => computeCoursePerformance(students, payments, period),
     [students, payments, period],
+  )
+
+  const utilityExpenses = useMemo(
+    () => computeUtilityExpenses(utilityBills, period),
+    [utilityBills, period],
+  )
+
+  const utilityTotal = useMemo(
+    () => utilityExpenses.reduce((sum, row) => sum + row.amount, 0),
+    [utilityExpenses],
   )
 
   function handleExportPdf() {
@@ -272,6 +292,46 @@ export default function ReportsPage() {
             </table>
           )}
         </div>
+      </section>
+
+      <section>
+        <SectionTitle>Expenses — Utilities</SectionTitle>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          {loading ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-24 animate-pulse rounded-xl bg-[#DDE3EC]" />
+            ))
+          ) : (
+            <>
+              {utilityExpenses.map((row) => (
+                <div
+                  key={row.category}
+                  className="rounded-xl border border-[#DDE3EC] bg-white p-5"
+                >
+                  <p className="text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+                    {row.label}
+                  </p>
+                  <p className="mt-1 font-jakarta text-xl font-bold text-[#0B3D6B]">
+                    {formatLKR(row.amount)}
+                  </p>
+                </div>
+              ))}
+              <div className="rounded-xl border border-[#E8A020]/40 bg-[#FFF8EB] p-5">
+                <p className="text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+                  Utilities Total
+                </p>
+                <p className="mt-1 font-jakarta text-xl font-bold text-[#E8A020]">
+                  {formatLKR(utilityTotal)}
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+        {!loading && utilityTotal === 0 && (
+          <p className="mt-3 text-sm text-[#5A6A7A]">
+            No utility bills recorded for this period. Add bills in Utility Bills.
+          </p>
+        )}
       </section>
 
       <section>

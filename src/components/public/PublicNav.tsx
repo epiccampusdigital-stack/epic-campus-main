@@ -134,21 +134,22 @@ export default function PublicNav() {
           </Link>
         </div>
 
-        <div className="flex items-center gap-2 lg:hidden">
-          <ThemeToggle />
-          <button
-            type="button"
-            className="rounded-lg p-2 text-[#0B3D6B]"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label="Toggle menu"
-          >
-            <span className={`ti ${mobileOpen ? 'ti-x' : 'ti-menu-2'} text-2xl`} />
-          </button>
-        </div>
+        <button
+          type="button"
+          className="rounded-lg p-2 text-[#0B3D6B] lg:hidden"
+          onClick={() => setMobileOpen(!mobileOpen)}
+          aria-label="Toggle menu"
+        >
+          <span className={`ti ${mobileOpen ? 'ti-x' : 'ti-menu-2'} text-2xl`} />
+        </button>
       </div>
 
       {mobileOpen && (
         <div className="border-t border-gray-100 bg-white px-4 py-5 lg:hidden">
+          <div className="mb-4 flex items-center justify-between rounded-xl bg-[#F5F7FB] px-4 py-3">
+            <span className="text-sm font-medium text-gray-700">Theme</span>
+            <ThemeToggle />
+          </div>
           <div className="space-y-1">
             {NAV_LINKS.map((link) => (
               <Link

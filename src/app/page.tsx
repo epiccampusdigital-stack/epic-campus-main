@@ -402,15 +402,6 @@ export default function HomePage() {
           <a href="mailto:info@epiccampus.lk" className="transition-colors hover:text-[#0B3D6B]">
             📧 info@epiccampus.lk
           </a>
-          <div className="flex gap-4">
-            {['ti-brand-facebook', 'ti-brand-instagram', 'ti-brand-tiktok'].map((icon) => (
-              <span
-                key={icon}
-                className={`ti ${icon} text-xl text-[#0B3D6B]`}
-                aria-hidden="true"
-              />
-            ))}
-          </div>
         </div>
       </section>
 

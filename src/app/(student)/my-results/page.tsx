@@ -5,10 +5,7 @@ import dynamic from 'next/dynamic'
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { parseExamAttempt } from '@/lib/student/portal'
-import {
-  downloadPDF,
-  generateExamCertificate,
-} from '@/lib/generatePDF'
+import CompletionCertificate from '@/components/student/CompletionCertificate'
 import { useStudentPortal } from '@/components/student/StudentContext'
 import type { ParsedExamAttempt } from '@/lib/student/portal'
 
@@ -32,7 +29,6 @@ export default function MyResultsPage() {
   const { student } = useStudentPortal()
   const [attempts, setAttempts] = useState<ParsedExamAttempt[]>([])
   const [loading, setLoading] = useState(true)
-  const [certLoading, setCertLoading] = useState<string | null>(null)
 
   useEffect(() => {
     if (!student) return
@@ -84,28 +80,14 @@ export default function MyResultsPage() {
 
   if (!student) return null
 
-  async function downloadExamCert(attempt: ParsedExamAttempt) {
-    setCertLoading(attempt.id)
-    try {
-      const bytes = await generateExamCertificate({
-        studentName: student!.name,
-        paperName: attempt.exam,
-        score: String(attempt.total),
-        grade: attempt.grade,
-        date: attempt.date || new Date().toISOString().slice(0, 10),
-      })
-      downloadPDF(bytes, `exam-${attempt.id}.pdf`)
-    } finally {
-      setCertLoading(null)
-    }
-  }
-
   return (
     <div className="space-y-6">
       <div>
         <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A]">My Exam Results</h2>
         <p className="text-sm text-[#5A6A7A]">Track your progress across attempts</p>
       </div>
+
+      <CompletionCertificate student={student} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-[#DDE3EC] bg-white p-5">
@@ -174,7 +156,6 @@ export default function MyResultsPage() {
                     'Total',
                     'Grade',
                     'Status',
-                    'Certificate',
                   ].map((h) => (
                     <th
                       key={h}
@@ -197,16 +178,6 @@ export default function MyResultsPage() {
                     <td className="px-3 py-3 font-semibold">{a.total || '—'}</td>
                     <td className="px-3 py-3 font-bold text-[#E8A020]">{a.grade}</td>
                     <td className="px-3 py-3 capitalize">{a.status}</td>
-                    <td className="px-3 py-3">
-                      <button
-                        type="button"
-                        onClick={() => downloadExamCert(a)}
-                        disabled={certLoading === a.id}
-                        className="flex items-center gap-1 rounded-full bg-[#E8A020] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#d4911c] disabled:opacity-60"
-                      >
-                        📄 {certLoading === a.id ? '…' : 'Download'}
-                      </button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
