@@ -183,6 +183,14 @@ export function parseStudent(id: string, data: Record<string, unknown>): Student
     status: (data.status as Student['status']) ?? 'pending',
     visaStatus: (data.visaStatus as Student['visaStatus']) ?? 'not-started',
     notes: data.notes ? String(data.notes) : undefined,
+    parentAccessCode: data.parentAccessCode
+      ? String(data.parentAccessCode)
+      : undefined,
+    parentAccessEnabled:
+      data.parentAccessEnabled != null
+        ? Boolean(data.parentAccessEnabled)
+        : undefined,
+    parentId: data.parentId ? String(data.parentId) : undefined,
     createdAt: created?.toISOString() ?? new Date().toISOString(),
     createdBy: String(data.createdBy ?? ''),
   }

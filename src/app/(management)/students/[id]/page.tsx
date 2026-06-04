@@ -18,6 +18,7 @@ import { parsePayment } from '@/lib/payments/helpers'
 import StudentFeePanel from '@/components/payments/StudentFeePanel'
 import { parseAttendance } from '@/lib/attendance/helpers'
 import StudentAgentSection from '@/components/students/StudentAgentSection'
+import ParentAccessSection from '@/components/students/ParentAccessSection'
 import StudentForm from '@/components/students/StudentForm'
 import {
   parseStudent,
@@ -270,6 +271,7 @@ export default function StudentProfilePage() {
         {tab === 'overview' && (
           <div className="space-y-6">
             <StudentAgentSection student={student} onUpdated={loadData} />
+            <ParentAccessSection student={student} onUpdated={loadData} />
             <div className="grid gap-8 lg:grid-cols-2">
             <div>
               <h3 className="mb-4 font-jakarta text-sm font-bold uppercase tracking-wide text-[#0B3D6B]">

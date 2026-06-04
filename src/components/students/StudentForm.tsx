@@ -19,6 +19,7 @@ import {
   sendWhatsAppNotification,
   sendCredentialsEmail,
 } from '@/lib/students/helpers'
+import { generateParentAccessCode } from '@/lib/parent/helpers'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { logAuditEvent } from '@/lib/audit/helpers'
 import {
@@ -368,6 +369,8 @@ export default function StudentForm({
           studentCode,
           uid: uid ?? null,
           feeSchedule: defaultFeeSchedule(),
+          parentAccessCode: generateParentAccessCode(),
+          parentAccessEnabled: true,
           createdAt: serverTimestamp(),
           createdBy: user.uid,
         })

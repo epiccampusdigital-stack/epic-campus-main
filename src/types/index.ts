@@ -7,6 +7,7 @@ export type Role =
   | 'examCoordinator'
   | 'student'
   | 'company'
+  | 'parent'
 
 export type CourseId = 'japan-ssw' | 'korea-d2d4' | 'china' | 'ielts' | 'nvq-it' | 'nvq-hospitality' | 'nvq-caregiving' | 'nvq-construction' | 'nvq-logistics'
 
@@ -20,13 +21,14 @@ export interface EpicUser {
   branchId?: string
   /** Reception / staff campus assignment */
   locationAssigned?: StudentLocation
+  /** Student document id (student or parent role) */
   studentId?: string
   /** Partner company document id when role is company */
   companyId?: string
   createdAt: string
 }
 
-export type StaffRole = Exclude<Role, 'student' | 'company'>
+export type StaffRole = Exclude<Role, 'student' | 'company' | 'parent'>
 export type StaffStatus = 'active' | 'pending' | 'suspended'
 export type SalaryType = 'fixed' | 'hourly' | 'commission'
 
@@ -117,8 +119,24 @@ export interface Student {
   status: 'active' | 'pending' | 'completed' | 'withdrawn'
   visaStatus?: 'not-started' | 'in-progress' | 'approved' | 'rejected'
   notes?: string
+  /** 6-digit code for parent/guardian registration */
+  parentAccessCode?: string
+  parentAccessEnabled?: boolean
+  /** Firebase uid of linked parent account */
+  parentId?: string
   createdAt: string
   createdBy: string
+}
+
+export interface ParentAccount {
+  id: string
+  parentName: string
+  email: string
+  phone: string
+  studentId: string
+  studentName: string
+  linkedAt: string
+  createdAt: string
 }
 
 export interface StudentDocument {
