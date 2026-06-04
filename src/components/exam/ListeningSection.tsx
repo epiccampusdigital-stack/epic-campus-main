@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import ExamAudioPlayer from '@/components/exam/ExamAudioPlayer'
 import ExamTimer from '@/components/exam/ExamTimer'
 import QuestionPalette from '@/components/exam/QuestionPalette'
 import { getAttempt, loadAnswers, markSection, saveAnswer } from '@/lib/exam/helpers'
@@ -21,15 +22,14 @@ export default function ListeningSection({
   timeLimitMinutes,
 }: ListeningSectionProps) {
   const router = useRouter()
-  const audioRef = useRef<HTMLAudioElement>(null)
-  const lastPositionRef = useRef(0)
+  const pauseAudioRef = useRef<(() => void) | null>(null)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [startedAt, setStartedAt] = useState<Date>(new Date())
   const [currentQ, setCurrentQ] = useState(0)
   const [submitting, setSubmitting] = useState(false)
 
   const active = questions[currentQ]
-  const hasAudio = active?.audioUrl
+  const hasAudio = Boolean(active?.audioUrl)
 
   const questionKey = useMemo(() => {
     const key: Record<string, string> = {}
@@ -47,25 +47,13 @@ export default function ListeningSection({
   }, [attemptId])
 
   useEffect(() => {
-    const audio = audioRef.current
-    if (!audio) return
+    pauseAudioRef.current?.()
+  }, [currentQ, active?.id])
 
-    const onTimeUpdate = () => {
-      lastPositionRef.current = audio.currentTime
-    }
-    const onSeeking = () => {
-      if (audio.currentTime > lastPositionRef.current) {
-        audio.currentTime = lastPositionRef.current
-      }
-    }
-
-    audio.addEventListener('timeupdate', onTimeUpdate)
-    audio.addEventListener('seeking', onSeeking)
-    return () => {
-      audio.removeEventListener('timeupdate', onTimeUpdate)
-      audio.removeEventListener('seeking', onSeeking)
-    }
-  }, [active?.audioUrl])
+  const goToQuestion = (index: number) => {
+    pauseAudioRef.current?.()
+    setCurrentQ(index)
+  }
 
   const answeredIndices = useMemo(() => {
     const set = new Set<number>()
@@ -83,6 +71,7 @@ export default function ListeningSection({
 
   const finishSection = useCallback(async () => {
     if (submitting) return
+    pauseAudioRef.current?.()
     setSubmitting(true)
     try {
       for (const q of questions) {
@@ -113,15 +102,22 @@ export default function ListeningSection({
         />
       </div>
 
-      <div className="mb-6 rounded-xl border border-[#DDE3EC] bg-white p-5">
-        {hasAudio ? (
-          <audio ref={audioRef} controls className="w-full" src={active.audioUrl!}>
-            <track kind="captions" />
-          </audio>
+      <div className="mb-6">
+        {hasAudio && active?.audioUrl ? (
+          <ExamAudioPlayer
+            key={active.id}
+            src={active.audioUrl}
+            onPauseRef={(fn) => {
+              pauseAudioRef.current = fn
+            }}
+          />
         ) : (
-          <p className="text-center font-inter text-sm text-amber-700">
-            Audio not available — practice mode
-          </p>
+          <div className="rounded-xl border border-[#DDE3EC] bg-[#F5F7FB] px-4 py-6 text-center">
+            <span className="ti ti-volume-off mb-2 block text-2xl text-[#94a3b8]" />
+            <p className="font-inter text-sm text-[#5A6A7A]">
+              Audio not available for this question
+            </p>
+          </div>
         )}
       </div>
 
@@ -130,7 +126,7 @@ export default function ListeningSection({
           total={questions.length}
           currentIndex={currentQ}
           answered={answeredIndices}
-          onSelect={setCurrentQ}
+          onSelect={goToQuestion}
         />
       </div>
 
@@ -173,7 +169,7 @@ export default function ListeningSection({
         <button
           type="button"
           disabled={currentQ === 0}
-          onClick={() => setCurrentQ((q) => q - 1)}
+          onClick={() => goToQuestion(currentQ - 1)}
           className="rounded-lg border border-[#DDE3EC] px-4 py-2 text-sm disabled:opacity-40"
         >
           Previous
@@ -181,7 +177,7 @@ export default function ListeningSection({
         {currentQ < questions.length - 1 ? (
           <button
             type="button"
-            onClick={() => setCurrentQ((q) => q + 1)}
+            onClick={() => goToQuestion(currentQ + 1)}
             className="rounded-lg bg-[#0B3D6B] px-6 py-2 text-sm font-bold text-white"
           >
             Next
@@ -193,7 +189,7 @@ export default function ListeningSection({
             onClick={finishSection}
             className="rounded-lg bg-[#E8A020] px-6 py-2 font-jakarta text-sm font-bold text-[#0B3D6B]"
           >
-            Next Section → Writing
+            {submitting ? 'Saving…' : 'Next Section → Writing'}
           </button>
         )}
       </div>

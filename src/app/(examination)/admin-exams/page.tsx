@@ -7,6 +7,7 @@ import { doc, getDoc } from 'firebase/firestore'
 import * as XLSX from 'xlsx'
 import AttemptDetailPanel from '@/components/exam/AttemptDetailPanel'
 import JsonImporter from '@/components/exam/JsonImporter'
+import ListeningQuestionsEditor from '@/components/exam/ListeningQuestionsEditor'
 import PaperForm from '@/components/exam/PaperForm'
 import { EXAM_MANAGEMENT_ROLES } from '@/lib/constants/roles'
 import {
@@ -37,6 +38,7 @@ export default function AdminExamsPage() {
   const [markingFilter, setMarkingFilter] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [editPaper, setEditPaper] = useState<ExamPaper | null>(null)
+  const [audioPaper, setAudioPaper] = useState<ExamPaper | null>(null)
   const [selectedAttempt, setSelectedAttempt] = useState<ExamAttempt | null>(null)
 
   const loadData = useCallback(async () => {
@@ -261,6 +263,13 @@ export default function AdminExamsPage() {
                         </button>
                         <button
                           type="button"
+                          onClick={() => setAudioPaper(p)}
+                          className="text-xs font-semibold text-[#0B3D6B] hover:underline"
+                        >
+                          Listening Audio
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleToggleStatus(p.id)}
                           className="text-xs font-semibold text-[#0B3D6B] hover:underline"
                         >
@@ -396,6 +405,14 @@ export default function AdminExamsPage() {
         onClose={() => setFormOpen(false)}
         onSaved={loadData}
       />
+
+      {audioPaper && (
+        <ListeningQuestionsEditor
+          paper={audioPaper}
+          open={!!audioPaper}
+          onClose={() => setAudioPaper(null)}
+        />
+      )}
 
       {selectedAttempt && (
         <AttemptDetailPanel

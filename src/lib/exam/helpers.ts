@@ -199,7 +199,12 @@ export async function fetchListeningQuestions(
     'listeningQuestions',
     fallback,
   )
-  return items.sort((a, b) => a.questionNumber - b.questionNumber)
+  return items
+    .map((q) => ({
+      ...q,
+      audioUrl: q.audioUrl ? String(q.audioUrl) : null,
+    }))
+    .sort((a, b) => a.questionNumber - b.questionNumber)
 }
 
 export async function fetchWritingTasks(paperId: string): Promise<WritingTask[]> {
@@ -512,6 +517,7 @@ interface ImportQuestionGroup {
     options?: string[]
     correctAnswer: string
     explanation?: string
+    audioUrl?: string | null
   }[]
 }
 
@@ -536,7 +542,8 @@ export async function importExamPaper(data: ExamImportPayload): Promise<string> 
     data.listeningQuestions?.flatMap((g) =>
       g.questions.map((q) => ({
         questionNumber: q.questionNumber,
-        audioUrl: g.audioUrl ?? null,
+        audioUrl:
+          (q as { audioUrl?: string | null }).audioUrl ?? g.audioUrl ?? null,
         questionText: q.questionText,
         options: q.options ?? [],
         correctAnswer: q.correctAnswer,
