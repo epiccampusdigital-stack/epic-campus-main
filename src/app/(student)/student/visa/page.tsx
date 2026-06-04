@@ -5,6 +5,7 @@ import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { COURSE_MAP } from '@/lib/constants/courses'
 import { useStudentPortal } from '@/components/student/StudentContext'
+import StudentVisaUploads from '@/components/visa/StudentVisaUploads'
 import type { VisaApplication, VisaApplicationStatus, VisaDocumentItem } from '@/types'
 
 const STAGES: { id: VisaApplicationStatus; label: string; emoji: string }[] = [
@@ -163,6 +164,7 @@ export default function StudentVisaPage() {
           </a>
           <p className="mt-4 text-xs text-[#5A6A7A]">WhatsApp: +94 77 123 4567 · info@epiccampus.lk</p>
         </div>
+        <StudentVisaUploads />
       </div>
     )
   }
@@ -246,6 +248,8 @@ export default function StudentVisaPage() {
           })}
         </div>
       </div>
+
+      <StudentVisaUploads />
 
       {/* Document checklist */}
       <div className="rounded-xl border border-[#DDE3EC] bg-white p-5">

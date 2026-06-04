@@ -34,7 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Reports', href: '/reports', icon: 'ti-chart-bar', roles: ['admin', 'owner', 'accountant'] },
   { label: 'Analytics', href: '/admin/analytics', icon: 'ti-chart-dots', roles: ['admin', 'owner'] },
   { label: 'Visa Tracker', href: '/admin/visa', icon: 'ti-plane', roles: ['admin', 'owner', 'reception'] },
-  { label: 'Messages', href: '/admin/messages', icon: 'ti-message', roles: ['admin', 'owner', 'reception', 'teacher'] },
+  { label: 'Messages', href: '/messages', icon: 'ti-message', roles: ['admin', 'owner', 'reception'] },
   { label: 'Exams', href: '/admin-exams', icon: 'ti-writing', roles: ['admin', 'owner', 'examCoordinator', 'teacher'] },
 ]
 
@@ -48,10 +48,10 @@ export default function ManagementSidebar() {
   useEffect(() => setMounted(true), [])
 
   useEffect(() => {
-    const q = query(collection(db, 'messageThreads'), orderBy('lastMessageAt', 'desc'))
+    const q = query(collection(db, 'conversations'), orderBy('lastMessageAt', 'desc'))
     const unsub = onSnapshot(q, (snap) => {
       const total = snap.docs.reduce(
-        (sum, d) => sum + (Number(d.data().unreadByAdmin) || 0),
+        (sum, d) => sum + (Number(d.data().unreadCount) || 0),
         0,
       )
       setUnreadMessages(total)
@@ -117,7 +117,7 @@ export default function ManagementSidebar() {
             >
               <span className={`ti ${item.icon} text-lg leading-none`} aria-hidden="true" />
               {item.label}
-              {item.href === '/admin/messages' && unreadMessages > 0 && (
+              {item.href === '/messages' && unreadMessages > 0 && (
                 <span className="ml-auto rounded-full bg-[#E8A020] px-2 py-0.5 text-xs font-bold text-[#0B3D6B]">
                   {unreadMessages}
                 </span>

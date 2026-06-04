@@ -10,15 +10,27 @@ import StudentTable, {
   StudentTableEmpty,
   StudentTableMeta,
 } from '@/components/students/StudentTable'
-import type { CourseId, Student } from '@/types'
+import { LOCATION_LABELS } from '@/lib/students/helpers'
+import { useManagement } from '@/components/layout/ManagementContext'
+import type { CourseId, Student, StudentLocation } from '@/types'
 
 const PAGE_SIZE = 10
 
+const LOCATION_OPTIONS: { id: StudentLocation | ''; label: string }[] = [
+  { id: '', label: 'All locations' },
+  { id: 'ahangama', label: LOCATION_LABELS.ahangama },
+  { id: 'galle', label: LOCATION_LABELS.galle },
+  { id: 'waduraba', label: LOCATION_LABELS.waduraba },
+  { id: 'pinnaduwa', label: LOCATION_LABELS.pinnaduwa },
+]
+
 export default function StudentsPage() {
+  const { user } = useManagement()
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [courseFilter, setCourseFilter] = useState<CourseId | ''>('')
+  const [locationFilter, setLocationFilter] = useState<StudentLocation | ''>('')
   const [statusFilter, setStatusFilter] = useState<Student['status'] | ''>('')
   const [batchFilter, setBatchFilter] = useState('')
   const [page, setPage] = useState(1)
@@ -45,6 +57,12 @@ export default function StudentsPage() {
     loadStudents()
   }, [loadStudents])
 
+  useEffect(() => {
+    if (user?.role === 'reception' && user.locationAssigned) {
+      setLocationFilter(user.locationAssigned)
+    }
+  }, [user?.role, user?.locationAssigned])
+
   const batches = useMemo(() => {
     const set = new Set(students.map((s) => s.batchId).filter(Boolean))
     return Array.from(set).sort()
@@ -56,6 +74,7 @@ export default function StudentsPage() {
       if (courseFilter && s.courseId !== courseFilter) return false
       if (statusFilter && s.status !== statusFilter) return false
       if (batchFilter && s.batchId !== batchFilter) return false
+      if (locationFilter && s.location !== locationFilter) return false
       if (!q) return true
       return (
         s.name.toLowerCase().includes(q) ||
@@ -64,11 +83,11 @@ export default function StudentsPage() {
         s.studentCode.toLowerCase().includes(q)
       )
     })
-  }, [students, search, courseFilter, statusFilter, batchFilter])
+  }, [students, search, courseFilter, statusFilter, batchFilter, locationFilter])
 
   useEffect(() => {
     setPage(1)
-  }, [search, courseFilter, statusFilter, batchFilter])
+  }, [search, courseFilter, statusFilter, batchFilter, locationFilter])
 
   const paginated = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE
@@ -105,7 +124,7 @@ export default function StudentsPage() {
       </div>
 
       <div className="rounded-xl border border-[#DDE3EC] bg-white p-4">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
           <div className="relative md:col-span-2 lg:col-span-1">
             <span
               className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A7A]"
@@ -151,6 +170,18 @@ export default function StudentsPage() {
             {batches.map((b) => (
               <option key={b} value={b}>
                 {b}
+              </option>
+            ))}
+          </select>
+          <select
+            value={locationFilter}
+            onChange={(e) => setLocationFilter(e.target.value as StudentLocation | '')}
+            className="rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm text-[#0D1B2A] outline-none focus:border-[#E8A020]"
+            title="Campus location"
+          >
+            {LOCATION_OPTIONS.map((loc) => (
+              <option key={loc.id || 'all'} value={loc.id}>
+                {loc.label}
               </option>
             ))}
           </select>

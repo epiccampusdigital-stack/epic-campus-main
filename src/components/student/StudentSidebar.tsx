@@ -37,7 +37,7 @@ export default function StudentSidebar() {
   useEffect(() => {
     if (!student) return
     const q = query(
-      collection(db, 'messageThreads'),
+      collection(db, 'conversations'),
       where('studentId', '==', student.id),
     )
     const unsub = onSnapshot(q, (snap) => {

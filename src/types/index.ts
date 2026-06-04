@@ -2,12 +2,16 @@ export type Role = 'admin' | 'owner' | 'reception' | 'accountant' | 'teacher' | 
 
 export type CourseId = 'japan-ssw' | 'korea-d2d4' | 'china' | 'ielts' | 'nvq-it' | 'nvq-hospitality' | 'nvq-caregiving' | 'nvq-construction' | 'nvq-logistics'
 
+export type StudentLocation = 'ahangama' | 'galle' | 'waduraba' | 'pinnaduwa'
+
 export interface EpicUser {
   uid: string
   email: string
   displayName: string
   role: Role
   branchId?: string
+  /** Reception / staff campus assignment */
+  locationAssigned?: StudentLocation
   studentId?: string
   createdAt: string
 }
@@ -43,7 +47,6 @@ export type PaymentMethod = 'cash' | 'bank-transfer' | 'stripe'
 export type PaymentStatus = 'paid' | 'partial' | 'pending' | 'cancelled'
 
 export type BatchDuration = '45days' | '90days' | 'custom'
-export type StudentLocation = 'ahangama' | 'galle' | 'waduraba' | 'pinnaduwa'
 export type CourseBatchStatus = 'active' | 'completed' | 'overdue'
 
 export interface StudentFeeLineItem {

@@ -51,6 +51,9 @@ export default function ManagementLayout({
           displayName: data.displayName ?? firebaseUser.displayName ?? '',
           role,
           branchId: data.branchId,
+          locationAssigned: data.locationAssigned
+            ? (String(data.locationAssigned) as EpicUser['locationAssigned'])
+            : undefined,
           studentId: data.studentId,
           createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? new Date().toISOString(),
         })
