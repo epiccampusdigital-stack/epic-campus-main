@@ -19,7 +19,7 @@ const BASE_NAV_ITEMS = [
   { label: 'My Materials', href: '/my-materials', icon: 'ti-books' },
   { label: 'Messages', href: '/student/messages', icon: 'ti-message' },
   { label: 'AI Study Assistant', href: '/student/assistant', icon: 'ti-robot' },
-  { label: 'Book Consultation', href: '/my-schedule', icon: 'ti-calendar' },
+  { label: 'Book Consultation', href: '/book-consultation', icon: 'ti-calendar' },
   { label: 'My Visa', href: '/student/visa', icon: 'ti-plane' },
 ]
 
