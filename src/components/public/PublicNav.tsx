@@ -127,6 +127,12 @@ export default function PublicNav() {
         <div className="hidden items-center gap-2 lg:flex">
           <ThemeToggle />
           <Link
+            href="/enroll"
+            className="inline-flex items-center rounded-full border-2 border-[#E8A020] px-6 py-2.5 text-sm font-semibold text-[#E8A020] transition-all hover:bg-[#E8A020] hover:text-white"
+          >
+            Enroll Now
+          </Link>
+          <Link
             href="/login"
             className="inline-flex items-center rounded-full bg-[#0B3D6B] px-7 py-3 text-sm font-semibold text-white shadow-md transition-all hover:bg-[#0a3460] hover:shadow-lg"
           >
@@ -187,8 +193,14 @@ export default function PublicNav() {
               )
             )}
             <Link
+              href="/enroll"
+              className="mt-4 block rounded-full border-2 border-[#E8A020] px-6 py-3.5 text-center text-sm font-semibold text-[#E8A020]"
+            >
+              Enroll Now
+            </Link>
+            <Link
               href="/login"
-              className="mt-4 block rounded-full bg-[#0B3D6B] px-6 py-3.5 text-center text-sm font-semibold text-white shadow-md"
+              className="mt-2 block rounded-full bg-[#0B3D6B] px-6 py-3.5 text-center text-sm font-semibold text-white shadow-md"
             >
               Login to Portal
             </Link>

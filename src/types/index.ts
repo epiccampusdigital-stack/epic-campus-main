@@ -612,3 +612,29 @@ export interface BroadcastRecipient {
   studentName: string
   phone: string
 }
+
+export type EnrollmentProgram = 'japan-ssw' | 'korea' | 'china' | 'ielts' | 'nvq'
+export type EnrollmentStatus = 'pending' | 'confirmed' | 'rejected'
+export type EnrollmentPaymentStatus = 'pending' | 'paid' | 'failed'
+
+export interface EnrollmentApplication {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  dateOfBirth: string
+  address: string
+  program: EnrollmentProgram
+  location: StudentLocation
+  batchDuration: BatchDuration
+  batchCustomDays?: number
+  registrationFeePaid: boolean
+  courseFeePaid: boolean
+  totalPaid: number
+  stripeSessionId?: string
+  stripePaymentStatus: EnrollmentPaymentStatus
+  status: EnrollmentStatus
+  studentId?: string
+  createdAt: string
+}

@@ -39,6 +39,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Visa Tracker', href: '/admin/visa', icon: 'ti-plane', roles: ['admin', 'owner', 'reception'] },
   { label: 'Messages', href: '/messages', icon: 'ti-message', roles: ['admin', 'owner', 'reception'] },
   { label: 'Broadcast', href: '/broadcast', icon: 'ti-speakerphone', roles: ['admin', 'owner', 'reception'] },
+  { label: 'Enrollments', href: '/enrollments', icon: 'ti-clipboard-list', roles: ['admin', 'owner', 'reception'] },
   { label: 'Exams', href: '/admin-exams', icon: 'ti-writing', roles: ['admin', 'owner', 'examCoordinator', 'teacher'] },
 ]
 

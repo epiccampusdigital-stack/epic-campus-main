@@ -111,5 +111,16 @@ service cloud.firestore {
       allow read, update: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'reception'];
     }
+
+    // Enrollment applications — public create (unauthenticated via API), staff read/update
+    match /enrollmentApplications/{enrollmentId} {
+      allow read: if request.auth != null && (
+        request.auth.token.role in ['admin', 'owner', 'reception'] ||
+        request.auth.uid == resource.data.studentId
+      );
+      allow create: if true;
+      allow update: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'reception'];
+    }
   }
 }

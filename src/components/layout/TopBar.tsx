@@ -14,6 +14,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/reports': 'Reports',
   '/partner-companies': 'Partner Companies',
   '/broadcast': 'WhatsApp Broadcast',
+  '/enrollments': 'Online Enrollments',
 }
 
 function getInitials(name: string): string {

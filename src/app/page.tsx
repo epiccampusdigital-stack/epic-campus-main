@@ -377,10 +377,11 @@ export default function HomePage() {
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-4">
             <Link
-              href="/contact"
-              className="inline-flex rounded-full bg-[#E8A020] px-8 py-4 font-semibold text-white transition-all hover:bg-[#d4911c] hover:shadow-lg"
+              href="/enroll"
+              className="inline-flex items-center gap-2 rounded-full bg-[#E8A020] px-8 py-4 font-semibold text-white transition-all hover:bg-[#d4911c] hover:shadow-lg"
             >
-              Apply Now
+              <span>Enroll Now</span>
+              <span className="ti ti-arrow-right" />
             </Link>
             <a
               href="tel:+94912228383"
@@ -388,6 +389,41 @@ export default function HomePage() {
             >
               Call Us
             </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Enroll Now CTA */}
+      <section className="bg-white py-20">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B3D6B] to-[#1A6BAD] p-10 sm:p-14">
+            <div className="flex flex-col items-center gap-6 text-center lg:flex-row lg:text-left">
+              <div className="flex-1 text-white">
+                <h2 className="font-jakarta text-3xl font-bold sm:text-4xl">
+                  Apply Online in Minutes
+                </h2>
+                <p className="mt-4 max-w-xl text-base text-white/75">
+                  Complete our simple enrollment form, choose your program, and pay securely with
+                  Stripe. Your student account will be created within 24 hours.
+                </p>
+                <ul className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-white/80 lg:justify-start">
+                  {['3 simple steps', 'Secure online payment', 'Account in 24 hours'].map(
+                    (item) => (
+                      <li key={item} className="flex items-center gap-1.5">
+                        <span className="ti ti-check text-[#E8A020]" />
+                        {item}
+                      </li>
+                    ),
+                  )}
+                </ul>
+              </div>
+              <Link
+                href="/enroll"
+                className="shrink-0 rounded-2xl bg-[#E8A020] px-10 py-4 font-jakarta font-bold text-white shadow-lg transition-all hover:bg-[#d4911c] hover:shadow-xl"
+              >
+                Enroll Now →
+              </Link>
+            </div>
           </div>
         </div>
       </section>
