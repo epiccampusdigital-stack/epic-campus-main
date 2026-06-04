@@ -200,7 +200,12 @@ function UtilityBillsPageContent() {
             loading={loading}
           />
         </div>
-        <UtilityBillList bills={filteredBills} loading={loading} onDeleted={loadBills} />
+        <UtilityBillList
+          bills={filteredBills}
+          loading={loading}
+          onDeleted={loadBills}
+          onAdd={() => setFormOpen(true)}
+        />
       </section>
 
       <UtilityBillForm open={formOpen} onClose={() => setFormOpen(false)} onSaved={loadBills} />

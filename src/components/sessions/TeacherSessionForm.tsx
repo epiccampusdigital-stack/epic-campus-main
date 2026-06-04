@@ -237,7 +237,7 @@ export default function TeacherSessionForm({
               />
             </div>
 
-            <div className="mb-4 grid grid-cols-2 gap-4">
+            <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block font-inter text-xs font-medium uppercase text-[#5A6A7A]">
                   Date *

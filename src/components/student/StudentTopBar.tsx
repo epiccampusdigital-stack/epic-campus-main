@@ -24,7 +24,7 @@ export default function StudentTopBar() {
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
-          className="rounded-lg p-2 text-[#0B3D6B] hover:bg-[#F5F7FB] lg:hidden"
+          className="rounded-lg p-2 text-[#0B3D6B] hover:bg-[#F5F7FB] md:hidden"
           aria-label="Open menu"
         >
           <span className="ti ti-menu-2 text-xl" aria-hidden="true" />

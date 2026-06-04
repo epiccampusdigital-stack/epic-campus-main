@@ -142,7 +142,7 @@ export default function KoreaPage() {
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-semibold text-[#0B3D6B]">{path.title}</h3>
                   {path.badge && (
-                    <span className="shrink-0 rounded-full bg-[#E8A020] px-3 py-1 text-xs text-white">
+                    <span className="shrink-0 rounded-full bg-[#E8A020] px-3 py-1 text-xs font-semibold text-[#0B3D6B]">
                       {path.badge}
                     </span>
                   )}

@@ -33,12 +33,12 @@ export default function TopBar() {
     )?.[1] ?? 'Epic Campus'
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-[#DDE3EC] bg-white px-6">
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-[#DDE3EC] bg-white px-4 dark:border-gray-700 dark:bg-gray-800 sm:px-6">
       <div className="flex items-center gap-4">
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
-          className="rounded-lg p-2 text-[#0B3D6B] hover:bg-[#F5F7FB] lg:hidden"
+          className="rounded-lg p-2 text-[#0B3D6B] hover:bg-[#F5F7FB] dark:text-white dark:hover:bg-gray-700 md:hidden"
           aria-label="Open menu"
         >
           <span className="ti ti-menu-2 text-xl" aria-hidden="true" />

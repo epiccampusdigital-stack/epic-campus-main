@@ -14,6 +14,7 @@ interface PaymentTableProps {
   loading?: boolean
   onViewReceipt: (payment: Payment) => void
   onEdit: (payment: Payment) => void
+  onAdd?: () => void
 }
 
 function TableSkeleton() {
@@ -36,6 +37,7 @@ export default function PaymentTable({
   loading,
   onViewReceipt,
   onEdit,
+  onAdd,
 }: PaymentTableProps) {
   if (loading) {
     return (
@@ -45,28 +47,41 @@ export default function PaymentTable({
     )
   }
 
-  if (payments.length === 0) return null
+  if (payments.length === 0) {
+    if (onAdd) return <PaymentTableEmpty onAdd={onAdd} />
+    return (
+      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#DDE3EC] bg-white px-6 py-16 text-center dark:border-gray-600 dark:bg-gray-800">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#0B3D6B]/10 dark:bg-[#0B3D6B]/30">
+          <span className="ti ti-receipt text-3xl text-[#0B3D6B] dark:text-[#E8A020]" aria-hidden="true" />
+        </div>
+        <h3 className="font-jakarta text-lg font-bold text-[#0D1B2A] dark:text-white">No payments yet</h3>
+        <p className="mt-2 max-w-sm font-inter text-sm text-[#5A6A7A] dark:text-gray-400">
+          Record your first fee collection to start tracking receipts and balances.
+        </p>
+      </div>
+    )
+  }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white">
+    <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:border-gray-700 dark:bg-gray-800">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[960px] text-left text-sm">
           <thead>
-            <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB]">
+            <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:border-gray-700 dark:bg-gray-900">
               {[
-                'Receipt No',
-                'Student',
-                'Agent',
-                'Course',
-                'Amount',
-                'Method',
-                'Date',
-                'Status',
-                'Actions',
-              ].map((h) => (
+                { h: 'Receipt No', hide: 'hidden sm:table-cell' },
+                { h: 'Student', hide: '' },
+                { h: 'Agent', hide: 'hidden md:table-cell' },
+                { h: 'Course', hide: 'hidden lg:table-cell' },
+                { h: 'Amount', hide: '' },
+                { h: 'Method', hide: 'hidden sm:table-cell' },
+                { h: 'Date', hide: 'hidden sm:table-cell' },
+                { h: 'Status', hide: '' },
+                { h: 'Actions', hide: '' },
+              ].map(({ h, hide }) => (
                 <th
                   key={h}
-                  className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]"
+                  className={`px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] ${hide}`}
                 >
                   {h}
                 </th>
@@ -75,25 +90,25 @@ export default function PaymentTable({
           </thead>
           <tbody className="divide-y divide-[#DDE3EC]">
             {payments.map((p) => (
-              <tr key={p.id} className="transition-colors hover:bg-[#F5F7FB]/60">
-                <td className="px-4 py-3 font-medium text-[#0B3D6B]">
+              <tr key={p.id} className="transition-colors hover:bg-[#F5F7FB]/60 dark:hover:bg-gray-700/40">
+                <td className="hidden px-4 py-3 font-medium text-[#0B3D6B] sm:table-cell dark:text-[#E8A020]">
                   {p.receiptNumber}
                 </td>
                 <td className="px-4 py-3">
                   <p className="font-medium text-[#0D1B2A] dark:text-white">{p.studentName}</p>
                   {p.studentCode && (
-                    <p className="text-xs text-[#5A6A7A]">{p.studentCode}</p>
+                    <p className="text-xs text-[#5A6A7A] dark:text-gray-400">{p.studentCode}</p>
                   )}
                 </td>
-                <td className="px-4 py-3 text-[#5A6A7A]">{p.agentName || '—'}</td>
-                <td className="max-w-[140px] truncate px-4 py-3 text-[#5A6A7A]">
+                <td className="hidden px-4 py-3 text-[#5A6A7A] md:table-cell dark:text-gray-400">{p.agentName || '—'}</td>
+                <td className="hidden max-w-[140px] truncate px-4 py-3 text-[#5A6A7A] lg:table-cell dark:text-gray-400">
                   {p.courseName ?? '—'}
                 </td>
                 <td className="px-4 py-3 font-semibold text-[#0D1B2A] dark:text-white">
                   {formatAmount(p.amount, 'LKR')}
                 </td>
-                <td className="px-4 py-3 text-[#5A6A7A]">{getMethodLabel(p.method)}</td>
-                <td className="px-4 py-3 text-[#5A6A7A]">
+                <td className="hidden px-4 py-3 text-[#5A6A7A] sm:table-cell dark:text-gray-400">{getMethodLabel(p.method)}</td>
+                <td className="hidden px-4 py-3 text-[#5A6A7A] sm:table-cell dark:text-gray-400">
                   {formatPaymentDate(p.paymentDate)}
                 </td>
                 <td className="px-4 py-3">

@@ -160,12 +160,12 @@ export default function ManagementSidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden shrink-0 lg:block">{sidebarContent}</aside>
+      <aside className="hidden shrink-0 md:block">{sidebarContent}</aside>
 
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />
@@ -173,7 +173,7 @@ export default function ManagementSidebar() {
 
       {/* Mobile drawer */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 lg:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 md:hidden ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

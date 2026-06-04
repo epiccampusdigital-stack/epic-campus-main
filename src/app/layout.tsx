@@ -20,26 +20,27 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'EPIC Campus | We Create Your Future',
+  title: 'EPIC Campus — We Create Your Future',
   description:
-    "EPIC Campus is Sri Lanka's leading overseas education and employment institute. Work in Japan via SSW visa, study in Korea or China with full scholarships, achieve your IELTS target score, or earn government-approved NVQ qualifications. Founded in 2011. 1,500+ students placed. 98% success rate.",
+    "Sri Lanka's trusted gateway to Japan, Korea, China and global careers since 2011.",
   keywords:
     'EPIC Campus, Sri Lanka, Japan SSW visa, Korea study, China scholarship, IELTS, NVQ, overseas education, study abroad Sri Lanka, work in Japan',
   authors: [{ name: 'EPIC Campus' }],
   creator: 'EPIC Campus',
   publisher: 'EPIC Campus',
-  metadataBase: new URL('https://epiccampus.live'),
+  metadataBase: new URL('https://www.epiccampus.lk'),
+  themeColor: '#0B3D6B',
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://epiccampus.live',
+    url: 'https://www.epiccampus.lk',
     siteName: 'EPIC Campus',
-    title: 'EPIC Campus | Your Future Has No Limit',
+    title: 'EPIC Campus — We Create Your Future',
     description:
-      "Study in Korea, work in Japan, or earn your IELTS score with EPIC Campus — Sri Lanka's most trusted overseas education institute since 2011.",
+      "Sri Lanka's trusted gateway to Japan, Korea, China and global careers since 2011.",
     images: [
       {
-        url: 'https://epiccampus.live/og-image.png',
+        url: '/og-image.png',
         width: 1200,
         height: 630,
         alt: 'EPIC Campus — We Create Your Future',
@@ -48,15 +49,15 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'EPIC Campus | Your Future Has No Limit',
+    title: 'EPIC Campus — We Create Your Future',
     description:
-      "Study in Korea, work in Japan, or earn your IELTS score with EPIC Campus — Sri Lanka's most trusted overseas education institute since 2011.",
-    images: ['https://epiccampus.live/og-image.png'],
+      "Sri Lanka's trusted gateway to Japan, Korea, China and global careers since 2011.",
+    images: ['/og-image.png'],
   },
   icons: {
-    icon: '/favicon.ico',
-    shortcut: '/favicon.ico',
-    apple: '/favicon.png',
+    icon: [{ url: '/favicon.ico' }],
+    shortcut: ['/favicon.ico'],
+    apple: [{ url: '/favicon.png' }],
   },
   robots: {
     index: true,

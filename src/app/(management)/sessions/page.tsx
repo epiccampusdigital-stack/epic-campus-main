@@ -35,7 +35,14 @@ export default function SessionsPage() {
     void load()
   }, [load])
 
-  if (!user) return null
+  if (!user) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="h-8 w-48 rounded bg-[#DDE3EC] dark:bg-gray-700" />
+        <div className="h-64 rounded-xl bg-[#DDE3EC] dark:bg-gray-700" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -70,6 +77,10 @@ export default function SessionsPage() {
           sessions={sessions}
           loading={loading}
           autoOpenSessionId={startId}
+          onAdd={() => {
+            setEditSession(null)
+            setFormOpen(true)
+          }}
           onEdit={(s) => {
             setEditSession(s)
             setFormOpen(true)

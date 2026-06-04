@@ -8,6 +8,7 @@ import {
   formatAgentMoney,
 } from '@/lib/agent/reports'
 import { currentMonthKey, getMonthPickerOptions } from '@/lib/dashboard/helpers'
+import EmptyState from '@/components/ui/EmptyState'
 import LocationFilterSelect from '@/components/ui/LocationFilterSelect'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { parsePayment } from '@/lib/payments/helpers'
@@ -117,7 +118,11 @@ export default function AgentReportsPage() {
           ))}
         </div>
       ) : rows.length === 0 ? (
-        <p className="text-center text-sm text-[#5A6A7A]">No agent data for this filter.</p>
+        <EmptyState
+          icon="ti-chart-dots-2"
+          title="No agent reports yet"
+          subtitle="Try a different month or location, or record payments with an assigned agent."
+        />
       ) : (
         <>
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

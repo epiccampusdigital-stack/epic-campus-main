@@ -4,6 +4,7 @@ import { deleteDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { logAuditEvent } from '@/lib/audit/helpers'
+import EmptyState from '@/components/ui/EmptyState'
 import {
   CATEGORY_BADGE,
   CATEGORY_LABELS,
@@ -16,12 +17,14 @@ interface UtilityBillListProps {
   bills: UtilityBill[]
   loading: boolean
   onDeleted: () => void
+  onAdd?: () => void
 }
 
 export default function UtilityBillList({
   bills,
   loading,
   onDeleted,
+  onAdd,
 }: UtilityBillListProps) {
   const { user } = useManagement()
   const isAdmin = user?.role === 'admin' || user?.role === 'owner'
@@ -57,34 +60,46 @@ export default function UtilityBillList({
 
   if (bills.length === 0) {
     return (
-      <p className="rounded-xl border border-[#DDE3EC] bg-white px-6 py-12 text-center text-sm text-[#5A6A7A]">
-        No utility bills for this month.
-      </p>
+      <EmptyState
+        icon="ti-receipt"
+        title="No utility bills yet"
+        subtitle="Add one-off electricity, water, internet, or other expenses for this month."
+        actionLabel={onAdd ? 'Add Bill' : undefined}
+        onAction={onAdd}
+      />
     )
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white">
+    <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:border-gray-700 dark:bg-gray-800">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead>
-            <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB]">
-              {['Date', 'Category', 'Amount', 'Notes', 'Photo', 'Added by', 'Actions'].map(
-                (h) => (
-                  <th
-                    key={h}
-                    className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]"
-                  >
-                    {h}
-                  </th>
-                ),
-              )}
+            <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:border-gray-700 dark:bg-gray-900">
+              {[
+                { h: 'Date', hide: 'hidden sm:table-cell' },
+                { h: 'Category', hide: '' },
+                { h: 'Amount', hide: '' },
+                { h: 'Notes', hide: 'hidden sm:table-cell' },
+                { h: 'Photo', hide: 'hidden md:table-cell' },
+                { h: 'Added by', hide: 'hidden lg:table-cell' },
+                { h: 'Actions', hide: '' },
+              ].map(({ h, hide }) => (
+                <th
+                  key={h}
+                  className={`px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] ${hide}`}
+                >
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-[#DDE3EC]">
             {bills.map((bill) => (
               <tr key={bill.id}>
-                <td className="px-4 py-3 text-[#5A6A7A]">{formatBillDate(bill.billDate)}</td>
+                <td className="hidden px-4 py-3 text-[#5A6A7A] sm:table-cell dark:text-gray-400">
+                  {formatBillDate(bill.billDate)}
+                </td>
                 <td className="px-4 py-3">
                   <span
                     className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${CATEGORY_BADGE[bill.category]}`}
@@ -92,13 +107,13 @@ export default function UtilityBillList({
                     {CATEGORY_LABELS[bill.category]}
                   </span>
                 </td>
-                <td className="px-4 py-3 font-semibold text-[#0B3D6B]">
+                <td className="px-4 py-3 font-semibold text-[#0B3D6B] dark:text-white">
                   {formatLKR(bill.amount)}
                 </td>
-                <td className="max-w-[200px] truncate px-4 py-3 text-[#5A6A7A]">
+                <td className="hidden max-w-[200px] truncate px-4 py-3 text-[#5A6A7A] sm:table-cell dark:text-gray-400">
                   {bill.notes || '—'}
                 </td>
-                <td className="px-4 py-3">
+                <td className="hidden px-4 py-3 md:table-cell">
                   {bill.photoUrl ? (
                     <a href={bill.photoUrl} target="_blank" rel="noopener noreferrer">
                       <img
@@ -111,7 +126,9 @@ export default function UtilityBillList({
                     '—'
                   )}
                 </td>
-                <td className="px-4 py-3 text-[#5A6A7A]">{bill.addedByName || '—'}</td>
+                <td className="hidden px-4 py-3 text-[#5A6A7A] lg:table-cell dark:text-gray-400">
+                  {bill.addedByName || '—'}
+                </td>
                 <td className="px-4 py-3">
                   {isAdmin ? (
                     <button

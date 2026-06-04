@@ -1,11 +1,14 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { parseExamAttempt } from '@/lib/student/portal'
 import CompletionCertificate from '@/components/student/CompletionCertificate'
+import EmptyState from '@/components/ui/EmptyState'
+import TableSkeleton from '@/components/ui/TableSkeleton'
 import { useStudentPortal } from '@/components/student/StudentContext'
 import type { ParsedExamAttempt } from '@/lib/student/portal'
 
@@ -138,9 +141,24 @@ export default function MyResultsPage() {
 
       <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white">
         {loading ? (
-          <div className="h-40 animate-pulse bg-[#DDE3EC]/40" />
+          <TableSkeleton rows={5} />
         ) : attempts.length === 0 ? (
-          <p className="px-6 py-12 text-center text-sm text-[#5A6A7A]">No exam results yet.</p>
+          <div className="p-4">
+            <EmptyState
+              icon="ti-certificate"
+              title="No exam results yet"
+              subtitle="Your scores will appear here after you complete an exam."
+            />
+            <div className="mt-4 text-center">
+              <Link
+                href="/exams"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#E8A020] px-5 py-2.5 font-jakarta text-sm font-bold text-[#0B3D6B] hover:bg-[#F5B942]"
+              >
+                <span className="ti ti-writing" aria-hidden="true" />
+                Take Exam
+              </Link>
+            </div>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[960px] text-left text-sm">

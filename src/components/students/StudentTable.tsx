@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import EmptyState from '@/components/ui/EmptyState'
 import { COURSE_MAP } from '@/lib/constants/courses'
 import {
   STATUS_STYLES,
@@ -18,6 +19,7 @@ interface StudentTableProps {
   students: Student[]
   loading?: boolean
   onEdit: (student: Student) => void
+  onAdd?: () => void
 }
 
 function TableSkeleton() {
@@ -59,6 +61,7 @@ export default function StudentTable({
   students,
   loading,
   onEdit,
+  onAdd,
 }: StudentTableProps) {
   if (loading) {
     return (
@@ -69,7 +72,14 @@ export default function StudentTable({
   }
 
   if (students.length === 0) {
-    return null
+    if (onAdd) return <StudentTableEmpty onAdd={onAdd} />
+    return (
+      <EmptyState
+        icon="ti-users"
+        title="No students yet"
+        subtitle="Add your first student to start managing enrollments, payments, and visa tracking."
+      />
+    )
   }
 
   return (

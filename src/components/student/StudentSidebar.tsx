@@ -150,18 +150,18 @@ export default function StudentSidebar() {
 
   return (
     <>
-      <aside className="hidden shrink-0 lg:block">{sidebarContent}</aside>
+      <aside className="hidden shrink-0 md:block">{sidebarContent}</aside>
 
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 lg:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 md:hidden ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

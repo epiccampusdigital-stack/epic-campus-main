@@ -7,6 +7,7 @@ import {
   formatSessionDateTime,
   sessionStatusStyle,
 } from '@/lib/sessions/helpers'
+import EmptyState from '@/components/ui/EmptyState'
 import type { TeacherSession } from '@/types'
 
 interface SessionsTableProps {
@@ -14,6 +15,7 @@ interface SessionsTableProps {
   loading: boolean
   onEdit: (session: TeacherSession) => void
   onRefresh: () => void
+  onAdd?: () => void
   /** Opens the complete-notes modal for this session (e.g. from Start Session link) */
   autoOpenSessionId?: string | null
 }
@@ -23,6 +25,7 @@ export default function SessionsTable({
   loading,
   onEdit,
   onRefresh,
+  onAdd,
   autoOpenSessionId,
 }: SessionsTableProps) {
   const [notesModal, setNotesModal] = useState<TeacherSession | null>(null)
@@ -74,7 +77,13 @@ export default function SessionsTable({
 
   if (sessions.length === 0) {
     return (
-      <p className="p-8 text-center text-sm text-[#5A6A7A]">No sessions yet. Add your first session.</p>
+      <EmptyState
+        icon="ti-chalkboard"
+        title="No sessions yet"
+        subtitle="Schedule one-on-one discussions with students about exams and course progress."
+        actionLabel={onAdd ? 'Add Session' : undefined}
+        onAction={onAdd}
+      />
     )
   }
 

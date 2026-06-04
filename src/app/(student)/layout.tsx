@@ -14,6 +14,7 @@ import {
 import { auth, db } from '@/lib/firebase/client'
 import { parseStudent } from '@/lib/students/helpers'
 import StudentSidebar from '@/components/student/StudentSidebar'
+import StudentBottomNav from '@/components/student/StudentBottomNav'
 import StudentTopBar from '@/components/student/StudentTopBar'
 import {
   StudentContext,
@@ -219,7 +220,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   }
 
   if (status !== 'ready' || !user || !student) {
-    return null
+    return <PortalLoadingScreen />
   }
 
   return (
@@ -237,8 +238,11 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         <StudentSidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
           <StudentTopBar />
-          <main className="flex-1 overflow-y-auto bg-[#F5F7FB] p-4 sm:p-6">{children}</main>
+          <main className="flex-1 overflow-y-auto bg-[#F5F7FB] p-4 pb-24 sm:p-6 md:pb-6">
+            {children}
+          </main>
         </div>
+        <StudentBottomNav />
       </div>
     </StudentContext.Provider>
   )

@@ -50,8 +50,8 @@ function StatCard({
   loading?: boolean
 }) {
   return (
-    <div className="rounded-xl border border-[#DDE3EC] bg-white p-5">
-      <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+    <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
+      <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-gray-400">
         {label}
       </p>
       {loading ? (
@@ -65,7 +65,7 @@ function StatCard({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="font-jakarta text-lg font-bold text-[#0D1B2A]">{children}</h3>
+    <h3 className="font-jakarta text-lg font-bold text-[#0D1B2A] dark:text-white">{children}</h3>
   )
 }
 

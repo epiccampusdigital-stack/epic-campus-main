@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import ConsultationSlotForm from '@/components/consultations/ConsultationSlotForm'
+import EmptyState from '@/components/ui/EmptyState'
 import {
   BOOKING_STATUS_BADGE,
   deleteConsultationSlot,
@@ -114,8 +115,8 @@ export default function ConsultationsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A]">Consultations</h2>
-          <p className="font-inter text-sm text-[#5A6A7A]">
+          <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white">Consultations</h2>
+          <p className="font-inter text-sm text-[#5A6A7A] dark:text-gray-400">
             Manage slots and bookings
           </p>
         </div>
@@ -154,18 +155,22 @@ export default function ConsultationsPage() {
       </div>
 
       {tab === 'slots' && (
-        <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white">
+        <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:border-gray-700 dark:bg-gray-800">
           {loading ? (
-            <div className="h-48 animate-pulse bg-[#DDE3EC]/40" />
+            <div className="h-48 animate-pulse bg-[#DDE3EC]/40 dark:bg-gray-700" />
           ) : slots.length === 0 ? (
-            <p className="px-6 py-12 text-center text-sm text-[#5A6A7A]">
-              No consultation slots yet. Add your first slot.
-            </p>
+            <EmptyState
+              icon="ti-calendar-event"
+              title="No consultation slots yet"
+              subtitle="Create available time slots for students to book one-on-one consultations."
+              actionLabel="Add Slot"
+              onAction={() => setFormOpen(true)}
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-left text-sm">
                 <thead>
-                  <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB]">
+                  <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:border-gray-700 dark:bg-gray-900">
                     {['Date', 'Time', 'Staff', 'Status', 'Actions'].map((h) => (
                       <th
                         key={h}
@@ -254,13 +259,15 @@ export default function ConsultationsPage() {
             )}
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white">
+          <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:border-gray-700 dark:bg-gray-800">
             {loading ? (
-              <div className="h-48 animate-pulse bg-[#DDE3EC]/40" />
+              <div className="h-48 animate-pulse bg-[#DDE3EC]/40 dark:bg-gray-700" />
             ) : filteredBookings.length === 0 ? (
-              <p className="px-6 py-12 text-center text-sm text-[#5A6A7A]">
-                No bookings match your filters.
-              </p>
+              <EmptyState
+                icon="ti-calendar-check"
+                title="No bookings found"
+                subtitle="Adjust filters or wait for students to book consultation slots."
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[960px] text-left text-sm">

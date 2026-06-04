@@ -42,7 +42,7 @@ export function PageHero({
         <div className="flex flex-wrap justify-center gap-4">
           <Link
             href="/contact"
-            className="rounded-full bg-[#E8A020] px-8 py-4 font-semibold text-white transition-all hover:bg-[#d4911c]"
+            className="rounded-full bg-[#E8A020] px-8 py-4 font-semibold text-[#0B3D6B] transition-all hover:bg-[#F5B942]"
           >
             Book Free Consultation
           </Link>
@@ -131,7 +131,7 @@ export function CtaSection({
         {children ?? (
           <Link
             href="/contact"
-            className="inline-block rounded-full bg-[#E8A020] px-10 py-4 text-lg font-semibold text-white transition-all hover:bg-[#d4911c]"
+            className="inline-block rounded-full bg-[#E8A020] px-10 py-4 text-lg font-semibold text-[#0B3D6B] transition-all hover:bg-[#F5B942]"
           >
             {button}
           </Link>
