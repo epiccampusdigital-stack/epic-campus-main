@@ -291,6 +291,23 @@ export type SessionStatus = 'scheduled' | 'completed' | 'cancelled'
 export type RecurringType = 'once' | 'weekly' | 'daily'
 export type BookingStatus = 'open' | 'pending' | 'approved' | 'declined'
 
+export type TeacherSessionStatus = 'scheduled' | 'completed' | 'cancelled'
+
+export interface TeacherSession {
+  id: string
+  teacherId: string
+  teacherName: string
+  studentId: string
+  studentName: string
+  topic: string
+  description: string
+  scheduledAt: string
+  duration: number
+  status: TeacherSessionStatus
+  notes: string
+  createdAt: string
+}
+
 export interface ScheduleSession {
   id: string
   type: SessionType

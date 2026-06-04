@@ -1,9 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { collection, getDocs, orderBy, query } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { COURSES } from '@/lib/constants/courses'
+import { parseAttempt } from '@/lib/exam/helpers'
+import {
+  TEACHER_STAT_LABELS,
+  filterStudentsByTeacherStat,
+  type TeacherStatFilter,
+} from '@/lib/dashboard/teacherStats'
 import { parseStudent } from '@/lib/students/helpers'
 import StudentForm from '@/components/students/StudentForm'
 import StudentTable, {
@@ -12,7 +19,7 @@ import StudentTable, {
 } from '@/components/students/StudentTable'
 import { LOCATION_LABELS } from '@/lib/students/helpers'
 import { useManagement } from '@/components/layout/ManagementContext'
-import type { CourseId, Student, StudentLocation } from '@/types'
+import type { CourseId, ExamAttempt, ExamResult, Student, StudentLocation } from '@/types'
 
 const PAGE_SIZE = 10
 
@@ -24,9 +31,40 @@ const LOCATION_OPTIONS: { id: StudentLocation | ''; label: string }[] = [
   { id: 'pinnaduwa', label: LOCATION_LABELS.pinnaduwa },
 ]
 
+function parseExamResult(id: string, data: Record<string, unknown>): ExamResult {
+  return {
+    id,
+    examId: String(data.examId ?? ''),
+    studentId: String(data.studentId ?? ''),
+    score: data.score != null ? Number(data.score) : undefined,
+    band: data.band ? String(data.band) : undefined,
+    level: data.level ? String(data.level) : undefined,
+    status: (data.status as ExamResult['status']) ?? 'pending',
+    notes: data.notes ? String(data.notes) : undefined,
+    createdAt: String(data.createdAt ?? new Date().toISOString()),
+    createdBy: String(data.createdBy ?? ''),
+  }
+}
+
+const TEACHER_STAT_VALUES: TeacherStatFilter[] = [
+  'active',
+  'passed',
+  'failed',
+  'dropped',
+  'repeats',
+]
+
 export default function StudentsPage() {
   const { user } = useManagement()
+  const searchParams = useSearchParams()
+  const teacherStatParam = searchParams.get('teacherStat')
+  const teacherStat = TEACHER_STAT_VALUES.includes(teacherStatParam as TeacherStatFilter)
+    ? (teacherStatParam as TeacherStatFilter)
+    : null
+
   const [students, setStudents] = useState<Student[]>([])
+  const [examResults, setExamResults] = useState<ExamResult[]>([])
+  const [examAttempts, setExamAttempts] = useState<ExamAttempt[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [courseFilter, setCourseFilter] = useState<CourseId | ''>('')
@@ -41,9 +79,29 @@ export default function StudentsPage() {
     setLoading(true)
     try {
       const q = query(collection(db, 'students'), orderBy('createdAt', 'desc'))
-      const snap = await getDocs(q)
+      const [studentsSnap, resultsSnap, attemptsSnap] = await Promise.all([
+        getDocs(q),
+        teacherStat
+          ? getDocs(collection(db, 'examResults')).catch(() => ({ docs: [] }))
+          : Promise.resolve({ docs: [] }),
+        teacherStat
+          ? getDocs(collection(db, 'examAttempts')).catch(() => ({ docs: [] }))
+          : Promise.resolve({ docs: [] }),
+      ])
       setStudents(
-        snap.docs.map((d) => parseStudent(d.id, d.data() as Record<string, unknown>)),
+        studentsSnap.docs.map((d) =>
+          parseStudent(d.id, d.data() as Record<string, unknown>),
+        ),
+      )
+      setExamResults(
+        resultsSnap.docs.map((d) =>
+          parseExamResult(d.id, d.data() as Record<string, unknown>),
+        ),
+      )
+      setExamAttempts(
+        attemptsSnap.docs.map((d) =>
+          parseAttempt(d.id, d.data() as Record<string, unknown>),
+        ),
       )
     } catch (err) {
       console.error('[StudentsPage] load failed:', err)
@@ -51,7 +109,7 @@ export default function StudentsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [teacherStat])
 
   useEffect(() => {
     loadStudents()
@@ -69,8 +127,12 @@ export default function StudentsPage() {
   }, [students])
 
   const filtered = useMemo(() => {
+    let list = students
+    if (teacherStat) {
+      list = filterStudentsByTeacherStat(list, teacherStat, examResults, examAttempts)
+    }
     const q = search.trim().toLowerCase()
-    return students.filter((s) => {
+    return list.filter((s) => {
       if (courseFilter && s.courseId !== courseFilter) return false
       if (statusFilter && s.status !== statusFilter) return false
       if (batchFilter && s.batchId !== batchFilter) return false
@@ -83,7 +145,17 @@ export default function StudentsPage() {
         s.studentCode.toLowerCase().includes(q)
       )
     })
-  }, [students, search, courseFilter, statusFilter, batchFilter, locationFilter])
+  }, [
+    students,
+    search,
+    courseFilter,
+    statusFilter,
+    batchFilter,
+    locationFilter,
+    teacherStat,
+    examResults,
+    examAttempts,
+  ])
 
   useEffect(() => {
     setPage(1)
@@ -110,7 +182,9 @@ export default function StudentsPage() {
         <div>
           <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A]">Students</h2>
           <p className="font-inter text-sm text-[#5A6A7A]">
-            Manage enrollments, profiles, and student records
+            {teacherStat
+              ? `Filtered: ${TEACHER_STAT_LABELS[teacherStat]}`
+              : 'Manage enrollments, profiles, and student records'}
           </p>
         </div>
         <button
@@ -122,6 +196,17 @@ export default function StudentsPage() {
           Add Student
         </button>
       </div>
+
+      {teacherStat && (
+        <div className="flex items-center justify-between rounded-lg border border-[#E8A020]/40 bg-[#E8A020]/10 px-4 py-3 text-sm text-[#0B3D6B]">
+          <span>
+            Showing <strong>{TEACHER_STAT_LABELS[teacherStat]}</strong> only
+          </span>
+          <a href="/students" className="font-semibold hover:underline">
+            Clear filter
+          </a>
+        </div>
+      )}
 
       <div className="rounded-xl border border-[#DDE3EC] bg-white p-4">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">

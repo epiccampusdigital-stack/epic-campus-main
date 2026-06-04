@@ -16,6 +16,8 @@ import {
   filterStudents,
   getMonthPickerOptions,
 } from '@/lib/dashboard/helpers'
+import TeacherDashboard from '@/components/dashboard/TeacherDashboard'
+import { useManagement } from '@/components/layout/ManagementContext'
 import type { CourseId, Payment, Student, AttendanceRecord } from '@/types'
 
 interface DashboardStats {
@@ -66,6 +68,7 @@ function isTodayInMonth(monthKey: string): boolean {
 }
 
 export default function DashboardPage() {
+  const { user } = useManagement()
   const [loading, setLoading] = useState(true)
   const [courseFilter, setCourseFilter] = useState<CourseId | ''>('')
   const [monthFilter, setMonthFilter] = useState(currentMonthKey())
@@ -104,8 +107,12 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
+    if (user?.role === 'teacher') {
+      setLoading(false)
+      return
+    }
     loadData()
-  }, [loadData])
+  }, [loadData, user?.role])
 
   const filteredStudents = useMemo(
     () => filterStudents(allStudents, courseFilter),
@@ -200,6 +207,10 @@ export default function DashboardPage() {
   }, [filteredStudents])
 
   const monthOptions = useMemo(() => getMonthPickerOptions(12), [])
+
+  if (user?.role === 'teacher') {
+    return <TeacherDashboard />
+  }
 
   const statCards = [
     {
