@@ -112,6 +112,24 @@ service cloud.firestore {
         request.auth.token.role in ['admin', 'owner', 'reception'];
     }
 
+    // AI chat history — student reads/writes own history, staff can read
+    match /aiChatHistory/{studentId}/messages/{messageId} {
+      allow read, write: if request.auth != null && (
+        request.auth.uid == studentId ||
+        request.auth.token.role in ['admin', 'owner', 'teacher']
+      );
+    }
+
+    // Study sessions — student reads/writes own sessions, staff can read
+    match /studySessions/{sessionId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.studentId ||
+        request.auth.token.role in ['admin', 'owner', 'teacher']
+      );
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && request.auth.uid == resource.data.studentId;
+    }
+
     // Enrollment applications — public create (unauthenticated via API), staff read/update
     match /enrollmentApplications/{enrollmentId} {
       allow read: if request.auth != null && (

@@ -8,6 +8,7 @@ import { parsePayment } from '@/lib/payments/helpers'
 import CourseDashboard from '@/components/student/CourseDashboard'
 import StudentSessionsWidget from '@/components/sessions/StudentSessionsWidget'
 import CompletionCertificate from '@/components/student/CompletionCertificate'
+import StudyStatsWidget from '@/components/student/StudyStatsWidget'
 import { useStudentPortal } from '@/components/student/StudentContext'
 import type { AttendanceRecord, Payment } from '@/types'
 
@@ -85,6 +86,7 @@ export default function MyDashboardPage() {
   return (
     <div className="space-y-4">
       <CompletionCertificate student={student} />
+      <StudyStatsWidget studentId={student.id} />
       <StudentSessionsWidget studentId={student.id} />
       <CourseDashboard
         student={student}

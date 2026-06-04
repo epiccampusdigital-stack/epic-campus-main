@@ -613,6 +613,26 @@ export interface BroadcastRecipient {
   phone: string
 }
 
+export type StudyMode =
+  | 'general'
+  | 'japanese-grammar'
+  | 'japanese-vocab'
+  | 'jlpt-practice'
+  | 'ielts-writing'
+  | 'ielts-speaking'
+  | 'korean-basics'
+
+export interface StudySession {
+  id: string
+  studentId: string
+  mode: StudyMode
+  startedAt: string
+  endedAt?: string
+  messageCount: number
+  practiceQuestionsAnswered: number
+  practiceQuestionsCorrect: number
+}
+
 export type EnrollmentProgram = 'japan-ssw' | 'korea' | 'china' | 'ielts' | 'nvq'
 export type EnrollmentStatus = 'pending' | 'confirmed' | 'rejected'
 export type EnrollmentPaymentStatus = 'pending' | 'paid' | 'failed'
