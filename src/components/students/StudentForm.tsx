@@ -8,6 +8,7 @@ import {
   setDoc,
   updateDoc,
   serverTimestamp,
+  Timestamp,
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { db, storage } from '@/lib/firebase/client'
@@ -20,7 +21,14 @@ import {
 } from '@/lib/students/helpers'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { logAuditEvent } from '@/lib/audit/helpers'
-import type { CourseId, Student } from '@/types'
+import {
+  AGENT_ROLES,
+  BATCH_DURATION_LABELS,
+  computeBatchEndDate,
+  defaultFeeSchedule,
+  LOCATION_LABELS,
+} from '@/lib/students/helpers'
+import type { BatchDuration, CourseId, Student, StudentLocation } from '@/types'
 
 export interface StudentFormValues {
   name: string
@@ -31,6 +39,11 @@ export interface StudentFormValues {
   address: string
   courseId: CourseId | ''
   batchId: string
+  batchDuration: BatchDuration | ''
+  batchCustomDays: string
+  batchStartDate: string
+  location: StudentLocation | ''
+  agentId: string
   enrollmentDate: string
   expectedCompletionDate: string
   feeAmount: string
@@ -50,6 +63,11 @@ const EMPTY: StudentFormValues = {
   address: '',
   courseId: '',
   batchId: '',
+  batchDuration: '90days',
+  batchCustomDays: '',
+  batchStartDate: new Date().toISOString().slice(0, 10),
+  location: 'ahangama',
+  agentId: '',
   enrollmentDate: new Date().toISOString().slice(0, 10),
   expectedCompletionDate: '',
   feeAmount: '',
@@ -77,6 +95,11 @@ function studentToForm(s: Student): StudentFormValues {
     address: s.address ?? '',
     courseId: s.courseId,
     batchId: s.batchId,
+    batchDuration: s.batchDuration ?? '90days',
+    batchCustomDays: s.batchCustomDays != null ? String(s.batchCustomDays) : '',
+    batchStartDate: s.batchStartDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+    location: s.location ?? 'ahangama',
+    agentId: s.agentId ?? '',
     enrollmentDate: s.enrollmentDate?.slice(0, 10) ?? '',
     expectedCompletionDate: s.expectedCompletionDate?.slice(0, 10) ?? '',
     feeAmount: s.feeAmount != null ? String(s.feeAmount) : '',
@@ -102,12 +125,14 @@ function TextInput({
   type = 'text',
   placeholder,
   required,
+  min,
 }: {
   value: string
   onChange: (v: string) => void
   type?: string
   placeholder?: string
   required?: boolean
+  min?: string
 }) {
   return (
     <input
@@ -116,6 +141,7 @@ function TextInput({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       required={required}
+      min={min}
       className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2.5 font-inter text-base text-[#0D1B2A] outline-none transition-colors focus:border-[#E8A020] sm:text-sm"
     />
   )
@@ -165,8 +191,18 @@ export default function StudentForm({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [agents, setAgents] = useState<{ uid: string; displayName: string }[]>([])
 
   const isEdit = !!student
+
+  const computedBatchEnd =
+    form.batchStartDate && form.batchDuration
+      ? computeBatchEndDate(
+          form.batchStartDate,
+          form.batchDuration as BatchDuration,
+          form.batchDuration === 'custom' ? Number(form.batchCustomDays) || undefined : undefined,
+        )
+      : ''
 
   useEffect(() => {
     if (open) {
@@ -174,6 +210,18 @@ export default function StudentForm({
       setPhotoFile(null)
       setPhotoPreview(student?.photoUrl ?? null)
       setError('')
+      void getDocs(collection(db, 'users')).then((snap) => {
+        const list = snap.docs
+          .filter((d) =>
+            (AGENT_ROLES as readonly string[]).includes(String(d.data().role ?? '')),
+          )
+          .map((d) => ({
+            uid: d.id,
+            displayName: String(d.data().displayName ?? d.data().email ?? 'Staff'),
+          }))
+          .sort((a, b) => a.displayName.localeCompare(b.displayName))
+        setAgents(list)
+      })
     }
   }, [open, student])
 
@@ -228,6 +276,20 @@ export default function StudentForm({
       const studentDocId = student?.id ?? doc(collection(db, 'students')).id
       const photoUrl = await uploadPhoto(studentDocId)
 
+      const selectedAgent = agents.find((a) => a.uid === form.agentId)
+      const batchDuration = (form.batchDuration || '90days') as BatchDuration
+      const batchEndIso = form.batchStartDate
+        ? computeBatchEndDate(
+            form.batchStartDate,
+            batchDuration,
+            batchDuration === 'custom' ? Number(form.batchCustomDays) || undefined : undefined,
+          )
+        : null
+      const batchStartTs = form.batchStartDate
+        ? Timestamp.fromDate(new Date(form.batchStartDate))
+        : null
+      const batchEndTs = batchEndIso ? Timestamp.fromDate(new Date(batchEndIso)) : null
+
       const payload = {
         name: form.name.trim(),
         nic: form.nic.trim(),
@@ -238,6 +300,16 @@ export default function StudentForm({
         photoUrl: photoUrl ?? null,
         courseId: form.courseId,
         batchId: form.batchId.trim(),
+        batchDuration,
+        batchCustomDays:
+          batchDuration === 'custom' && form.batchCustomDays
+            ? Number(form.batchCustomDays)
+            : null,
+        batchStartDate: batchStartTs,
+        batchEndDate: batchEndTs,
+        location: form.location || 'ahangama',
+        agentId: form.agentId || null,
+        agentName: selectedAgent?.displayName ?? null,
         branchId: user.branchId ?? 'galle-main',
         enrollmentDate: form.enrollmentDate || null,
         expectedCompletionDate: form.expectedCompletionDate || null,
@@ -295,6 +367,7 @@ export default function StudentForm({
           ...payload,
           studentCode,
           uid: uid ?? null,
+          feeSchedule: defaultFeeSchedule(),
           createdAt: serverTimestamp(),
           createdBy: user.uid,
         })
@@ -481,16 +554,95 @@ export default function StudentForm({
                   ))}
                 </SelectInput>
               </div>
+              <div>
+                <FieldLabel>Batch Name / ID *</FieldLabel>
+                <TextInput
+                  value={form.batchId}
+                  onChange={(v) => setField('batchId', v)}
+                  placeholder="e.g. Batch 12"
+                  required
+                />
+              </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <FieldLabel>Batch *</FieldLabel>
+                  <FieldLabel>Batch Duration *</FieldLabel>
+                  <SelectInput
+                    value={form.batchDuration}
+                    onChange={(v) => setField('batchDuration', v as BatchDuration)}
+                    required
+                  >
+                    {(Object.keys(BATCH_DURATION_LABELS) as BatchDuration[]).map((d) => (
+                      <option key={d} value={d}>
+                        {BATCH_DURATION_LABELS[d]}
+                      </option>
+                    ))}
+                  </SelectInput>
+                </div>
+                {form.batchDuration === 'custom' && (
+                  <div>
+                    <FieldLabel>Custom Days *</FieldLabel>
+                    <TextInput
+                      type="number"
+                      min="1"
+                      value={form.batchCustomDays}
+                      onChange={(v) => setField('batchCustomDays', v)}
+                      placeholder="e.g. 60"
+                      required
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <FieldLabel>Batch Start Date *</FieldLabel>
                   <TextInput
-                    value={form.batchId}
-                    onChange={(v) => setField('batchId', v)}
-                    placeholder="e.g. Batch 12"
+                    type="date"
+                    value={form.batchStartDate}
+                    onChange={(v) => setField('batchStartDate', v)}
                     required
                   />
                 </div>
+                <div>
+                  <FieldLabel>Batch End Date (auto)</FieldLabel>
+                  <input
+                    type="text"
+                    readOnly
+                    value={computedBatchEnd || '—'}
+                    className="w-full cursor-not-allowed rounded-lg border border-[#DDE3EC] bg-[#F5F7FB] px-3 py-2.5 font-inter text-sm text-[#5A6A7A]"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <FieldLabel>Location *</FieldLabel>
+                  <SelectInput
+                    value={form.location}
+                    onChange={(v) => setField('location', v as StudentLocation)}
+                    required
+                  >
+                    {(Object.keys(LOCATION_LABELS) as StudentLocation[]).map((loc) => (
+                      <option key={loc} value={loc}>
+                        {LOCATION_LABELS[loc]}
+                      </option>
+                    ))}
+                  </SelectInput>
+                </div>
+                <div>
+                  <FieldLabel>Agent</FieldLabel>
+                  <SelectInput
+                    value={form.agentId}
+                    onChange={(v) => setField('agentId', v)}
+                  >
+                    <option value="">Select agent</option>
+                    {agents.map((a) => (
+                      <option key={a.uid} value={a.uid}>
+                        {a.displayName}
+                      </option>
+                    ))}
+                  </SelectInput>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <FieldLabel>Enrollment Date</FieldLabel>
                   <TextInput
@@ -499,14 +651,14 @@ export default function StudentForm({
                     onChange={(v) => setField('enrollmentDate', v)}
                   />
                 </div>
-              </div>
-              <div>
-                <FieldLabel>Expected Completion</FieldLabel>
-                <TextInput
-                  type="date"
-                  value={form.expectedCompletionDate}
-                  onChange={(v) => setField('expectedCompletionDate', v)}
-                />
+                <div>
+                  <FieldLabel>Expected Completion</FieldLabel>
+                  <TextInput
+                    type="date"
+                    value={form.expectedCompletionDate}
+                    onChange={(v) => setField('expectedCompletionDate', v)}
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="sm:col-span-2">

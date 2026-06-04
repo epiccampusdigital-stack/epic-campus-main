@@ -96,7 +96,7 @@ export function getMethodLabel(method: PaymentMethod): string {
     case 'bank-transfer':
       return 'Bank Transfer'
     case 'stripe':
-      return 'Stripe'
+      return 'Online (Stripe)'
     default:
       return method
   }

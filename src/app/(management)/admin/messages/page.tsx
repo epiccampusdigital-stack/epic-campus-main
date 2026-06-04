@@ -186,7 +186,7 @@ export default function AdminMessagesPage() {
                           className={`rounded-2xl px-3 py-2 text-sm leading-relaxed ${
                             isStaff
                               ? 'rounded-br-sm bg-[#0B3D6B] text-white'
-                              : 'rounded-bl-sm border border-gray-100 bg-gray-100 text-gray-800'
+                              : 'rounded-bl-sm border border-gray-100 bg-gray-100 text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
                           }`}
                         >
                           {m.content}

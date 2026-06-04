@@ -108,6 +108,16 @@ function ProfileSetupError() {
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+
+  useEffect(() => {
+    const root = document.documentElement
+    root.classList.remove('dark')
+    root.classList.add('light')
+    root.style.colorScheme = 'light'
+    return () => {
+      root.style.colorScheme = ''
+    }
+  }, [])
   const [user, setUser] = useState<EpicUser | null>(null)
   const [student, setStudent] = useState<Student | null>(null)
   const [status, setStatus] = useState<StudentPortalStatus>('idle')
@@ -223,7 +233,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         refreshStudent,
       }}
     >
-      <div className="flex h-screen overflow-hidden">
+      <div className="light flex h-screen overflow-hidden bg-[#F5F7FB] text-[#0D1B2A]">
         <StudentSidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
           <StudentTopBar />

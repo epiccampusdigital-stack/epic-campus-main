@@ -24,7 +24,7 @@ export interface PaymentFormValues {
   studentId: string
   type: PaymentType
   amount: string
-  currency: 'LKR' | 'USD'
+  currency: 'LKR'
   method: PaymentMethod
   bankReference: string
   stripeId: string
@@ -67,7 +67,7 @@ function paymentToForm(p: Payment): PaymentFormValues {
     studentId: p.studentId,
     type: p.type,
     amount: String(p.amount),
-    currency: p.currency,
+    currency: 'LKR',
     method: p.method,
     bankReference: p.bankReference ?? '',
     stripeId: p.stripeId ?? '',
@@ -143,7 +143,7 @@ export default function PaymentForm({
         courseId: selectedStudent.courseId,
         courseName: course?.label ?? selectedStudent.courseId,
         amount,
-        currency: form.currency,
+        currency: 'LKR',
         type: form.type,
         method: form.method,
         bankReference: form.method === 'bank-transfer' ? form.bankReference.trim() || null : null,
@@ -185,7 +185,7 @@ export default function PaymentForm({
           await sendPaymentWhatsApp(
             selectedStudent.mobile,
             selectedStudent.name,
-            formatAmount(amount, form.currency),
+            formatAmount(amount, 'LKR'),
             receiptNumber,
           )
           void fetch('/api/notify', {
@@ -195,7 +195,7 @@ export default function PaymentForm({
               type: 'payment',
               phone: selectedStudent.mobile,
               name: selectedStudent.name,
-              data: { amount: formatAmount(amount, form.currency) },
+              data: { amount: formatAmount(amount, 'LKR') },
             }),
           })
         }
@@ -207,7 +207,7 @@ export default function PaymentForm({
           action: 'payment_recorded',
           entityType: 'payment',
           entityId: paymentDocId,
-          details: `Recorded ${receiptNumber} — ${formatAmount(amount, form.currency)} from ${selectedStudent.name}`,
+          details: `Recorded ${receiptNumber} — ${formatAmount(amount, 'LKR')} from ${selectedStudent.name}`,
         })
       }
 
@@ -230,12 +230,12 @@ export default function PaymentForm({
         aria-hidden="true"
       />
       <aside
-        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-white shadow-2xl"
+        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-white shadow-2xl dark:bg-gray-800"
         role="dialog"
         aria-modal="true"
       >
         <div className="flex items-center justify-between border-b border-[#DDE3EC] px-6 py-4">
-          <h2 className="font-jakarta text-lg font-bold text-[#0D1B2A]">
+          <h2 className="font-jakarta text-lg font-bold text-[#0D1B2A] dark:text-white">
             {isEdit ? 'Edit Payment' : 'Record Payment'}
           </h2>
           <button
@@ -314,30 +314,17 @@ export default function PaymentForm({
               </div>
             </div>
 
-            <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="sm:col-span-2">
-                <FieldLabel>Amount *</FieldLabel>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.amount}
-                  onChange={(e) => setField('amount', e.target.value)}
-                  required
-                  className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-base outline-none focus:border-[#E8A020] sm:text-sm"
-                />
-              </div>
-              <div>
-                <FieldLabel>Currency</FieldLabel>
-                <select
-                  value={form.currency}
-                  onChange={(e) => setField('currency', e.target.value as 'LKR' | 'USD')}
-                  className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
-                >
-                  <option value="LKR">LKR</option>
-                  <option value="USD">USD</option>
-                </select>
-              </div>
+            <div className="mb-5">
+              <FieldLabel>Amount (LKR) *</FieldLabel>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={form.amount}
+                onChange={(e) => setField('amount', e.target.value)}
+                required
+                className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2.5 font-inter text-base text-[#0D1B2A] outline-none focus:border-[#E8A020] dark:border-gray-600 dark:bg-gray-800 dark:text-white sm:text-sm"
+              />
             </div>
 
             <div className="mb-5">
@@ -349,7 +336,7 @@ export default function PaymentForm({
               >
                 <option value="cash">Cash</option>
                 <option value="bank-transfer">Bank Transfer</option>
-                <option value="stripe">Stripe</option>
+                <option value="stripe">Online (Stripe)</option>
               </select>
             </div>
 

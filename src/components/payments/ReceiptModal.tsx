@@ -51,7 +51,9 @@ export default function ReceiptModal({ payment, open, onClose }: ReceiptModalPro
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:static print:block print:p-0">
         <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-xl bg-white shadow-2xl print:max-h-none print:shadow-none">
           <div className="flex items-center justify-between border-b border-[#DDE3EC] px-4 py-3 print:hidden">
-            <h2 className="font-jakarta font-bold text-[#0D1B2A]">Payment Receipt</h2>
+            <h2 className="font-jakarta font-bold text-[#0D1B2A] dark:text-white">
+              Payment Receipt
+            </h2>
             <button
               type="button"
               onClick={onClose}
@@ -89,7 +91,7 @@ export default function ReceiptModal({ payment, open, onClose }: ReceiptModalPro
                 </div>
                 <div className="text-right">
                   <p className="text-xs uppercase text-[#5A6A7A]">Date</p>
-                  <p className="text-sm font-medium text-[#0D1B2A]">
+                  <p className="text-sm font-medium text-[#0D1B2A] dark:text-white">
                     {formatPaymentDate(payment.paymentDate)}
                   </p>
                 </div>
@@ -98,23 +100,23 @@ export default function ReceiptModal({ payment, open, onClose }: ReceiptModalPro
               <div className="mb-4 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-[#5A6A7A]">Student</span>
-                  <span className="font-medium text-[#0D1B2A]">{payment.studentName}</span>
+                  <span className="font-medium text-[#0D1B2A] dark:text-white">{payment.studentName}</span>
                 </div>
                 {payment.studentCode && (
                   <div className="flex justify-between">
                     <span className="text-[#5A6A7A]">Student ID</span>
-                    <span className="text-[#0D1B2A]">{payment.studentCode}</span>
+                    <span className="text-[#0D1B2A] dark:text-white">{payment.studentCode}</span>
                   </div>
                 )}
                 {payment.courseName && (
                   <div className="flex justify-between">
                     <span className="text-[#5A6A7A]">Course</span>
-                    <span className="text-right text-[#0D1B2A]">{payment.courseName}</span>
+                    <span className="text-right text-[#0D1B2A] dark:text-white">{payment.courseName}</span>
                   </div>
                 )}
                 <div className="flex justify-between">
                   <span className="text-[#5A6A7A]">Type</span>
-                  <span className="capitalize text-[#0D1B2A]">{getTypeLabel(payment.type)}</span>
+                  <span className="capitalize text-[#0D1B2A] dark:text-white">{getTypeLabel(payment.type)}</span>
                 </div>
               </div>
 
@@ -128,18 +130,18 @@ export default function ReceiptModal({ payment, open, onClose }: ReceiptModalPro
               <div className="mb-4 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-[#5A6A7A]">Method</span>
-                  <span className="text-[#0D1B2A]">{getMethodLabel(payment.method)}</span>
+                  <span className="text-[#0D1B2A] dark:text-white">{getMethodLabel(payment.method)}</span>
                 </div>
                 {payment.bankReference && (
                   <div className="flex justify-between">
                     <span className="text-[#5A6A7A]">Reference</span>
-                    <span className="text-[#0D1B2A]">{payment.bankReference}</span>
+                    <span className="text-[#0D1B2A] dark:text-white">{payment.bankReference}</span>
                   </div>
                 )}
                 {payment.stripeId && (
                   <div className="flex justify-between">
                     <span className="text-[#5A6A7A]">Stripe ID</span>
-                    <span className="truncate text-[#0D1B2A]">{payment.stripeId}</span>
+                    <span className="truncate text-[#0D1B2A] dark:text-white">{payment.stripeId}</span>
                   </div>
                 )}
               </div>

@@ -34,7 +34,7 @@ function StatCard({
   loading?: boolean
 }) {
   return (
-    <div className="rounded-xl border border-[#DDE3EC] bg-white p-5">
+    <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
       <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
         {label}
       </p>
@@ -169,7 +169,7 @@ export default function PaymentsPage() {
         />
       </div>
 
-      <div className="rounded-xl border border-[#DDE3EC] bg-white p-4">
+      <div className="rounded-xl border border-[#DDE3EC] bg-white p-4 dark:bg-gray-800">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <div className="relative xl:col-span-2">
             <span
@@ -204,7 +204,7 @@ export default function PaymentsPage() {
             <option value="">All methods</option>
             <option value="cash">Cash</option>
             <option value="bank-transfer">Bank Transfer</option>
-            <option value="stripe">Stripe</option>
+            <option value="stripe">Online (Stripe)</option>
           </select>
           <select
             value={statusFilter}

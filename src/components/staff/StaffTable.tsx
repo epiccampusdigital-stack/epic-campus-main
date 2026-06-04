@@ -74,7 +74,7 @@ export function PendingStaffBanner({
             <div className="flex items-center gap-3">
               <Avatar member={member} />
               <div>
-                <p className="font-jakarta font-semibold text-[#0D1B2A]">
+                <p className="font-jakarta font-semibold text-[#0D1B2A] dark:text-white">
                   {member.displayName}
                 </p>
                 <p className="text-xs text-[#5A6A7A]">
@@ -148,7 +148,9 @@ export default function StaffTable({
                   <Avatar member={member} />
                 </td>
                 <td className="px-4 py-3">
-                  <p className="font-medium text-[#0D1B2A]">{member.displayName}</p>
+                  <p className="font-medium text-[#0D1B2A] dark:text-white">
+                    {member.displayName}
+                  </p>
                   {member.nic && (
                     <p className="text-xs text-[#5A6A7A]">{member.nic}</p>
                   )}
@@ -218,7 +220,9 @@ export function StaffTableEmpty({ onAdd }: { onAdd: () => void }) {
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#0B3D6B]/10">
         <span className="ti ti-id-badge text-3xl text-[#0B3D6B]" aria-hidden="true" />
       </div>
-      <h3 className="font-jakarta text-lg font-bold text-[#0D1B2A]">No staff members yet</h3>
+      <h3 className="font-jakarta text-lg font-bold text-[#0D1B2A] dark:text-white">
+        No staff members yet
+      </h3>
       <p className="mt-2 max-w-sm font-inter text-sm text-[#5A6A7A]">
         Invite team members and manage roles, access, and payroll details.
       </p>

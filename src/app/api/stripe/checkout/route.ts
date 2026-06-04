@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       line_items: [
         {
           price_data: {
-            currency: currency || 'usd',
+            currency: (currency || 'lkr').toLowerCase(),
             product_data: {
               name: description || 'EPIC Campus Program Fee',
               description: `Payment for ${studentName || 'student'}`,

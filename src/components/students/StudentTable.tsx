@@ -4,8 +4,13 @@ import Link from 'next/link'
 import { COURSE_MAP } from '@/lib/constants/courses'
 import {
   STATUS_STYLES,
+  LOCATION_STYLES,
+  LOCATION_LABELS,
+  COURSE_BATCH_STATUS_STYLES,
   getInitials,
   formatDate,
+  formatBatchSummary,
+  getCourseBatchStatus,
 } from '@/lib/students/helpers'
 import type { Student } from '@/types'
 
@@ -57,7 +62,7 @@ export default function StudentTable({
 }: StudentTableProps) {
   if (loading) {
     return (
-      <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white">
+      <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:bg-gray-800">
         <TableSkeleton />
       </div>
     )
@@ -68,22 +73,28 @@ export default function StudentTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white">
+    <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:bg-gray-800">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left">
+        <table className="w-full min-w-[1100px] text-left">
           <thead>
-            <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB]">
+            <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:bg-gray-800">
               <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]">
                 Student
               </th>
               <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]">
                 Course
               </th>
+              <th className="hidden px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] md:table-cell">
+                Location
+              </th>
+              <th className="hidden px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] lg:table-cell">
+                Agent
+              </th>
               <th className="hidden px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] sm:table-cell">
                 Batch
               </th>
               <th className="hidden px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] md:table-cell">
-                Phone
+                Course Status
               </th>
               <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]">
                 Status
@@ -96,13 +107,17 @@ export default function StudentTable({
           <tbody className="divide-y divide-[#DDE3EC]">
             {students.map((student) => {
               const course = COURSE_MAP[student.courseId]
+              const batchStatus = getCourseBatchStatus(student)
               return (
-                <tr key={student.id} className="transition-colors hover:bg-[#F5F7FB]/60">
+                <tr
+                  key={student.id}
+                  className="transition-colors hover:bg-[#F5F7FB]/60 dark:hover:bg-gray-700/40"
+                >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <Avatar student={student} />
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-[#0D1B2A]">
+                        <p className="truncate font-medium text-[#0D1B2A] dark:text-white">
                           {student.name}
                         </p>
                         <p className="truncate text-xs text-[#5A6A7A]">
@@ -118,11 +133,29 @@ export default function StudentTable({
                       <span className="max-w-[120px] truncate">{course?.label ?? student.courseId}</span>
                     </span>
                   </td>
-                  <td className="hidden px-4 py-3 text-sm text-[#5A6A7A] sm:table-cell">
-                    {student.batchId || '—'}
+                  <td className="hidden px-4 py-3 md:table-cell">
+                    {student.location ? (
+                      <span
+                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${LOCATION_STYLES[student.location]}`}
+                      >
+                        {LOCATION_LABELS[student.location]}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-[#5A6A7A]">—</span>
+                    )}
                   </td>
-                  <td className="hidden px-4 py-3 text-sm text-[#5A6A7A] md:table-cell">
-                    {student.mobile || '—'}
+                  <td className="hidden px-4 py-3 text-sm text-[#5A6A7A] lg:table-cell">
+                    {student.agentName || '—'}
+                  </td>
+                  <td className="hidden max-w-[180px] px-4 py-3 text-sm text-[#5A6A7A] sm:table-cell">
+                    <span className="line-clamp-2">{formatBatchSummary(student)}</span>
+                  </td>
+                  <td className="hidden px-4 py-3 md:table-cell">
+                    <span
+                      className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${COURSE_BATCH_STATUS_STYLES[batchStatus]}`}
+                    >
+                      {batchStatus}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <span
@@ -162,11 +195,13 @@ export default function StudentTable({
 
 export function StudentTableEmpty({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#DDE3EC] bg-white px-6 py-16 text-center">
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#DDE3EC] bg-white px-6 py-16 text-center dark:bg-gray-800">
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#0B3D6B]/10">
         <span className="ti ti-users text-3xl text-[#0B3D6B]" aria-hidden="true" />
       </div>
-      <h3 className="font-jakarta text-lg font-bold text-[#0D1B2A]">No students yet</h3>
+      <h3 className="font-jakarta text-lg font-bold text-[#0D1B2A] dark:text-white">
+        No students yet
+      </h3>
       <p className="mt-2 max-w-sm font-inter text-sm text-[#5A6A7A]">
         Add your first student to start managing enrollments, payments, and visa tracking.
       </p>

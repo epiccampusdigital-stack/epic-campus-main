@@ -81,11 +81,11 @@ export default function ManagementLayout({
     <ManagementContext.Provider
       value={{ user, loading, sidebarOpen, setSidebarOpen }}
     >
-      <div className="flex h-screen overflow-hidden">
+      <div className="flex h-screen overflow-hidden bg-[#F5F7FB] dark:bg-gray-900">
         <ManagementSidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
           <TopBar />
-          <main className="flex-1 overflow-y-auto bg-[#F5F7FB] p-6">
+          <main className="flex-1 overflow-y-auto bg-[#F5F7FB] p-6 dark:bg-gray-900">
             {children}
           </main>
         </div>

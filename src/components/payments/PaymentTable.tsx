@@ -39,7 +39,7 @@ export default function PaymentTable({
 }: PaymentTableProps) {
   if (loading) {
     return (
-      <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white">
+      <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:bg-gray-800">
         <TableSkeleton />
       </div>
     )
@@ -58,7 +58,6 @@ export default function PaymentTable({
                 'Student',
                 'Course',
                 'Amount',
-                'Currency',
                 'Method',
                 'Date',
                 'Status',
@@ -80,7 +79,7 @@ export default function PaymentTable({
                   {p.receiptNumber}
                 </td>
                 <td className="px-4 py-3">
-                  <p className="font-medium text-[#0D1B2A]">{p.studentName}</p>
+                  <p className="font-medium text-[#0D1B2A] dark:text-white">{p.studentName}</p>
                   {p.studentCode && (
                     <p className="text-xs text-[#5A6A7A]">{p.studentCode}</p>
                   )}
@@ -88,10 +87,9 @@ export default function PaymentTable({
                 <td className="max-w-[140px] truncate px-4 py-3 text-[#5A6A7A]">
                   {p.courseName ?? '—'}
                 </td>
-                <td className="px-4 py-3 font-semibold text-[#0D1B2A]">
-                  {formatAmount(p.amount, p.currency)}
+                <td className="px-4 py-3 font-semibold text-[#0D1B2A] dark:text-white">
+                  {formatAmount(p.amount, 'LKR')}
                 </td>
-                <td className="px-4 py-3 text-[#5A6A7A]">{p.currency}</td>
                 <td className="px-4 py-3 text-[#5A6A7A]">{getMethodLabel(p.method)}</td>
                 <td className="px-4 py-3 text-[#5A6A7A]">
                   {formatPaymentDate(p.paymentDate)}
@@ -138,7 +136,9 @@ export function PaymentTableEmpty({ onAdd }: { onAdd: () => void }) {
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#0B3D6B]/10">
         <span className="ti ti-receipt text-3xl text-[#0B3D6B]" aria-hidden="true" />
       </div>
-      <h3 className="font-jakarta text-lg font-bold text-[#0D1B2A]">No payments recorded</h3>
+      <h3 className="font-jakarta text-lg font-bold text-[#0D1B2A] dark:text-white">
+        No payments recorded
+      </h3>
       <p className="mt-2 max-w-sm font-inter text-sm text-[#5A6A7A]">
         Record your first fee collection to start tracking receipts and student balances.
       </p>

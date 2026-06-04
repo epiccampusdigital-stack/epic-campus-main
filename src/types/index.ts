@@ -38,6 +38,40 @@ export interface StaffMember {
   approvedAt?: string
 }
 
+export type PaymentType = 'tuition' | 'registration' | 'exam' | 'visa' | 'other'
+export type PaymentMethod = 'cash' | 'bank-transfer' | 'stripe'
+export type PaymentStatus = 'paid' | 'partial' | 'pending' | 'cancelled'
+
+export type BatchDuration = '45days' | '90days' | 'custom'
+export type StudentLocation = 'ahangama' | 'galle' | 'waduraba' | 'pinnaduwa'
+export type CourseBatchStatus = 'active' | 'completed' | 'overdue'
+
+export interface StudentFeeLineItem {
+  paid: boolean
+  amount: number
+  method?: PaymentMethod
+  paymentDate?: string
+  reference?: string
+  stripePaymentLinkUrl?: string
+}
+
+export interface StudentOtherExpense {
+  id: string
+  description: string
+  amount: number
+  paid: boolean
+  method?: PaymentMethod
+  paymentDate?: string
+  reference?: string
+  stripePaymentLinkUrl?: string
+}
+
+export interface StudentFeeSchedule {
+  registration: StudentFeeLineItem
+  course: StudentFeeLineItem
+  otherExpenses: StudentOtherExpense[]
+}
+
 export interface Student {
   id: string
   studentCode: string
@@ -52,6 +86,14 @@ export interface Student {
   courseId: CourseId
   batchId: string
   branchId: string
+  batchDuration?: BatchDuration
+  batchCustomDays?: number
+  batchStartDate?: string
+  batchEndDate?: string
+  location?: StudentLocation
+  agentId?: string
+  agentName?: string
+  feeSchedule?: StudentFeeSchedule
   enrollmentDate?: string
   expectedCompletionDate?: string
   feeAmount?: number
@@ -124,10 +166,6 @@ export interface VisaApplication {
   notes: string
   whatsappPhone?: string
 }
-
-export type PaymentType = 'tuition' | 'registration' | 'exam' | 'visa' | 'other'
-export type PaymentMethod = 'cash' | 'bank-transfer' | 'stripe'
-export type PaymentStatus = 'paid' | 'partial' | 'pending' | 'cancelled'
 
 export interface Payment {
   id: string

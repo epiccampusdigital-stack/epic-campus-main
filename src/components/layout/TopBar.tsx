@@ -43,7 +43,7 @@ export default function TopBar() {
         >
           <span className="ti ti-menu-2 text-xl" aria-hidden="true" />
         </button>
-        <h1 className="font-jakarta text-lg font-bold text-[#0D1B2A]">
+        <h1 className="font-jakarta text-lg font-bold text-[#0D1B2A] dark:text-white">
           {pageTitle}
         </h1>
       </div>
@@ -63,7 +63,9 @@ export default function TopBar() {
               {getInitials(user.displayName)}
             </div>
             <div className="hidden sm:block">
-              <p className="text-sm font-medium text-[#0D1B2A]">{user.displayName}</p>
+              <p className="text-sm font-medium text-[#0D1B2A] dark:text-white">
+                {user.displayName}
+              </p>
               <p className="text-xs text-[#5A6A7A]">
                 {ROLE_LABELS[user.role] ?? user.role}
               </p>

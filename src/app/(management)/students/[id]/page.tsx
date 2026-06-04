@@ -14,7 +14,8 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { COURSE_MAP } from '@/lib/constants/courses'
-import { parsePayment, formatAmount } from '@/lib/payments/helpers'
+import { parsePayment } from '@/lib/payments/helpers'
+import StudentFeePanel from '@/components/payments/StudentFeePanel'
 import { parseAttendance } from '@/lib/attendance/helpers'
 import StudentForm from '@/components/students/StudentForm'
 import {
@@ -24,6 +25,7 @@ import {
   VISA_STATUS_STYLES,
   getInitials,
   formatDate,
+  LOCATION_LABELS,
 } from '@/lib/students/helpers'
 import type { ExamResult, Payment, Student, StudentDocument, AttendanceRecord } from '@/types'
 
@@ -285,6 +287,21 @@ export default function StudentProfilePage() {
               <dl className="space-y-3">
                 <InfoRow label="Course" value={course?.label} />
                 <InfoRow label="Batch" value={student.batchId} />
+                <InfoRow
+                  label="Batch period"
+                  value={
+                    student.batchStartDate && student.batchEndDate
+                      ? `${formatDate(student.batchStartDate)} → ${formatDate(student.batchEndDate)}`
+                      : undefined
+                  }
+                />
+                <InfoRow
+                  label="Location"
+                  value={
+                    student.location ? LOCATION_LABELS[student.location] : undefined
+                  }
+                />
+                <InfoRow label="Agent" value={student.agentName} />
                 <InfoRow label="Enrolled" value={formatDate(student.enrollmentDate)} />
                 <InfoRow label="Expected Completion" value={formatDate(student.expectedCompletionDate)} />
                 <InfoRow
@@ -308,38 +325,7 @@ export default function StudentProfilePage() {
         )}
 
         {tab === 'payments' && (
-          <div>
-            {payments.length === 0 ? (
-              <p className="py-8 text-center text-sm text-[#5A6A7A]">No payment records yet.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[560px] text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-[#DDE3EC] text-xs uppercase text-[#5A6A7A]">
-                      <th className="pb-3 pr-4">Receipt</th>
-                      <th className="pb-3 pr-4">Type</th>
-                      <th className="pb-3 pr-4">Amount</th>
-                      <th className="pb-3 pr-4">Method</th>
-                      <th className="pb-3">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#DDE3EC]">
-                    {payments.map((p) => (
-                      <tr key={p.id}>
-                        <td className="py-3 pr-4 font-medium">{p.receiptNumber || p.id.slice(0, 8)}</td>
-                        <td className="py-3 pr-4 capitalize text-[#5A6A7A]">{p.type}</td>
-                        <td className="py-3 pr-4 font-medium">{formatAmount(p.amount, p.currency)}</td>
-                        <td className="py-3 pr-4 capitalize text-[#5A6A7A]">{p.method.replace('-', ' ')}</td>
-                        <td className="py-3">
-                          <span className="capitalize">{p.status}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          <StudentFeePanel student={student} payments={payments} onUpdated={loadData} />
         )}
 
         {tab === 'attendance' && (
