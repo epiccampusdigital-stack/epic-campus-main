@@ -17,19 +17,12 @@ import StudentTable, {
   StudentTableEmpty,
   StudentTableMeta,
 } from '@/components/students/StudentTable'
-import { LOCATION_LABELS } from '@/lib/students/helpers'
+import { getDefaultLocationFilter } from '@/lib/locations/helpers'
+import LocationFilterSelect from '@/components/ui/LocationFilterSelect'
 import { useManagement } from '@/components/layout/ManagementContext'
 import type { CourseId, ExamAttempt, ExamResult, Student, StudentLocation } from '@/types'
 
 const PAGE_SIZE = 10
-
-const LOCATION_OPTIONS: { id: StudentLocation | ''; label: string }[] = [
-  { id: '', label: 'All locations' },
-  { id: 'ahangama', label: LOCATION_LABELS.ahangama },
-  { id: 'galle', label: LOCATION_LABELS.galle },
-  { id: 'waduraba', label: LOCATION_LABELS.waduraba },
-  { id: 'pinnaduwa', label: LOCATION_LABELS.pinnaduwa },
-]
 
 function parseExamResult(id: string, data: Record<string, unknown>): ExamResult {
   return {
@@ -116,9 +109,8 @@ export default function StudentsPage() {
   }, [loadStudents])
 
   useEffect(() => {
-    if (user?.role === 'reception' && user.locationAssigned) {
-      setLocationFilter(user.locationAssigned)
-    }
+    const def = getDefaultLocationFilter(user)
+    if (def) setLocationFilter(def)
   }, [user?.role, user?.locationAssigned])
 
   const batches = useMemo(() => {
@@ -258,18 +250,7 @@ export default function StudentsPage() {
               </option>
             ))}
           </select>
-          <select
-            value={locationFilter}
-            onChange={(e) => setLocationFilter(e.target.value as StudentLocation | '')}
-            className="rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm text-[#0D1B2A] outline-none focus:border-[#E8A020]"
-            title="Campus location"
-          >
-            {LOCATION_OPTIONS.map((loc) => (
-              <option key={loc.id || 'all'} value={loc.id}>
-                {loc.label}
-              </option>
-            ))}
-          </select>
+          <LocationFilterSelect value={locationFilter} onChange={setLocationFilter} />
         </div>
       </div>
 

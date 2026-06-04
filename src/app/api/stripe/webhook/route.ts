@@ -55,9 +55,19 @@ export async function POST(req: NextRequest) {
 
     if (studentId) {
       try {
+        let agentId: string | null = null
+        let agentName: string | null = null
+        const studentSnap = await adminDb.collection('students').doc(studentId).get()
+        if (studentSnap.exists) {
+          const s = studentSnap.data()!
+          agentId = s.agentId ? String(s.agentId) : null
+          agentName = s.agentName ? String(s.agentName) : null
+        }
         await adminDb.collection('payments').add({
           studentId,
           studentName: studentName || '',
+          agentId,
+          agentName,
           amount,
           currency: (session.currency || 'lkr').toUpperCase(),
           stripeSessionId: session.id,

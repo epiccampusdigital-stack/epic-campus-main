@@ -56,6 +56,8 @@ export function parsePayment(id: string, data: Record<string, unknown>): Payment
     paymentDate: paymentDate?.toISOString() ?? created?.toISOString() ?? new Date().toISOString(),
     notes: data.notes ? String(data.notes) : undefined,
     branchId: String(data.branchId ?? ''),
+    agentId: data.agentId ? String(data.agentId) : undefined,
+    agentName: data.agentName ? String(data.agentName) : undefined,
     createdAt: created?.toISOString() ?? new Date().toISOString(),
     createdBy: String(data.createdBy ?? ''),
   }

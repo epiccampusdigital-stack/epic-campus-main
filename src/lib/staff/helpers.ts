@@ -41,6 +41,9 @@ export function parseStaff(id: string, data: Record<string, unknown>): StaffMemb
     address: data.address ? String(data.address) : undefined,
     photoUrl: data.photoUrl ? String(data.photoUrl) : undefined,
     branchId: String(data.branchId ?? 'galle-main'),
+    locationAssigned: data.locationAssigned
+      ? (String(data.locationAssigned) as StaffMember['locationAssigned'])
+      : undefined,
     startDate: start,
     salaryType: (data.salaryType as SalaryType) ?? 'fixed',
     baseSalary: Number(data.baseSalary ?? 0),

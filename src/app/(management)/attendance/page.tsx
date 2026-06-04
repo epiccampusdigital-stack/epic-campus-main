@@ -10,12 +10,15 @@ import {
   parseAttendance,
   todayISO,
 } from '@/lib/attendance/helpers'
+import LocationFilterSelect from '@/components/ui/LocationFilterSelect'
+import { useManagement } from '@/components/layout/ManagementContext'
+import { studentIdSetForLocation } from '@/lib/locations/helpers'
 import AttendanceForm from '@/components/attendance/AttendanceForm'
 import AttendanceTable, {
   AttendanceTableEmpty,
   AttendanceTableMeta,
 } from '@/components/attendance/AttendanceTable'
-import type { AttendanceRecord, AttendanceStatus, CourseId, Student } from '@/types'
+import type { AttendanceRecord, AttendanceStatus, CourseId, Student, StudentLocation } from '@/types'
 
 const PAGE_SIZE = 10
 
@@ -43,6 +46,7 @@ function StatCard({
 }
 
 export default function AttendancePage() {
+  const { user } = useManagement()
   const [records, setRecords] = useState<AttendanceRecord[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,6 +54,7 @@ export default function AttendancePage() {
   const [courseFilter, setCourseFilter] = useState<CourseId | ''>('')
   const [batchFilter, setBatchFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<AttendanceStatus | ''>('')
+  const [locationFilter, setLocationFilter] = useState<StudentLocation | ''>('')
   const [page, setPage] = useState(1)
   const [formOpen, setFormOpen] = useState(false)
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
@@ -83,6 +88,21 @@ export default function AttendancePage() {
     loadData()
   }, [loadData])
 
+  useEffect(() => {
+    if (
+      user &&
+      (user.role === 'reception' || user.role === 'teacher') &&
+      user.locationAssigned
+    ) {
+      setLocationFilter(user.locationAssigned)
+    }
+  }, [user?.role, user?.locationAssigned])
+
+  const locationStudentIds = useMemo(
+    () => studentIdSetForLocation(students, locationFilter),
+    [students, locationFilter],
+  )
+
   const batches = useMemo(() => {
     const source = courseFilter
       ? students.filter((s) => s.courseId === courseFilter)
@@ -93,19 +113,20 @@ export default function AttendancePage() {
 
   const filtered = useMemo(() => {
     return records.filter((r) => {
+      if (locationFilter && !locationStudentIds.has(r.studentId)) return false
       if (dateFilter && r.date.slice(0, 10) !== dateFilter) return false
       if (courseFilter && r.courseId !== courseFilter) return false
       if (batchFilter && r.batchName !== batchFilter) return false
       if (statusFilter && r.status !== statusFilter) return false
       return true
     })
-  }, [records, dateFilter, courseFilter, batchFilter, statusFilter])
+  }, [records, locationFilter, locationStudentIds, dateFilter, courseFilter, batchFilter, statusFilter])
 
   const stats = useMemo(() => computeAttendanceStats(filtered), [filtered])
 
   useEffect(() => {
     setPage(1)
-  }, [dateFilter, courseFilter, batchFilter, statusFilter])
+  }, [dateFilter, courseFilter, batchFilter, statusFilter, locationFilter])
 
   const paginated = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE
@@ -147,7 +168,13 @@ export default function AttendancePage() {
       </div>
 
       <div className="rounded-xl border border-[#DDE3EC] bg-white p-4">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
+          <div>
+            <label className="mb-1 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+              Location
+            </label>
+            <LocationFilterSelect value={locationFilter} onChange={setLocationFilter} className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]" />
+          </div>
           <div>
             <label className="mb-1 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
               Date

@@ -17,6 +17,7 @@ import { COURSE_MAP } from '@/lib/constants/courses'
 import { parsePayment } from '@/lib/payments/helpers'
 import StudentFeePanel from '@/components/payments/StudentFeePanel'
 import { parseAttendance } from '@/lib/attendance/helpers'
+import StudentAgentSection from '@/components/students/StudentAgentSection'
 import StudentForm from '@/components/students/StudentForm'
 import {
   parseStudent,
@@ -267,7 +268,9 @@ export default function StudentProfilePage() {
 
       <div className="rounded-xl border border-[#DDE3EC] bg-white p-6">
         {tab === 'overview' && (
-          <div className="grid gap-8 lg:grid-cols-2">
+          <div className="space-y-6">
+            <StudentAgentSection student={student} onUpdated={loadData} />
+            <div className="grid gap-8 lg:grid-cols-2">
             <div>
               <h3 className="mb-4 font-jakarta text-sm font-bold uppercase tracking-wide text-[#0B3D6B]">
                 Personal Information
@@ -301,7 +304,6 @@ export default function StudentProfilePage() {
                     student.location ? LOCATION_LABELS[student.location] : undefined
                   }
                 />
-                <InfoRow label="Agent" value={student.agentName} />
                 <InfoRow label="Enrolled" value={formatDate(student.enrollmentDate)} />
                 <InfoRow label="Expected Completion" value={formatDate(student.expectedCompletionDate)} />
                 <InfoRow
@@ -321,6 +323,7 @@ export default function StudentProfilePage() {
                 </div>
               )}
             </div>
+          </div>
           </div>
         )}
 

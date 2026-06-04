@@ -19,7 +19,8 @@ import {
 import { generateTempPassword, sendCredentialsEmail } from '@/lib/students/helpers'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { logAuditEvent } from '@/lib/audit/helpers'
-import type { SalaryType, StaffMember, StaffRole, StaffStatus } from '@/types'
+import { LOCATION_LABELS } from '@/lib/students/helpers'
+import type { SalaryType, StaffMember, StaffRole, StaffStatus, StudentLocation } from '@/types'
 
 export interface StaffFormValues {
   displayName: string
@@ -34,6 +35,7 @@ export interface StaffFormValues {
   salaryType: SalaryType
   baseSalary: string
   commissionRate: string
+  locationAssigned: StudentLocation | ''
 }
 
 const EMPTY: StaffFormValues = {
@@ -49,6 +51,7 @@ const EMPTY: StaffFormValues = {
   salaryType: 'fixed',
   baseSalary: '',
   commissionRate: '',
+  locationAssigned: '',
 }
 
 interface StaffFormProps {
@@ -73,6 +76,7 @@ function staffToForm(s: StaffMember): StaffFormValues {
     salaryType: s.salaryType,
     baseSalary: s.baseSalary ? String(s.baseSalary) : '',
     commissionRate: s.commissionRate != null ? String(s.commissionRate) : '',
+    locationAssigned: s.locationAssigned ?? '',
   }
 }
 
@@ -165,6 +169,7 @@ export default function StaffForm({
             ? Number(form.commissionRate)
             : null,
         status: 'active',
+        locationAssigned: form.locationAssigned || null,
         pendingDocId: staffDocId,
       }),
     })
@@ -211,13 +216,18 @@ export default function StaffForm({
           form.salaryType === 'commission' && form.commissionRate
             ? Number(form.commissionRate)
             : null,
+        locationAssigned: form.locationAssigned || null,
         updatedAt: serverTimestamp(),
       }
 
       if (isEdit && staff) {
         await updateDoc(doc(db, 'users', staff.id), payload)
-        if (photoUrl && staff.uid) {
-          await updateDoc(doc(db, 'users', staff.uid), { photoUrl }).catch(() => {})
+        const uidTarget = staff.uid && staff.uid !== staff.id ? staff.uid : null
+        if (uidTarget) {
+          await updateDoc(doc(db, 'users', uidTarget), {
+            locationAssigned: form.locationAssigned || null,
+            ...(photoUrl ? { photoUrl } : {}),
+          }).catch(() => {})
         }
       } else if (form.status === 'active') {
         const uid = await createAuthAccount(staffDocId, form.email.trim(), form.displayName.trim())
@@ -440,6 +450,25 @@ export default function StaffForm({
                   disabled={isView}
                   className={inputClass}
                 />
+              </div>
+
+              <div>
+                <FieldLabel>Assigned location</FieldLabel>
+                <select
+                  value={form.locationAssigned}
+                  onChange={(e) =>
+                    setField('locationAssigned', e.target.value as StudentLocation | '')
+                  }
+                  disabled={isView}
+                  className={inputClass}
+                >
+                  <option value="">Not set</option>
+                  {(Object.keys(LOCATION_LABELS) as StudentLocation[]).map((loc) => (
+                    <option key={loc} value={loc}>
+                      {LOCATION_LABELS[loc]}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

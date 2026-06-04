@@ -17,8 +17,9 @@ import {
   getMonthPickerOptions,
 } from '@/lib/dashboard/helpers'
 import TeacherDashboard from '@/components/dashboard/TeacherDashboard'
+import LocationFilterSelect from '@/components/ui/LocationFilterSelect'
 import { useManagement } from '@/components/layout/ManagementContext'
-import type { CourseId, Payment, Student, AttendanceRecord } from '@/types'
+import type { CourseId, Payment, Student, AttendanceRecord, StudentLocation } from '@/types'
 
 interface DashboardStats {
   monthIncome: number
@@ -71,6 +72,7 @@ export default function DashboardPage() {
   const { user } = useManagement()
   const [loading, setLoading] = useState(true)
   const [courseFilter, setCourseFilter] = useState<CourseId | ''>('')
+  const [locationFilter, setLocationFilter] = useState<StudentLocation | ''>('')
   const [monthFilter, setMonthFilter] = useState(currentMonthKey())
   const [allStudents, setAllStudents] = useState<Student[]>([])
   const [allPayments, setAllPayments] = useState<Payment[]>([])
@@ -114,15 +116,27 @@ export default function DashboardPage() {
     loadData()
   }, [loadData, user?.role])
 
+  useEffect(() => {
+    if (
+      user &&
+      (user.role === 'reception' || user.role === 'teacher') &&
+      user.locationAssigned
+    ) {
+      setLocationFilter(user.locationAssigned)
+    }
+  }, [user?.role, user?.locationAssigned])
+
   const filteredStudents = useMemo(
-    () => filterStudents(allStudents, courseFilter),
-    [allStudents, courseFilter],
+    () => filterStudents(allStudents, courseFilter, locationFilter),
+    [allStudents, courseFilter, locationFilter],
   )
 
-  const filteredPayments = useMemo(
-    () => filterPayments(allPayments, monthFilter, courseFilter),
-    [allPayments, monthFilter, courseFilter],
-  )
+  const filteredPayments = useMemo(() => {
+    const byMonthCourse = filterPayments(allPayments, monthFilter, courseFilter)
+    if (!locationFilter) return byMonthCourse
+    const ids = new Set(filteredStudents.map((s) => s.id))
+    return byMonthCourse.filter((p) => ids.has(p.studentId))
+  }, [allPayments, monthFilter, courseFilter, locationFilter, filteredStudents])
 
   const studentIds = useMemo(
     () => new Set(filteredStudents.map((s) => s.id)),
@@ -165,16 +179,18 @@ export default function DashboardPage() {
   }, [filteredPayments, filteredStudents, filteredAttendance, monthFilter])
 
   const pendingItems = useMemo(() => {
+    const scopedIds = new Set(filteredStudents.map((s) => s.id))
     const paymentPending = allPayments.filter((p) => {
       if (p.status !== 'pending' && p.status !== 'partial') return false
       if (!matchesCourseForPending(p, courseFilter)) return false
+      if (locationFilter && !scopedIds.has(p.studentId)) return false
       return true
     })
     const studentPending = filteredStudents.filter(
       (s) => s.paymentStatus === 'pending' || s.paymentStatus === 'partial',
     )
     return { paymentPending, studentPending }
-  }, [allPayments, filteredStudents, courseFilter])
+  }, [allPayments, filteredStudents, courseFilter, locationFilter])
 
   function matchesCourseForPending(p: Payment, filter: CourseId | ''): boolean {
     if (!filter) return true
@@ -252,6 +268,12 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 rounded-xl border border-[#DDE3EC] bg-white p-4 dark:border-gray-600 dark:bg-gray-800 sm:flex-row sm:flex-wrap sm:items-end">
+        <div>
+          <label className="mb-1.5 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+            Location
+          </label>
+          <LocationFilterSelect value={locationFilter} onChange={setLocationFilter} />
+        </div>
         <div className="min-w-[200px] flex-1">
           <label className="mb-1.5 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
             Course / program

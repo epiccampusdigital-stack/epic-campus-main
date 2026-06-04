@@ -33,6 +33,7 @@ export interface StaffMember {
   address?: string
   photoUrl?: string
   branchId: string
+  locationAssigned?: StudentLocation
   startDate?: string
   salaryType: SalaryType
   baseSalary: number
@@ -190,6 +191,8 @@ export interface Payment {
   paymentDate: string
   notes?: string
   branchId: string
+  agentId?: string
+  agentName?: string
   createdAt: string
   createdBy: string
 }

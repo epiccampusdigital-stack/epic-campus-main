@@ -150,6 +150,8 @@ export default function StudentFeePanel({
       receiptNumber,
       receiptNo: receiptNumber,
       branchId: user.branchId ?? student.branchId ?? 'galle-main',
+      agentId: student.agentId ?? null,
+      agentName: student.agentName ?? null,
       createdAt: serverTimestamp(),
       createdBy: user.uid,
     })

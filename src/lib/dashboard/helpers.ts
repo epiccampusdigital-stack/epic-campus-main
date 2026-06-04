@@ -1,7 +1,5 @@
-import type { CourseId } from '@/types'
-import type { Payment } from '@/types'
-import type { Student } from '@/types'
-import type { AttendanceRecord } from '@/types'
+import { filterStudentsByLocation } from '@/lib/locations/helpers'
+import type { CourseId, Payment, Student, AttendanceRecord, StudentLocation } from '@/types'
 
 export function monthKeyToRange(monthKey: string): { start: Date; end: Date } {
   const [y, m] = monthKey.split('-').map(Number)
@@ -39,9 +37,14 @@ export function filterPayments(
   )
 }
 
-export function filterStudents(students: Student[], courseFilter: CourseId | ''): Student[] {
-  if (!courseFilter) return students
-  return students.filter((s) => s.courseId === courseFilter)
+export function filterStudents(
+  students: Student[],
+  courseFilter: CourseId | '',
+  locationFilter: StudentLocation | '' = '',
+): Student[] {
+  let list = students
+  if (courseFilter) list = list.filter((s) => s.courseId === courseFilter)
+  return filterStudentsByLocation(list, locationFilter)
 }
 
 export function filterAttendance(

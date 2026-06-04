@@ -8,6 +8,7 @@ import {
   getStatusColor,
   getStatusLabel,
 } from '@/lib/staff/helpers'
+import { LOCATION_LABELS, LOCATION_STYLES } from '@/lib/students/helpers'
 import type { StaffMember } from '@/types'
 
 interface StaffTableProps {
@@ -126,6 +127,7 @@ export default function StaffTable({
                 'Avatar',
                 'Name',
                 'Role',
+                'Location',
                 'Email',
                 'Phone',
                 'Status',
@@ -161,6 +163,17 @@ export default function StaffTable({
                   >
                     {getRoleLabel(member.role)}
                   </span>
+                </td>
+                <td className="px-4 py-3">
+                  {member.locationAssigned ? (
+                    <span
+                      className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${LOCATION_STYLES[member.locationAssigned]}`}
+                    >
+                      {LOCATION_LABELS[member.locationAssigned]}
+                    </span>
+                  ) : (
+                    <span className="text-[#5A6A7A]">—</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-[#5A6A7A]">{member.email || '—'}</td>
                 <td className="px-4 py-3 text-[#5A6A7A]">{member.phone || '—'}</td>

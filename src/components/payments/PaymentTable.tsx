@@ -56,6 +56,7 @@ export default function PaymentTable({
               {[
                 'Receipt No',
                 'Student',
+                'Agent',
                 'Course',
                 'Amount',
                 'Method',
@@ -84,6 +85,7 @@ export default function PaymentTable({
                     <p className="text-xs text-[#5A6A7A]">{p.studentCode}</p>
                   )}
                 </td>
+                <td className="px-4 py-3 text-[#5A6A7A]">{p.agentName || '—'}</td>
                 <td className="max-w-[140px] truncate px-4 py-3 text-[#5A6A7A]">
                   {p.courseName ?? '—'}
                 </td>

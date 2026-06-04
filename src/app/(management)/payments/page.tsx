@@ -10,13 +10,16 @@ import {
   computePaymentStats,
   formatLKR,
 } from '@/lib/payments/helpers'
+import LocationFilterSelect from '@/components/ui/LocationFilterSelect'
+import { useManagement } from '@/components/layout/ManagementContext'
+import { studentIdSetForLocation } from '@/lib/locations/helpers'
 import PaymentForm from '@/components/payments/PaymentForm'
 import PaymentTable, {
   PaymentTableEmpty,
   PaymentTableMeta,
 } from '@/components/payments/PaymentTable'
 import dynamic from 'next/dynamic'
-import type { CourseId, Payment, PaymentMethod, PaymentStatus, Student } from '@/types'
+import type { CourseId, Payment, PaymentMethod, PaymentStatus, Student, StudentLocation } from '@/types'
 
 const ReceiptModal = dynamic(() => import('@/components/payments/ReceiptModal'), {
   ssr: false,
@@ -48,6 +51,7 @@ function StatCard({
 }
 
 export default function PaymentsPage() {
+  const { user } = useManagement()
   const [payments, setPayments] = useState<Payment[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
@@ -57,6 +61,7 @@ export default function PaymentsPage() {
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | ''>('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [locationFilter, setLocationFilter] = useState<StudentLocation | ''>('')
   const [page, setPage] = useState(1)
   const [formOpen, setFormOpen] = useState(false)
   const [editPayment, setEditPayment] = useState<Payment | null>(null)
@@ -91,11 +96,31 @@ export default function PaymentsPage() {
     loadData()
   }, [loadData])
 
-  const stats = useMemo(() => computePaymentStats(payments), [payments])
+  useEffect(() => {
+    if (
+      user &&
+      (user.role === 'reception' || user.role === 'teacher') &&
+      user.locationAssigned
+    ) {
+      setLocationFilter(user.locationAssigned)
+    }
+  }, [user?.role, user?.locationAssigned])
+
+  const locationStudentIds = useMemo(
+    () => studentIdSetForLocation(students, locationFilter),
+    [students, locationFilter],
+  )
+
+  const scopedPayments = useMemo(() => {
+    if (!locationFilter) return payments
+    return payments.filter((p) => locationStudentIds.has(p.studentId))
+  }, [payments, locationFilter, locationStudentIds])
+
+  const stats = useMemo(() => computePaymentStats(scopedPayments), [scopedPayments])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return payments.filter((p) => {
+    return scopedPayments.filter((p) => {
       if (courseFilter && p.courseId !== courseFilter) return false
       if (methodFilter && p.method !== methodFilter) return false
       if (statusFilter && p.status !== statusFilter) return false
@@ -108,11 +133,11 @@ export default function PaymentsPage() {
         (p.studentCode?.toLowerCase().includes(q) ?? false)
       )
     })
-  }, [payments, search, courseFilter, methodFilter, statusFilter, dateFrom, dateTo])
+  }, [scopedPayments, search, courseFilter, methodFilter, statusFilter, dateFrom, dateTo])
 
   useEffect(() => {
     setPage(1)
-  }, [search, courseFilter, methodFilter, statusFilter, dateFrom, dateTo])
+  }, [search, courseFilter, methodFilter, statusFilter, dateFrom, dateTo, locationFilter])
 
   const paginated = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE
@@ -206,6 +231,7 @@ export default function PaymentsPage() {
             <option value="bank-transfer">Bank Transfer</option>
             <option value="stripe">Online (Stripe)</option>
           </select>
+          <LocationFilterSelect value={locationFilter} onChange={setLocationFilter} />
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as PaymentStatus | '')}

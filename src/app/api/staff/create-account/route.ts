@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
       commissionRate,
       status,
       pendingDocId,
+      locationAssigned,
     } = body
 
     if (!email || !password || !displayName || !role) {
@@ -71,6 +72,7 @@ export async function POST(req: NextRequest) {
       commissionRate: commissionRate != null ? Number(commissionRate) : null,
       createdAt: now,
       approvedAt: status === 'active' ? now : null,
+      locationAssigned: locationAssigned ?? null,
     }
 
     await adminDb.collection('users').doc(userRecord.uid).set(userPayload)

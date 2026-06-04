@@ -108,6 +108,12 @@ export default function ReceiptModal({ payment, open, onClose }: ReceiptModalPro
                     <span className="text-[#0D1B2A] dark:text-white">{payment.studentCode}</span>
                   </div>
                 )}
+                {payment.agentName && (
+                  <div className="flex justify-between">
+                    <span className="text-[#5A6A7A]">Agent</span>
+                    <span className="text-[#0D1B2A] dark:text-white">{payment.agentName}</span>
+                  </div>
+                )}
                 {payment.courseName && (
                   <div className="flex justify-between">
                     <span className="text-[#5A6A7A]">Course</span>

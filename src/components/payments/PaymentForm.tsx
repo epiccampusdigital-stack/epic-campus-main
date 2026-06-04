@@ -152,6 +152,8 @@ export default function PaymentForm({
         paymentDate: form.paymentDate,
         notes: form.notes.trim() || null,
         branchId: user.branchId ?? selectedStudent.branchId ?? 'galle-main',
+        agentId: selectedStudent.agentId ?? null,
+        agentName: selectedStudent.agentName ?? null,
         updatedAt: serverTimestamp(),
       }
 
