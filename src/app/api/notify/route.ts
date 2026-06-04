@@ -28,8 +28,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Unknown notification type' }, { status: 400 })
     }
 
-    const sent = await sendWhatsApp(phone, message)
-    return NextResponse.json({ success: true, sent })
+    const result = await sendWhatsApp(phone, message)
+    return NextResponse.json({ success: true, sent: result.ok })
   } catch (err) {
     console.error('[notify API]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

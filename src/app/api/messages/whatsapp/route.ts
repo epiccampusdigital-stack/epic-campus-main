@@ -15,8 +15,8 @@ export async function POST(req: NextRequest) {
       body = `Hi ${name}, your payment of LKR ${Number(paymentAmount).toLocaleString('en-LK')} is ready. Pay here: ${paymentLink}`
     }
 
-    const sent = await sendWhatsApp(String(phone), body)
-    return NextResponse.json({ ok: true, sent })
+    const result = await sendWhatsApp(String(phone), body)
+    return NextResponse.json({ ok: true, sent: result.ok })
   } catch (err) {
     console.error('[messages/whatsapp]', err)
     return NextResponse.json({ error: 'Failed to send WhatsApp message' }, { status: 500 })

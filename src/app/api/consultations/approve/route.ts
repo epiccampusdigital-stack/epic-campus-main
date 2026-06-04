@@ -32,10 +32,11 @@ export async function POST(request: Request) {
     if (booking.studentPhone) {
       const dateLabel = formatConsultationDate(booking.date)
       const timeLabel = formatTimeRange(booking.startTime, booking.endTime)
-      whatsappSent = await sendWhatsApp(
+      const sendResult = await sendWhatsApp(
         booking.studentPhone,
         `Hi ${booking.studentName}, your EPIC Campus consultation on ${dateLabel} at ${timeLabel} with ${booking.staffName} has been confirmed. See you then! — epiccampus.live`,
       )
+      whatsappSent = sendResult.ok
     }
 
     return NextResponse.json({ ok: true, whatsappSent })

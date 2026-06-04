@@ -4,24 +4,46 @@ const accountSid = process.env.TWILIO_ACCOUNT_SID
 const authToken = process.env.TWILIO_AUTH_TOKEN
 const from = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886'
 
-export async function sendWhatsApp(to: string, message: string): Promise<boolean> {
+export function normalizeWhatsAppNumber(phone: string): string {
+  let digits = phone.replace(/\s+/g, '').replace(/^whatsapp:/i, '')
+  if (digits.startsWith('+')) digits = digits.slice(1)
+  if (digits.startsWith('0')) digits = `94${digits.slice(1)}`
+  if (!digits.startsWith('94') && digits.length === 9) digits = `94${digits}`
+  return digits
+}
+
+export async function sendWhatsApp(
+  to: string,
+  message: string,
+  mediaUrl?: string,
+): Promise<{ ok: boolean; error?: string }> {
   if (!accountSid || !authToken || accountSid.startsWith('ACxxxx')) {
     console.log('[Twilio] Not configured — skipping WhatsApp send')
-    return false
+    return { ok: false, error: 'Twilio not configured' }
   }
   try {
     const client = twilio(accountSid, authToken)
-    const normalized = to.replace(/\s+/g, '').replace(/^\+/, '')
-    await client.messages.create({
+    const normalized = normalizeWhatsAppNumber(to)
+    const payload: {
+      from: string
+      to: string
+      body: string
+      mediaUrl?: string[]
+    } = {
       from,
-      to: `whatsapp:+${normalized.replace(/^whatsapp:/, '')}`,
+      to: `whatsapp:+${normalized}`,
       body: message,
-    })
+    }
+    if (mediaUrl) {
+      payload.mediaUrl = [mediaUrl]
+    }
+    await client.messages.create(payload)
     console.log(`[Twilio] WhatsApp sent to ${to}`)
-    return true
+    return { ok: true }
   } catch (err) {
+    const error = err instanceof Error ? err.message : 'Send failed'
     console.error('[Twilio] Failed to send WhatsApp:', err)
-    return false
+    return { ok: false, error }
   }
 }
 

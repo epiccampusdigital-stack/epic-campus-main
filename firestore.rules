@@ -90,6 +90,17 @@ service cloud.firestore {
         request.auth.token.role in ['admin', 'owner', 'reception', 'teacher'];
     }
 
+    match /broadcastMessages/{docId} {
+      allow read, write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'reception'];
+    }
+
+    match /broadcastLogs/{docId} {
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'reception'];
+      allow write: if false;
+    }
+
     // Public inquiries from contact form
     match /inquiries/{inquiryId} {
       allow create: if request.resource.data.keys().hasAll(['fullName', 'email', 'phone', 'program'])

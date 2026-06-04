@@ -563,3 +563,52 @@ export interface PartnerNotification {
   read: boolean
   createdAt: string
 }
+
+export type BroadcastAudience = 'all' | 'filtered'
+export type BroadcastMediaType = 'image' | 'pdf'
+export type BroadcastStatus = 'draft' | 'scheduled' | 'sent' | 'failed' | 'partial'
+export type BroadcastLogStatus = 'sent' | 'failed' | 'pending'
+export type BroadcastPaymentFilter = 'paid' | 'partial' | 'unpaid'
+
+export interface BroadcastFilters {
+  location?: StudentLocation[]
+  course?: string[]
+  visaStatus?: string[]
+  paymentStatus?: BroadcastPaymentFilter
+  batchStatus?: CourseBatchStatus[]
+}
+
+export interface BroadcastMessage {
+  id: string
+  title: string
+  message: string
+  mediaUrl?: string
+  mediaType?: BroadcastMediaType
+  audience: BroadcastAudience
+  filters: BroadcastFilters
+  recipientCount: number
+  recipientNumbers: string[]
+  status: BroadcastStatus
+  scheduledAt?: string
+  sentAt?: string
+  createdBy: string
+  createdByName: string
+  createdAt: string
+}
+
+export interface BroadcastLog {
+  id: string
+  broadcastId: string
+  studentId: string
+  studentName: string
+  phone: string
+  status: BroadcastLogStatus
+  error?: string
+  sentAt: string
+}
+
+export interface BroadcastRecipient {
+  studentId: string
+  studentName: string
+  phone: string
+}
