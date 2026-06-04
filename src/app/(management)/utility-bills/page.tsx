@@ -1,10 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { collection, getDocs, orderBy, query } from 'firebase/firestore'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import UtilityBillForm from '@/components/utility-bills/UtilityBillForm'
 import UtilityBillList from '@/components/utility-bills/UtilityBillList'
+import FixedBillsPanel from '@/components/utility-bills/FixedBillsPanel'
 import {
   currentMonthKey,
   formatLKR,
@@ -13,6 +15,8 @@ import {
   sumByCategory,
   type UtilityBill,
 } from '@/lib/utility-bills/helpers'
+import { UTILITY_LOCATIONS } from '@/lib/utility-bills/fixed-bills'
+import type { StudentLocation } from '@/types'
 
 function SummaryCard({
   label,
@@ -24,7 +28,7 @@ function SummaryCard({
   loading?: boolean
 }) {
   return (
-    <div className="rounded-xl border border-[#DDE3EC] bg-white p-5">
+    <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
       <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
         {label}
       </p>
@@ -37,11 +41,17 @@ function SummaryCard({
   )
 }
 
-export default function UtilityBillsPage() {
+function UtilityBillsPageContent() {
+  const searchParams = useSearchParams()
   const [bills, setBills] = useState<UtilityBill[]>([])
   const [loading, setLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)
-  const [monthFilter, setMonthFilter] = useState(currentMonthKey())
+  const [monthFilter, setMonthFilter] = useState(
+    () => searchParams.get('month') || currentMonthKey(),
+  )
+  const [location, setLocation] = useState<StudentLocation>(
+    () => (searchParams.get('location') as StudentLocation) || 'ahangama',
+  )
 
   const monthOptions = useMemo(() => getLastSixMonthKeys(), [])
 
@@ -68,6 +78,21 @@ export default function UtilityBillsPage() {
     loadBills()
   }, [loadBills])
 
+  useEffect(() => {
+    const paidId = searchParams.get('paid')
+    if (!paidId) return
+    void (async () => {
+      const snap = await getDoc(doc(db, 'fixedUtilityBills', paidId))
+      if (snap.exists() && !snap.data()?.paid) {
+        await updateDoc(doc(db, 'fixedUtilityBills', paidId), {
+          paid: true,
+          paymentDate: new Date().toISOString().slice(0, 10),
+          updatedAt: serverTimestamp(),
+        })
+      }
+    })()
+  }, [searchParams])
+
   const summaryMonth = monthFilter
   const categoryTotals = useMemo(
     () => sumByCategory(bills, summaryMonth),
@@ -83,9 +108,11 @@ export default function UtilityBillsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A]">Utility Bills</h2>
+          <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white">
+            Utility Bills
+          </h2>
           <p className="font-inter text-sm text-[#5A6A7A]">
-            Track monthly utility expenses
+            Fixed monthly bills and one-off utility expenses by location
           </p>
         </div>
         <button
@@ -98,35 +125,36 @@ export default function UtilityBillsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          label="Electricity (this month)"
-          value={formatLKR(categoryTotals.electricity)}
-          loading={loading}
-        />
-        <SummaryCard
-          label="Water (this month)"
-          value={formatLKR(categoryTotals.water)}
-          loading={loading}
-        />
-        <SummaryCard
-          label="Internet (this month)"
-          value={formatLKR(categoryTotals.internet)}
-          loading={loading}
-        />
-        <SummaryCard
-          label="Other (this month)"
-          value={formatLKR(categoryTotals.other)}
-          loading={loading}
-        />
+      <div className="flex flex-wrap gap-2 border-b border-[#DDE3EC] pb-1 dark:border-gray-600">
+        {UTILITY_LOCATIONS.map((loc) => (
+          <button
+            key={loc.id}
+            type="button"
+            onClick={() => setLocation(loc.id)}
+            className={`rounded-t-lg px-4 py-2 font-jakarta text-sm font-semibold transition-colors ${
+              location === loc.id
+                ? 'border-b-2 border-[#E8A020] text-[#0B3D6B]'
+                : 'text-[#5A6A7A] hover:text-[#0B3D6B]'
+            }`}
+          >
+            {loc.label}
+          </button>
+        ))}
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <label className="font-inter text-sm font-medium text-[#5A6A7A]">Month</label>
+        <input
+          type="month"
+          value={monthFilter}
+          onChange={(e) => setMonthFilter(e.target.value)}
+          className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+        />
         <select
           value={monthFilter}
           onChange={(e) => setMonthFilter(e.target.value)}
-          className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm"
+          className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+          aria-label="Month quick pick"
         >
           {monthOptions.map((m) => (
             <option key={m.value} value={m.value}>
@@ -136,9 +164,61 @@ export default function UtilityBillsPage() {
         </select>
       </div>
 
-      <UtilityBillList bills={filteredBills} loading={loading} onDeleted={loadBills} />
+      <section className="space-y-3">
+        <h3 className="font-jakarta text-base font-bold text-[#0B3D6B] dark:text-white">
+          Fixed bills — {UTILITY_LOCATIONS.find((l) => l.id === location)?.label}
+        </h3>
+        <p className="text-sm text-[#5A6A7A]">
+          Recurring monthly bills reset each month (new month = all unchecked).
+        </p>
+        <FixedBillsPanel location={location} month={monthFilter} />
+      </section>
+
+      <section className="space-y-4">
+        <h3 className="font-jakarta text-base font-bold text-[#0B3D6B] dark:text-white">
+          One-off utility entries
+        </h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard
+            label="Electricity (this month)"
+            value={formatLKR(categoryTotals.electricity)}
+            loading={loading}
+          />
+          <SummaryCard
+            label="Water (this month)"
+            value={formatLKR(categoryTotals.water)}
+            loading={loading}
+          />
+          <SummaryCard
+            label="Internet (this month)"
+            value={formatLKR(categoryTotals.internet)}
+            loading={loading}
+          />
+          <SummaryCard
+            label="Other (this month)"
+            value={formatLKR(categoryTotals.other)}
+            loading={loading}
+          />
+        </div>
+        <UtilityBillList bills={filteredBills} loading={loading} onDeleted={loadBills} />
+      </section>
 
       <UtilityBillForm open={formOpen} onClose={() => setFormOpen(false)} onSaved={loadBills} />
     </div>
+  )
+}
+
+export default function UtilityBillsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="animate-pulse space-y-4 p-6">
+          <div className="h-10 w-48 rounded bg-[#DDE3EC]" />
+          <div className="h-64 rounded-xl bg-[#DDE3EC]" />
+        </div>
+      }
+    >
+      <UtilityBillsPageContent />
+    </Suspense>
   )
 }

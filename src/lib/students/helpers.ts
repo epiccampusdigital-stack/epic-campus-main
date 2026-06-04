@@ -61,13 +61,13 @@ export function computeBatchEndDate(
 }
 
 export function getCourseBatchStatus(student: Student): CourseBatchStatus {
+  if (student.status === 'completed') return 'completed'
   if (!student.batchEndDate) return 'active'
   const end = new Date(student.batchEndDate)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   end.setHours(23, 59, 59, 999)
   if (end < today) return 'overdue'
-  if (student.status === 'completed') return 'completed'
   return 'active'
 }
 

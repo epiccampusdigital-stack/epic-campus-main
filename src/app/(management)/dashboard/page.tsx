@@ -1,33 +1,30 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import {
-  collection,
-  query,
-  getDocs,
-  where,
-  orderBy,
-  limit,
-  Timestamp,
-} from 'firebase/firestore'
+import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { formatLKR } from '@/lib/utils/formatCurrency'
 import { parsePayment, getStatusColor } from '@/lib/payments/helpers'
-import { COURSE_MAP } from '@/lib/constants/courses'
-import type { CourseId, Payment, Student } from '@/types'
+import { parseStudent } from '@/lib/students/helpers'
+import { parseAttendance } from '@/lib/attendance/helpers'
+import { COURSES, COURSE_MAP } from '@/lib/constants/courses'
+import {
+  currentMonthKey,
+  filterAttendance,
+  filterPayments,
+  filterStudents,
+  getMonthPickerOptions,
+} from '@/lib/dashboard/helpers'
+import type { CourseId, Payment, Student, AttendanceRecord } from '@/types'
 
 interface DashboardStats {
+  monthIncome: number
   todayCollection: number
   activeStudents: number
   pendingPayments: number
-  monthIncome: number
-}
-
-interface CourseEnrollment {
-  label: string
-  count: number
-  target: number
+  attendanceSessions: number
+  attendancePresent: number
 }
 
 const STATUS_STYLES: Record<Student['status'], string> = {
@@ -44,54 +41,9 @@ const PAYMENT_STATUS_STYLES: Record<Payment['status'], string> = {
   cancelled: getStatusColor('cancelled'),
 }
 
-function toDate(value: unknown): Date | null {
-  if (!value) return null
-  if (value instanceof Timestamp) return value.toDate()
-  if (typeof value === 'string') return new Date(value)
-  if (typeof value === 'object' && value !== null && 'seconds' in value) {
-    return new Date((value as { seconds: number }).seconds * 1000)
-  }
-  return null
-}
-
-function startOfToday(): Date {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function startOfMonth(): Date {
-  const d = new Date()
-  d.setDate(1)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function parseStudent(id: string, data: Record<string, unknown>): Student {
-  const created = toDate(data.createdAt)
-  const year = new Date().getFullYear()
-  return {
-    id,
-    studentCode: String(data.studentCode ?? `EC-${year}-000`),
-    uid: data.uid ? String(data.uid) : undefined,
-    name: String(data.name ?? ''),
-    nic: String(data.nic ?? ''),
-    email: data.email ? String(data.email) : undefined,
-    mobile: String(data.mobile ?? ''),
-    courseId: data.courseId as CourseId,
-    batchId: String(data.batchId ?? ''),
-    branchId: String(data.branchId ?? ''),
-    registrationFee: Number(data.registrationFee ?? data.feeAmount ?? 0),
-    status: (data.status as Student['status']) ?? 'pending',
-    visaStatus: data.visaStatus as Student['visaStatus'],
-    createdAt: created?.toISOString() ?? new Date().toISOString(),
-    createdBy: String(data.createdBy ?? ''),
-  }
-}
-
 function StatSkeleton() {
   return (
-    <div className="animate-pulse rounded-xl border border-[#DDE3EC] bg-white p-5">
+    <div className="animate-pulse rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
       <div className="mb-3 h-3 w-24 rounded bg-[#DDE3EC]" />
       <div className="mb-2 h-8 w-32 rounded bg-[#DDE3EC]" />
       <div className="h-3 w-20 rounded bg-[#DDE3EC]" />
@@ -109,121 +61,173 @@ function TableSkeleton({ rows = 5 }: { rows?: number }) {
   )
 }
 
+function isTodayInMonth(monthKey: string): boolean {
+  return monthKey === currentMonthKey()
+}
+
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState<DashboardStats>({
-    todayCollection: 0,
-    activeStudents: 0,
-    pendingPayments: 0,
-    monthIncome: 0,
-  })
-  const [recentStudents, setRecentStudents] = useState<Student[]>([])
-  const [recentPayments, setRecentPayments] = useState<Payment[]>([])
-  const [courseEnrollment, setCourseEnrollment] = useState<CourseEnrollment[]>([])
+  const [courseFilter, setCourseFilter] = useState<CourseId | ''>('')
+  const [monthFilter, setMonthFilter] = useState(currentMonthKey())
+  const [allStudents, setAllStudents] = useState<Student[]>([])
+  const [allPayments, setAllPayments] = useState<Payment[]>([])
+  const [allAttendance, setAllAttendance] = useState<AttendanceRecord[]>([])
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [studentsSnap, paymentsSnap, attendanceSnap] = await Promise.all([
+        getDocs(collection(db, 'students')),
+        getDocs(collection(db, 'payments')),
+        getDocs(collection(db, 'attendance')),
+      ])
+      setAllStudents(
+        studentsSnap.docs.map((d) =>
+          parseStudent(d.id, d.data() as Record<string, unknown>),
+        ),
+      )
+      setAllPayments(
+        paymentsSnap.docs.map((d) =>
+          parsePayment(d.id, d.data() as Record<string, unknown>),
+        ),
+      )
+      setAllAttendance(
+        attendanceSnap.docs.map((d) =>
+          parseAttendance(d.id, d.data() as Record<string, unknown>),
+        ),
+      )
+    } catch (err) {
+      console.error('Dashboard fetch error:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    async function fetchDashboard() {
-      try {
-        const todayStart = Timestamp.fromDate(startOfToday())
-        const monthStart = Timestamp.fromDate(startOfMonth())
+    loadData()
+  }, [loadData])
 
-        const [
-          todaySnap,
-          activeSnap,
-          pendingSnap,
-          monthSnap,
-          studentsSnap,
-          paymentsSnap,
-          allStudentsSnap,
-        ] = await Promise.all([
-          getDocs(query(collection(db, 'payments'), where('createdAt', '>=', todayStart))),
-          getDocs(query(collection(db, 'students'), where('status', '==', 'active'))),
-          getDocs(query(collection(db, 'payments'), where('status', '==', 'pending'))),
-          getDocs(query(collection(db, 'payments'), where('createdAt', '>=', monthStart))),
-          getDocs(query(collection(db, 'students'), orderBy('createdAt', 'desc'), limit(10))),
-          getDocs(query(collection(db, 'payments'), orderBy('createdAt', 'desc'), limit(5))),
-          getDocs(collection(db, 'students')),
-        ])
+  const filteredStudents = useMemo(
+    () => filterStudents(allStudents, courseFilter),
+    [allStudents, courseFilter],
+  )
 
-        let todayTotal = 0
-        todaySnap.forEach((doc) => {
-          todayTotal += Number(doc.data().amount ?? 0)
-        })
+  const filteredPayments = useMemo(
+    () => filterPayments(allPayments, monthFilter, courseFilter),
+    [allPayments, monthFilter, courseFilter],
+  )
 
-        let monthTotal = 0
-        monthSnap.forEach((doc) => {
-          monthTotal += Number(doc.data().amount ?? 0)
-        })
+  const studentIds = useMemo(
+    () => new Set(filteredStudents.map((s) => s.id)),
+    [filteredStudents],
+  )
 
-        setStats({
-          todayCollection: todayTotal,
-          activeStudents: activeSnap.size,
-          pendingPayments: pendingSnap.size,
-          monthIncome: monthTotal,
-        })
+  const filteredAttendance = useMemo(
+    () => filterAttendance(allAttendance, monthFilter, studentIds),
+    [allAttendance, monthFilter, studentIds],
+  )
 
-        setRecentStudents(
-          studentsSnap.docs.map((d) => parseStudent(d.id, d.data() as Record<string, unknown>))
-        )
+  const stats = useMemo((): DashboardStats => {
+    const today = new Date().toISOString().slice(0, 10)
+    let monthIncome = 0
+    let todayCollection = 0
+    let pendingPayments = 0
 
-        setRecentPayments(
-          paymentsSnap.docs.map((d) => parsePayment(d.id, d.data() as Record<string, unknown>))
-        )
-
-        const counts: Record<string, number> = {
-          'japan-ssw': 0,
-          'korea-d2d4': 0,
-          china: 0,
-          ielts: 0,
-          nvq: 0,
+    for (const p of filteredPayments) {
+      if (p.status === 'pending' || p.status === 'partial') pendingPayments++
+      if (p.status === 'paid' || p.status === 'partial') {
+        const lkr = p.currency === 'USD' ? p.amount * 320 : p.amount
+        monthIncome += lkr
+        if (isTodayInMonth(monthFilter) && p.paymentDate.slice(0, 10) === today) {
+          todayCollection += lkr
         }
-
-        allStudentsSnap.forEach((doc) => {
-          const courseId = doc.data().courseId as string
-          if (courseId === 'japan-ssw') counts['japan-ssw']++
-          else if (courseId === 'korea-d2d4') counts['korea-d2d4']++
-          else if (courseId === 'china') counts.china++
-          else if (courseId === 'ielts') counts.ielts++
-          else if (courseId?.startsWith('nvq-')) counts.nvq++
-        })
-
-        setCourseEnrollment([
-          { label: 'Japan SSW', count: counts['japan-ssw'], target: 20 },
-          { label: 'Korea D2/D4', count: counts['korea-d2d4'], target: 20 },
-          { label: 'China Program', count: counts.china, target: 20 },
-          { label: 'IELTS', count: counts.ielts, target: 20 },
-          { label: 'NVQ (combined)', count: counts.nvq, target: 20 },
-        ])
-      } catch (err) {
-        console.error('Dashboard fetch error:', err)
-      } finally {
-        setLoading(false)
       }
     }
 
-    fetchDashboard()
-  }, [])
+    const activeStudents = filteredStudents.filter((s) => s.status === 'active').length
+    const attendancePresent = filteredAttendance.filter((a) => a.status === 'present').length
+
+    return {
+      monthIncome,
+      todayCollection,
+      activeStudents,
+      pendingPayments,
+      attendanceSessions: filteredAttendance.length,
+      attendancePresent,
+    }
+  }, [filteredPayments, filteredStudents, filteredAttendance, monthFilter])
+
+  const pendingItems = useMemo(() => {
+    const paymentPending = allPayments.filter((p) => {
+      if (p.status !== 'pending' && p.status !== 'partial') return false
+      if (!matchesCourseForPending(p, courseFilter)) return false
+      return true
+    })
+    const studentPending = filteredStudents.filter(
+      (s) => s.paymentStatus === 'pending' || s.paymentStatus === 'partial',
+    )
+    return { paymentPending, studentPending }
+  }, [allPayments, filteredStudents, courseFilter])
+
+  function matchesCourseForPending(p: Payment, filter: CourseId | ''): boolean {
+    if (!filter) return true
+    return p.courseId === filter
+  }
+
+  const recentStudents = useMemo(() => {
+    return [...filteredStudents]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 10)
+  }, [filteredStudents])
+
+  const recentPayments = useMemo(() => {
+    return [...filteredPayments]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 5)
+  }, [filteredPayments])
+
+  const courseEnrollment = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const c of COURSES) counts[c.id] = 0
+    for (const s of filteredStudents) {
+      if (counts[s.courseId] != null) counts[s.courseId]++
+    }
+    return COURSES.map((c) => ({
+      label: c.label,
+      count: counts[c.id] ?? 0,
+      target: 20,
+    }))
+  }, [filteredStudents])
+
+  const monthOptions = useMemo(() => getMonthPickerOptions(12), [])
 
   const statCards = [
     {
-      label: "Today's Collection",
-      value: formatLKR(stats.todayCollection),
-      sub: 'Collected today',
+      label: isTodayInMonth(monthFilter) ? "Today's Collection" : 'Month collection',
+      value: formatLKR(
+        isTodayInMonth(monthFilter) ? stats.todayCollection : stats.monthIncome,
+      ),
+      sub: isTodayInMonth(monthFilter) ? 'Paid today' : `Paid in ${monthFilter}`,
     },
     {
       label: 'Active Students',
       value: String(stats.activeStudents),
-      sub: 'Currently enrolled',
+      sub: courseFilter ? 'In selected course' : 'All courses',
     },
     {
       label: 'Pending Payments',
       value: String(stats.pendingPayments),
-      sub: 'Awaiting payment',
+      sub: 'In selected month & course',
     },
     {
-      label: 'This Month Income',
+      label: 'Month Income',
       value: formatLKR(stats.monthIncome),
-      sub: 'Month to date',
+      sub: monthFilter,
+    },
+    {
+      label: 'Attendance (month)',
+      value: `${stats.attendancePresent} / ${stats.attendanceSessions}`,
+      sub: 'Present / sessions',
     },
   ]
 
@@ -236,19 +240,61 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Stat cards */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="flex flex-col gap-4 rounded-xl border border-[#DDE3EC] bg-white p-4 dark:border-gray-600 dark:bg-gray-800 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="min-w-[200px] flex-1">
+          <label className="mb-1.5 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+            Course / program
+          </label>
+          <select
+            value={courseFilter}
+            onChange={(e) => setCourseFilter(e.target.value as CourseId | '')}
+            className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2.5 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+          >
+            <option value="">All courses</option>
+            {COURSES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.flag} {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1.5 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+            Month
+          </label>
+          <input
+            type="month"
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2.5 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+          />
+        </div>
+        <select
+          value={monthFilter}
+          onChange={(e) => setMonthFilter(e.target.value)}
+          className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+          aria-label="Month quick select"
+        >
+          {monthOptions.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {loading
-          ? Array.from({ length: 4 }).map((_, i) => <StatSkeleton key={i} />)
+          ? Array.from({ length: 5 }).map((_, i) => <StatSkeleton key={i} />)
           : statCards.map((card) => (
               <div
                 key={card.label}
-                className="rounded-xl border border-[#DDE3EC] border-l-[3px] border-l-[#E8A020] bg-white p-5"
+                className="rounded-xl border border-[#DDE3EC] border-l-[3px] border-l-[#E8A020] bg-white p-5 dark:bg-gray-800"
               >
                 <p className="font-inter text-xs uppercase tracking-wide text-[#5A6A7A]">
                   {card.label}
                 </p>
-                <p className="font-jakarta mt-2 text-[28px] font-bold leading-tight text-[#0D1B2A]">
+                <p className="font-jakarta mt-2 text-[28px] font-bold leading-tight text-[#0D1B2A] dark:text-white">
                   {card.value}
                 </p>
                 <p className="mt-1 font-inter text-xs text-[#5A6A7A]">{card.sub}</p>
@@ -256,56 +302,130 @@ export default function DashboardPage() {
             ))}
       </section>
 
-      {/* Quick actions */}
+      <section className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:border-gray-600 dark:bg-gray-800">
+        <div className="flex flex-col gap-3 border-b border-[#DDE3EC] px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-gray-600">
+          <h2 className="font-jakarta text-base font-bold text-[#0D1B2A] dark:text-white">
+            Pending & follow-up
+          </h2>
+          <select
+            value={courseFilter}
+            onChange={(e) => setCourseFilter(e.target.value as CourseId | '')}
+            className="rounded-lg border border-[#DDE3EC] px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            aria-label="Filter pending by course"
+          >
+            <option value="">All courses</option>
+            {COURSES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {loading ? (
+          <TableSkeleton rows={4} />
+        ) : pendingItems.paymentPending.length === 0 &&
+          pendingItems.studentPending.length === 0 ? (
+          <p className="p-8 text-center text-sm text-[#5A6A7A]">No pending items for this course.</p>
+        ) : (
+          <div className="divide-y divide-[#DDE3EC] dark:divide-gray-600">
+            {pendingItems.paymentPending.map((p) => (
+              <div
+                key={p.id}
+                className="flex flex-wrap items-center justify-between gap-2 px-5 py-3"
+              >
+                <div>
+                  <p className="font-medium text-[#0D1B2A] dark:text-white">{p.studentName}</p>
+                  <p className="text-xs text-[#5A6A7A]">
+                    Payment · {p.receiptNumber || p.type} · {formatLKR(p.amount)}
+                  </p>
+                </div>
+                <Link
+                  href="/payments"
+                  className="text-sm font-semibold text-[#0B3D6B] hover:text-[#E8A020]"
+                >
+                  Record payment →
+                </Link>
+              </div>
+            ))}
+            {pendingItems.studentPending.map((s) => (
+              <div
+                key={s.id}
+                className="flex flex-wrap items-center justify-between gap-2 px-5 py-3"
+              >
+                <div>
+                  <p className="font-medium text-[#0D1B2A] dark:text-white">{s.name}</p>
+                  <p className="text-xs text-[#5A6A7A]">
+                    Student fee · {COURSE_MAP[s.courseId]?.label} · {s.paymentStatus}
+                  </p>
+                </div>
+                <Link
+                  href={`/students/${s.id}`}
+                  className="text-sm font-semibold text-[#0B3D6B] hover:text-[#E8A020]"
+                >
+                  View student →
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       <section>
-        <h2 className="font-jakarta mb-4 text-base font-bold text-[#0D1B2A]">Quick Actions</h2>
+        <h2 className="font-jakarta mb-4 text-base font-bold text-[#0D1B2A] dark:text-white">
+          Quick Actions
+        </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {quickActions.map((action) => (
             <Link
               key={action.href}
               href={action.href}
-              className="group rounded-xl border border-[#DDE3EC] bg-white p-5 transition-all hover:border-[#E8A020] hover:shadow-sm"
+              className="group rounded-xl border border-[#DDE3EC] bg-white p-5 transition-all hover:border-[#E8A020] hover:shadow-sm dark:bg-gray-800"
             >
               <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#0B3D6B] text-white">
                 <span className={`ti ${action.icon} text-lg`} aria-hidden="true" />
               </div>
-              <p className="font-jakarta font-semibold text-[#0D1B2A]">{action.title}</p>
+              <p className="font-jakarta font-semibold text-[#0D1B2A] dark:text-white">
+                {action.title}
+              </p>
               <p className="mt-1 font-inter text-xs text-[#5A6A7A]">{action.subtitle}</p>
             </Link>
           ))}
         </div>
       </section>
 
-      {/* Two column: students + enrollment */}
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-5">
         <div className="xl:col-span-3">
-          <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white">
-            <div className="border-b border-[#DDE3EC] px-5 py-4">
-              <h2 className="font-jakarta text-base font-bold text-[#0D1B2A]">Recent Students</h2>
+          <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:bg-gray-800">
+            <div className="border-b border-[#DDE3EC] px-5 py-4 dark:border-gray-600">
+              <h2 className="font-jakarta text-base font-bold text-[#0D1B2A] dark:text-white">
+                Recent Students
+              </h2>
             </div>
             {loading ? (
               <TableSkeleton rows={6} />
             ) : recentStudents.length === 0 ? (
               <p className="p-8 text-center font-inter text-sm text-[#5A6A7A]">
-                No students yet — register your first student
+                No students match filters
               </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left font-inter text-sm">
                   <thead>
-                    <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB]">
-                      <th className="px-5 py-3 text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">Name</th>
-                      <th className="px-5 py-3 text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">Course</th>
-                      <th className="px-5 py-3 text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">Batch</th>
-                      <th className="px-5 py-3 text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">Status</th>
+                    <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:bg-gray-900">
+                      <th className="px-5 py-3 text-xs font-medium uppercase text-[#5A6A7A]">Name</th>
+                      <th className="px-5 py-3 text-xs font-medium uppercase text-[#5A6A7A]">Course</th>
+                      <th className="px-5 py-3 text-xs font-medium uppercase text-[#5A6A7A]">Batch</th>
+                      <th className="px-5 py-3 text-xs font-medium uppercase text-[#5A6A7A]">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {recentStudents.map((student) => {
                       const course = COURSE_MAP[student.courseId]
                       return (
-                        <tr key={student.id} className="border-b border-[#DDE3EC] last:border-0">
-                          <td className="px-5 py-3 font-medium text-[#0D1B2A]">{student.name}</td>
+                        <tr key={student.id} className="border-b border-[#DDE3EC] last:border-0 dark:border-gray-600">
+                          <td className="px-5 py-3 font-medium text-[#0D1B2A] dark:text-white">
+                            {student.name}
+                          </td>
                           <td className="px-5 py-3">
                             <span className="inline-flex items-center gap-1 rounded-full border border-[#DDE3EC] bg-[#F5F7FB] px-2.5 py-0.5 text-xs text-[#0B3D6B]">
                               {course?.flag} {course?.label.split(' ')[0] ?? student.courseId}
@@ -313,7 +433,9 @@ export default function DashboardPage() {
                           </td>
                           <td className="px-5 py-3 text-[#5A6A7A]">{student.batchId}</td>
                           <td className="px-5 py-3">
-                            <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs capitalize ${STATUS_STYLES[student.status]}`}>
+                            <span
+                              className={`inline-block rounded-full border px-2.5 py-0.5 text-xs capitalize ${STATUS_STYLES[student.status]}`}
+                            >
                               {student.status}
                             </span>
                           </td>
@@ -328,8 +450,10 @@ export default function DashboardPage() {
         </div>
 
         <div className="xl:col-span-2">
-          <div className="rounded-xl border border-[#DDE3EC] bg-white p-5">
-            <h2 className="font-jakarta mb-5 text-base font-bold text-[#0D1B2A]">Course Enrollment</h2>
+          <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
+            <h2 className="font-jakarta mb-5 text-base font-bold text-[#0D1B2A] dark:text-white">
+              Course Enrollment
+            </h2>
             {loading ? (
               <div className="animate-pulse space-y-4">
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -343,7 +467,7 @@ export default function DashboardPage() {
                   return (
                     <div key={course.label}>
                       <div className="mb-1.5 flex justify-between font-inter text-sm">
-                        <span className="text-[#0D1B2A]">{course.label}</span>
+                        <span className="text-[#0D1B2A] dark:text-white">{course.label}</span>
                         <span className="text-[#5A6A7A]">
                           {course.count} / {course.target}
                         </span>
@@ -363,41 +487,42 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Recent payments */}
       <section>
-        <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white">
-          <div className="border-b border-[#DDE3EC] px-5 py-4">
-            <h2 className="font-jakarta text-base font-bold text-[#0D1B2A]">Recent Payments</h2>
+        <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:bg-gray-800">
+          <div className="border-b border-[#DDE3EC] px-5 py-4 dark:border-gray-600">
+            <h2 className="font-jakarta text-base font-bold text-[#0D1B2A] dark:text-white">
+              Recent Payments
+            </h2>
           </div>
           {loading ? (
             <TableSkeleton rows={5} />
           ) : recentPayments.length === 0 ? (
             <p className="p-8 text-center font-inter text-sm text-[#5A6A7A]">
-              No payments recorded yet — record your first payment
+              No payments in selected period
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left font-inter text-sm">
                 <thead>
-                  <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB]">
-                    <th className="px-5 py-3 text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">Receipt No</th>
-                    <th className="px-5 py-3 text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">Student</th>
-                    <th className="px-5 py-3 text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">Amount</th>
-                    <th className="px-5 py-3 text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">Type</th>
-                    <th className="px-5 py-3 text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">Method</th>
-                    <th className="px-5 py-3 text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">Status</th>
+                  <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:bg-gray-900">
+                    <th className="px-5 py-3 text-xs font-medium uppercase text-[#5A6A7A]">Receipt</th>
+                    <th className="px-5 py-3 text-xs font-medium uppercase text-[#5A6A7A]">Student</th>
+                    <th className="px-5 py-3 text-xs font-medium uppercase text-[#5A6A7A]">Amount</th>
+                    <th className="px-5 py-3 text-xs font-medium uppercase text-[#5A6A7A]">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {recentPayments.map((payment) => (
-                    <tr key={payment.id} className="border-b border-[#DDE3EC] last:border-0">
-                      <td className="px-5 py-3 font-medium text-[#0D1B2A]">{payment.receiptNumber || '—'}</td>
-                      <td className="px-5 py-3 text-[#0D1B2A]">{payment.studentName}</td>
+                    <tr key={payment.id} className="border-b border-[#DDE3EC] last:border-0 dark:border-gray-600">
+                      <td className="px-5 py-3 font-medium text-[#0D1B2A] dark:text-white">
+                        {payment.receiptNumber || '—'}
+                      </td>
+                      <td className="px-5 py-3 text-[#0D1B2A] dark:text-white">{payment.studentName}</td>
                       <td className="px-5 py-3 font-medium text-[#0B3D6B]">{formatLKR(payment.amount)}</td>
-                      <td className="px-5 py-3 capitalize text-[#5A6A7A]">{payment.type}</td>
-                      <td className="px-5 py-3 capitalize text-[#5A6A7A]">{payment.method.replace('-', ' ')}</td>
                       <td className="px-5 py-3">
-                        <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs capitalize ${PAYMENT_STATUS_STYLES[payment.status]}`}>
+                        <span
+                          className={`inline-block rounded-full border px-2.5 py-0.5 text-xs capitalize ${PAYMENT_STATUS_STYLES[payment.status]}`}
+                        >
                           {payment.status}
                         </span>
                       </td>

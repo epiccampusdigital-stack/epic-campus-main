@@ -7,11 +7,37 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder'
 
 export async function POST(req: NextRequest) {
   try {
-    const { amount, currency, studentId, studentName, description, successUrl, cancelUrl } =
-      await req.json()
+    const body = await req.json()
+    const {
+      amount,
+      currency,
+      studentId,
+      studentName,
+      description,
+      successUrl,
+      cancelUrl,
+      metadata: extraMetadata,
+    } = body
 
-    if (!amount || !studentId) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    if (!amount) {
+      return NextResponse.json({ error: 'Missing amount' }, { status: 400 })
+    }
+
+    const fixedBillId =
+      extraMetadata?.fixedBillId != null ? String(extraMetadata.fixedBillId) : undefined
+
+    if (!studentId && !fixedBillId) {
+      return NextResponse.json(
+        { error: 'Missing studentId or fixedBillId' },
+        { status: 400 },
+      )
+    }
+
+    const sessionMetadata: Record<string, string> = {
+      studentId: studentId ? String(studentId) : '',
+      studentName: studentName ? String(studentName) : '',
+      fixedBillId: fixedBillId ?? '',
+      billType: extraMetadata?.billType ? String(extraMetadata.billType) : '',
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -21,10 +47,12 @@ export async function POST(req: NextRequest) {
           price_data: {
             currency: (currency || 'lkr').toLowerCase(),
             product_data: {
-              name: description || 'EPIC Campus Program Fee',
-              description: `Payment for ${studentName || 'student'}`,
+              name: description || 'EPIC Campus Payment',
+              description: studentName
+                ? `Payment for ${studentName}`
+                : description || 'Epic Campus',
             },
-            unit_amount: Math.round(amount * 100),
+            unit_amount: Math.round(Number(amount) * 100),
           },
           quantity: 1,
         },
@@ -32,10 +60,7 @@ export async function POST(req: NextRequest) {
       mode: 'payment',
       success_url: successUrl || `${req.nextUrl.origin}/student/payments?success=true`,
       cancel_url: cancelUrl || `${req.nextUrl.origin}/student/payments?cancelled=true`,
-      metadata: {
-        studentId,
-        studentName: studentName || '',
-      },
+      metadata: sessionMetadata,
     })
 
     return NextResponse.json({ sessionId: session.id, url: session.url })

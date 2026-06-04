@@ -28,8 +28,30 @@ export async function POST(req: NextRequest) {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session
-    const { studentId, studentName } = session.metadata || {}
+    const meta = session.metadata || {}
+    const studentId = meta.studentId || ''
+    const studentName = meta.studentName || ''
+    const fixedBillId = meta.fixedBillId || ''
     const amount = (session.amount_total || 0) / 100
+    const paymentDate = new Date().toISOString().slice(0, 10)
+
+    if (fixedBillId) {
+      try {
+        await adminDb.collection('fixedUtilityBills').doc(fixedBillId).set(
+          {
+            paid: true,
+            actualAmount: amount,
+            paymentDate,
+            stripeSessionId: session.id,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        )
+        console.log(`[Stripe webhook] Fixed utility bill ${fixedBillId} marked paid`)
+      } catch (err) {
+        console.error('[Stripe webhook] Fixed bill update failed:', err)
+      }
+    }
 
     if (studentId) {
       try {
@@ -37,14 +59,14 @@ export async function POST(req: NextRequest) {
           studentId,
           studentName: studentName || '',
           amount,
-          currency: session.currency || 'usd',
+          currency: (session.currency || 'lkr').toUpperCase(),
           stripeSessionId: session.id,
           status: 'paid',
           paidAt: FieldValue.serverTimestamp(),
           createdAt: FieldValue.serverTimestamp(),
           method: 'stripe',
           type: 'tuition',
-          paymentDate: new Date().toISOString().slice(0, 10),
+          paymentDate,
         })
         console.log(`[Stripe webhook] Payment recorded for student ${studentId}: ${amount}`)
       } catch (err) {
