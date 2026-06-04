@@ -38,6 +38,8 @@ function getRedirectPath(role: string): string {
     case 'accountant':
     case 'teacher':
       return '/dashboard'
+    case 'company':
+      return '/company/dashboard'
     default:
       return '/dashboard'
   }

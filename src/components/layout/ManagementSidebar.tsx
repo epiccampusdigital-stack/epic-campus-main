@@ -34,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Audit Log', href: '/audit-log', icon: 'ti-shield-check', roles: ['admin', 'owner'] },
   { label: 'Reports', href: '/reports', icon: 'ti-chart-bar', roles: ['admin', 'owner', 'accountant'] },
   { label: 'Agent Reports', href: '/agent-reports', icon: 'ti-chart-dots-2', roles: ['admin', 'owner', 'accountant'] },
+  { label: 'Partners', href: '/partner-companies', icon: 'ti-building', roles: ['admin', 'owner'] },
   { label: 'Analytics', href: '/admin/analytics', icon: 'ti-chart-dots', roles: ['admin', 'owner'] },
   { label: 'Visa Tracker', href: '/admin/visa', icon: 'ti-plane', roles: ['admin', 'owner', 'reception'] },
   { label: 'Messages', href: '/messages', icon: 'ti-message', roles: ['admin', 'owner', 'reception'] },

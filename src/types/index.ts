@@ -1,4 +1,12 @@
-export type Role = 'admin' | 'owner' | 'reception' | 'accountant' | 'teacher' | 'examCoordinator' | 'student'
+export type Role =
+  | 'admin'
+  | 'owner'
+  | 'reception'
+  | 'accountant'
+  | 'teacher'
+  | 'examCoordinator'
+  | 'student'
+  | 'company'
 
 export type CourseId = 'japan-ssw' | 'korea-d2d4' | 'china' | 'ielts' | 'nvq-it' | 'nvq-hospitality' | 'nvq-caregiving' | 'nvq-construction' | 'nvq-logistics'
 
@@ -13,10 +21,12 @@ export interface EpicUser {
   /** Reception / staff campus assignment */
   locationAssigned?: StudentLocation
   studentId?: string
+  /** Partner company document id when role is company */
+  companyId?: string
   createdAt: string
 }
 
-export type StaffRole = Exclude<Role, 'student'>
+export type StaffRole = Exclude<Role, 'student' | 'company'>
 export type StaffStatus = 'active' | 'pending' | 'suspended'
 export type SalaryType = 'fixed' | 'hourly' | 'commission'
 
@@ -468,4 +478,70 @@ export interface SpeakingSubmission {
   score?: number | null
   feedback?: string
   markingStatus: ExamMarkingStatus
+}
+
+export type PartnerCountry = 'japan'
+export type PartnerFeeCurrency = 'LKR' | 'JPY'
+export type PartnerFeeStatus = 'paid' | 'unpaid' | 'na'
+export type PartnerCompanyStatus = 'active' | 'inactive'
+
+export interface PartnerCompany {
+  id: string
+  name: string
+  country: PartnerCountry
+  industry: string
+  contactName: string
+  contactEmail: string
+  contactPhone: string
+  logoUrl?: string
+  placementFee: number
+  placementFeeCurrency: PartnerFeeCurrency
+  feeStatus: PartnerFeeStatus
+  status: PartnerCompanyStatus
+  loginUid?: string
+  createdAt: string
+  createdBy: string
+}
+
+export type CandidateShortlistStatus =
+  | 'viewing'
+  | 'shortlisted'
+  | 'interview_requested'
+  | 'interview_confirmed'
+  | 'placed'
+  | 'rejected'
+
+export interface CandidateShortlist {
+  id: string
+  companyId: string
+  companyName: string
+  studentId: string
+  studentName: string
+  status: CandidateShortlistStatus
+  interviewDate?: string
+  notes: string
+  placementFee: number
+  feePaid: boolean
+  /** Denormalized for company portal */
+  studentAge?: number
+  japaneseLevel?: string
+  examScoreSummary?: string
+  batchStatus?: CourseBatchStatus
+  placedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PartnerNotification {
+  id: string
+  type: 'partner_interview_request'
+  title: string
+  message: string
+  companyId: string
+  companyName: string
+  studentId: string
+  studentDisplayName: string
+  candidateShortlistId: string
+  read: boolean
+  createdAt: string
 }

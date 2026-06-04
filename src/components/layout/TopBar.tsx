@@ -12,6 +12,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/staff': 'Staff',
   '/audit-log': 'Audit Log',
   '/reports': 'Reports',
+  '/partner-companies': 'Partner Companies',
 }
 
 function getInitials(name: string): string {

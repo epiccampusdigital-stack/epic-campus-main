@@ -19,6 +19,8 @@ import {
 import TeacherDashboard from '@/components/dashboard/TeacherDashboard'
 import LocationFilterSelect from '@/components/ui/LocationFilterSelect'
 import { useManagement } from '@/components/layout/ManagementContext'
+import { fetchUnreadPartnerNotifications } from '@/lib/partners/helpers'
+import type { PartnerNotification } from '@/types'
 import type { CourseId, Payment, Student, AttendanceRecord, StudentLocation } from '@/types'
 
 interface DashboardStats {
@@ -77,6 +79,7 @@ export default function DashboardPage() {
   const [allStudents, setAllStudents] = useState<Student[]>([])
   const [allPayments, setAllPayments] = useState<Payment[]>([])
   const [allAttendance, setAllAttendance] = useState<AttendanceRecord[]>([])
+  const [partnerNotifications, setPartnerNotifications] = useState<PartnerNotification[]>([])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -101,12 +104,17 @@ export default function DashboardPage() {
           parseAttendance(d.id, d.data() as Record<string, unknown>),
         ),
       )
+      if (user?.role === 'admin' || user?.role === 'owner') {
+        setPartnerNotifications(await fetchUnreadPartnerNotifications())
+      } else {
+        setPartnerNotifications([])
+      }
     } catch (err) {
       console.error('Dashboard fetch error:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [user?.role])
 
   useEffect(() => {
     if (user?.role === 'teacher') {
@@ -357,10 +365,31 @@ export default function DashboardPage() {
         {loading ? (
           <TableSkeleton rows={4} />
         ) : pendingItems.paymentPending.length === 0 &&
-          pendingItems.studentPending.length === 0 ? (
+          pendingItems.studentPending.length === 0 &&
+          partnerNotifications.length === 0 ? (
           <p className="p-8 text-center text-sm text-[#5A6A7A]">No pending items for this course.</p>
         ) : (
           <div className="divide-y divide-[#DDE3EC] dark:divide-gray-600">
+            {partnerNotifications.map((n) => (
+              <div
+                key={n.id}
+                className="flex flex-wrap items-center justify-between gap-2 bg-[#E8A020]/5 px-5 py-3"
+              >
+                <div>
+                  <p className="font-medium text-[#0D1B2A] dark:text-white">{n.title}</p>
+                  <p className="text-xs text-[#5A6A7A]">
+                    Partner · {n.companyName} · {n.studentDisplayName}
+                  </p>
+                  <p className="text-xs text-[#5A6A7A]">{n.message}</p>
+                </div>
+                <Link
+                  href="/partner-companies"
+                  className="text-sm font-semibold text-[#0B3D6B] hover:text-[#E8A020]"
+                >
+                  Review →
+                </Link>
+              </div>
+            ))}
             {pendingItems.paymentPending.map((p) => (
               <div
                 key={p.id}
