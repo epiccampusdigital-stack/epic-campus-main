@@ -13,6 +13,10 @@ const config: Config = {
         background: "var(--background)",
         foreground: "var(--foreground)",
       },
+      fontFamily: {
+        'dm-sans': ['DM Sans', 'sans-serif'],
+        'noto-jp': ['Noto Sans JP', 'sans-serif'],
+      },
     },
   },
   plugins: [],

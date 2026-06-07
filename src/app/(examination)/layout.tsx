@@ -104,22 +104,8 @@ export default function ExaminationLayout({
 
   return (
     <ExamContext.Provider value={{ user, student }}>
-      <div className="flex min-h-screen flex-col bg-white">
-        <header className="flex items-center justify-between border-b border-[#DDE3EC] bg-white px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-[#0B3D6B] px-3 py-2">
-              <img
-                src="/images/logo-transparent.png"
-                alt="Epic Campus"
-                className="h-8 w-auto"
-              />
-            </div>
-            <span className="hidden font-jakarta text-sm font-semibold text-[#0B3D6B] sm:inline">
-              Japanese Language Examination
-            </span>
-          </div>
-        </header>
-        <main className="flex-1 bg-[#F5F7FB]">{children}</main>
+      <div className="font-['DM_Sans'] min-h-screen bg-[#F5F7FB]">
+        {children}
       </div>
     </ExamContext.Provider>
   )

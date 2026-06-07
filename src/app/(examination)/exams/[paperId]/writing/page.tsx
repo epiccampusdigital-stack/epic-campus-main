@@ -39,6 +39,7 @@ export default function WritingPage() {
       tasks={tasks}
       level={paper.level}
       timeLimitMinutes={paper.writingMinutes}
+      paperCode={paper.code}
     />
   )
 }

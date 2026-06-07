@@ -193,7 +193,7 @@ export default function JsonImporter({ onImported }: JsonImporterProps) {
         <button
           type="button"
           onClick={handleDownloadTemplate}
-          className="rounded-lg border border-[#DDE3EC] px-4 py-2 text-sm font-semibold text-[#0B3D6B] hover:bg-[#F5F7FB]"
+          className="border border-gray-200 rounded-[7px] px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
         >
           Download template
         </button>
@@ -207,9 +207,10 @@ export default function JsonImporter({ onImported }: JsonImporterProps) {
           setErrors([])
           setSuccess(null)
         }}
-        placeholder="Paste JSON here…"
+        placeholder="// Paste your paper JSON here..."
         rows={16}
-        className="w-full rounded-lg border border-[#DDE3EC] bg-[#1e1e2e] p-4 font-mono text-sm text-green-300 placeholder:text-gray-500 focus:border-[#0B3D6B] focus:outline-none"
+        className="w-full h-64 font-mono text-sm bg-gray-950 text-green-400 rounded-lg p-4
+                   resize-none border-0 focus:outline-none focus:ring-1 focus:ring-[#E8A020]/40"
         spellCheck={false}
       />
 
@@ -232,7 +233,7 @@ export default function JsonImporter({ onImported }: JsonImporterProps) {
         <button
           type="button"
           onClick={handleValidate}
-          className="rounded-lg bg-[#0B3D6B] px-5 py-2.5 text-sm font-bold text-white"
+          className="bg-[#0B3D6B] text-white rounded-[7px] px-4 py-2 text-sm font-medium hover:bg-[#0B3D6B]/90 transition-colors"
         >
           Validate
         </button>
@@ -240,7 +241,8 @@ export default function JsonImporter({ onImported }: JsonImporterProps) {
           type="button"
           onClick={handleImport}
           disabled={!validated || importing}
-          className="rounded-lg bg-[#E8A020] px-5 py-2.5 text-sm font-bold text-[#0B3D6B] disabled:cursor-not-allowed disabled:opacity-50"
+          className="bg-[#E8A020] text-white rounded-[7px] px-4 py-2 text-sm font-medium
+                     hover:bg-[#E8A020]/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           {importing ? 'Importing…' : 'Import to Firestore'}
         </button>

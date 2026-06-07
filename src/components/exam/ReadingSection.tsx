@@ -1,19 +1,17 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import ExamTimer from '@/components/exam/ExamTimer'
-import QuestionPalette from '@/components/exam/QuestionPalette'
+import ExamTopbar from '@/components/exam/ExamTopbar'
 import { getAttempt, loadAnswers, markSection, saveAnswer } from '@/lib/exam/helpers'
 import type { ReadingQuestion } from '@/types'
-
-const PER_PAGE = 5
 
 interface ReadingSectionProps {
   paperId: string
   attemptId: string
   questions: ReadingQuestion[]
   timeLimitMinutes: number
+  paperCode?: string
 }
 
 export default function ReadingSection({
@@ -21,21 +19,18 @@ export default function ReadingSection({
   attemptId,
   questions,
   timeLimitMinutes,
+  paperCode = '',
 }: ReadingSectionProps) {
   const router = useRouter()
-  const [page, setPage] = useState(0)
+  const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [startedAt, setStartedAt] = useState<Date>(new Date())
   const [submitting, setSubmitting] = useState(false)
-
-  const pageQuestions = questions.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE)
-  const totalPages = Math.ceil(questions.length / PER_PAGE) || 1
+  const [timeLeft, setTimeLeft] = useState<number | null>(null)
 
   const questionKey = useMemo(() => {
     const key: Record<string, string> = {}
-    questions.forEach((q) => {
-      key[q.id] = q.correctAnswer
-    })
+    questions.forEach((q) => { key[q.id] = q.correctAnswer })
     return key
   }, [questions])
 
@@ -46,6 +41,7 @@ export default function ReadingSection({
     loadAnswers(attemptId, 'reading').then(setAnswers)
   }, [attemptId])
 
+  // Auto-save every 30 s
   useEffect(() => {
     const interval = setInterval(() => {
       Object.entries(answers).forEach(([id, val]) => {
@@ -54,23 +50,9 @@ export default function ReadingSection({
           saveAnswer(attemptId, id, val, 'reading', q?.correctAnswer).catch(console.error)
         }
       })
-    }, 30000)
+    }, 30_000)
     return () => clearInterval(interval)
   }, [answers, attemptId, questions])
-
-  const answeredIndices = useMemo(() => {
-    const set = new Set<number>()
-    questions.forEach((q, i) => {
-      if (answers[q.id]) set.add(i)
-    })
-    return set
-  }, [answers, questions])
-
-  const handleAnswer = (questionId: string, value: string) => {
-    setAnswers((prev) => ({ ...prev, [questionId]: value }))
-    const q = questions.find((x) => x.id === questionId)
-    saveAnswer(attemptId, questionId, value, 'reading', q?.correctAnswer).catch(console.error)
-  }
 
   const finishSection = useCallback(async () => {
     if (submitting) return
@@ -87,125 +69,204 @@ export default function ReadingSection({
     }
   }, [answers, attemptId, paperId, questionKey, questions, router, submitting])
 
-  const handleExpire = useCallback(() => {
-    finishSection()
-  }, [finishSection])
+  // Timer
+  const finishRef = useRef(finishSection)
+  useEffect(() => { finishRef.current = finishSection })
+
+  useEffect(() => {
+    const elapsed = Math.floor((Date.now() - startedAt.getTime()) / 1000)
+    const remaining = Math.max(0, timeLimitMinutes * 60 - elapsed)
+    setTimeLeft(remaining)
+    if (remaining === 0) { finishRef.current(); return }
+    const t = setInterval(() => {
+      setTimeLeft((p) => {
+        const next = (p ?? 1) - 1
+        if (next <= 0) { finishRef.current(); return 0 }
+        return next
+      })
+    }, 1000)
+    return () => clearInterval(t)
+  }, [startedAt, timeLimitMinutes])
+
+  const answeredIndices = useMemo(() => {
+    const set = new Set<number>()
+    questions.forEach((q, i) => { if (answers[q.id]) set.add(i) })
+    return set
+  }, [answers, questions])
+
+  const handleAnswer = (questionId: string, letter: string) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: letter }))
+    const q = questions.find((x) => x.id === questionId)
+    saveAnswer(attemptId, questionId, letter, 'reading', q?.correctAnswer).catch(console.error)
+  }
 
   if (questions.length === 0) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-12 text-center">
         <p className="mb-2 text-lg font-semibold text-[#0B3D6B]">No questions available for this section yet.</p>
-        <p className="mb-6 text-sm text-[#5A6A7A]">
-          An admin needs to import questions using the JSON importer in Admin &gt; Exams.
+        <p className="mb-6 text-sm text-gray-500">
+          An admin needs to import questions using the JSON importer in Admin › Exams.
         </p>
-        <a
-          href="/exams"
-          className="inline-block rounded-lg border border-[#DDE3EC] px-6 py-2.5 text-sm font-semibold text-[#0B3D6B]"
-        >
+        <a href="/exams" className="inline-block rounded-lg border border-gray-200 px-6 py-2.5 text-sm font-semibold text-[#0B3D6B]">
           Return to Exam List
         </a>
       </div>
     )
   }
 
+  const question = questions[currentQuestion]
+  const selectedAnswer = question ? answers[question.id] : undefined
+  const isLast = currentQuestion === questions.length - 1
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="font-jakarta text-xl font-bold text-[#0B3D6B]">Reading</h1>
-        <ExamTimer
-          startedAt={startedAt}
-          timeLimitMinutes={timeLimitMinutes}
-          onExpire={handleExpire}
-        />
-      </div>
+    <div className="flex flex-col h-screen">
+      <ExamTopbar
+        paperCode={paperCode}
+        section="reading"
+        timeLeft={timeLeft ?? undefined}
+        currentQ={currentQuestion + 1}
+        totalQ={questions.length}
+      />
 
-      <div className="mb-4">
-        <QuestionPalette
-          total={questions.length}
-          currentIndex={page * PER_PAGE}
-          answered={answeredIndices}
-          onSelect={(i) => setPage(Math.floor(i / PER_PAGE))}
-        />
-      </div>
+      {/* 2-column body */}
+      <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 52px - 56px)' }}>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-[#DDE3EC] bg-white p-6">
-          <p className="mb-2 font-inter text-xs uppercase text-[#5A6A7A]">Passage</p>
-          {pageQuestions.map((q) => (
-            <p
-              key={q.id}
-              className="mb-4 font-inter text-lg leading-relaxed text-[#0D1B2A]"
-            >
-              {q.passageText}
-            </p>
-          ))}
-        </div>
+        {/* Main question column */}
+        <div className="flex-1 overflow-y-auto px-6 py-5">
 
-        <div className="space-y-6">
-          {pageQuestions.map((q) => (
-            <div key={q.id} className="rounded-xl border border-[#DDE3EC] bg-white p-5">
-              <p className="mb-1 font-inter text-xs text-[#5A6A7A]">
-                Question {q.questionNumber}
+          {/* Question header */}
+          <div className="flex items-baseline gap-2 mb-4">
+            <span className="text-[11px] font-semibold text-[#0B3D6B] bg-[#0B3D6B]/[0.07] px-2 py-0.5 rounded">
+              Q{currentQuestion + 1}
+            </span>
+            <span className="text-[11px] text-gray-400">Multiple choice</span>
+          </div>
+
+          {/* Passage — amber left-border box */}
+          {question?.passageText && (
+            <div className="bg-gray-50 border-l-[3px] border-[#E8A020] rounded-r-lg px-4 py-3 mb-5">
+              <p className="font-['Noto_Sans_JP'] text-[14px] leading-[2.2] text-gray-800">
+                {question.passageText}
               </p>
-              <p className="mb-4 font-jakarta font-semibold text-[#0D1B2A]">
-                {q.questionText}
-              </p>
-              <div className="space-y-2">
-                {q.options.map((opt, idx) => {
-                  const letter = String.fromCharCode(65 + idx)
-                  return (
-                    <label
-                      key={letter}
-                      className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-colors ${
-                        answers[q.id] === letter
-                          ? 'border-[#0B3D6B] bg-[#0B3D6B]/5'
-                          : 'border-[#DDE3EC] hover:bg-[#F5F7FB]'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name={q.id}
-                        value={letter}
-                        checked={answers[q.id] === letter}
-                        onChange={() => handleAnswer(q.id, letter)}
-                        className="text-[#0B3D6B]"
-                      />
-                      <span className="font-medium text-[#0B3D6B]">{letter}.</span>
-                      <span className="text-[#0D1B2A]">{opt}</span>
-                    </label>
-                  )
-                })}
-              </div>
             </div>
-          ))}
+          )}
+
+          {/* Question text */}
+          <p className="text-[14px] font-medium text-gray-800 mb-4">
+            {question?.questionText}
+          </p>
+
+          {/* Options */}
+          {question?.options.map((opt, i) => {
+            const letter = ['A', 'B', 'C', 'D'][i]
+            const isSelected = selectedAnswer === letter
+            return (
+              <button
+                key={i}
+                onClick={() => handleAnswer(question.id, letter)}
+                className={`w-full flex items-center gap-3 px-4 py-[10px] rounded-[8px]
+                            border text-[13px] text-left mb-2 transition-all
+                            ${isSelected
+                              ? 'border-[#0B3D6B] bg-[#0B3D6B]/[0.05]'
+                              : 'border-gray-200 hover:border-[#1A6BAD] hover:bg-blue-50/30'
+                            }`}
+              >
+                <span className={`w-[22px] h-[22px] rounded-full border-[1.5px] flex items-center
+                                  justify-center text-[11px] font-semibold flex-shrink-0 transition-all
+                                  ${isSelected
+                                    ? 'border-[#0B3D6B] bg-[#0B3D6B] text-white'
+                                    : 'border-gray-300 text-gray-400'
+                                  }`}>
+                  {letter}
+                </span>
+                <span className={isSelected ? 'text-gray-800' : 'text-gray-600'}>{opt}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Right sidebar */}
+        <div className="w-[220px] flex-shrink-0 bg-white border-l border-gray-100 overflow-y-auto px-4 py-5">
+          <div className="text-[11px] uppercase tracking-[0.06em] text-gray-400 font-semibold mb-3">
+            Questions
+          </div>
+
+          {/* Question palette */}
+          <div className="grid grid-cols-5 gap-1.5 mb-5">
+            {questions.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentQuestion(i)}
+                className={`w-[30px] h-[30px] rounded-[6px] text-[11px] font-medium border transition-colors
+                            ${i === currentQuestion
+                              ? 'bg-[#E8A020] text-white border-[#E8A020]'
+                              : answeredIndices.has(i)
+                                ? 'bg-[#0B3D6B] text-white border-[#0B3D6B]'
+                                : 'border-gray-200 text-gray-400 hover:border-gray-300'
+                            }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+
+          {/* Legend */}
+          <div className="space-y-1.5 mb-5">
+            {[
+              { color: 'bg-[#0B3D6B]', label: 'Answered' },
+              { color: 'bg-[#E8A020]', label: 'Current' },
+              { color: 'bg-gray-100 border border-gray-200', label: 'Unanswered' },
+            ].map((l) => (
+              <div key={l.label} className="flex items-center gap-2 text-[11px] text-gray-400">
+                <div className={`w-[10px] h-[10px] rounded-[3px] ${l.color}`} />
+                {l.label}
+              </div>
+            ))}
+          </div>
+
+          {/* Progress */}
+          <div className="pt-4 border-t border-gray-100">
+            <div className="text-[11px] text-gray-400 mb-1.5">Progress</div>
+            <div className="h-[3px] bg-gray-100 rounded-full">
+              <div
+                className="h-[3px] bg-[#E8A020] rounded-full transition-all"
+                style={{ width: `${Math.round((answeredIndices.size / questions.length) * 100)}%` }}
+              />
+            </div>
+            <div className="text-[11px] text-gray-400 mt-1.5 tabular-nums">
+              {answeredIndices.size} / {questions.length} answered
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="mt-8 flex justify-between">
+      {/* Bottom nav bar */}
+      <div className="bg-white border-t border-gray-100 px-6 py-3 flex justify-between items-center z-40 flex-shrink-0">
         <button
-          type="button"
-          disabled={page === 0}
-          onClick={() => setPage((p) => p - 1)}
-          className="rounded-lg border border-[#DDE3EC] px-4 py-2 text-sm font-semibold text-[#5A6A7A] disabled:opacity-40"
+          onClick={() => setCurrentQuestion((c) => Math.max(0, c - 1))}
+          disabled={currentQuestion === 0}
+          className="px-4 py-2 border border-gray-200 rounded-[7px] text-sm text-gray-500
+                     hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          Previous
+          ← Previous
         </button>
-        {page < totalPages - 1 ? (
+        <span className="text-[12px] text-gray-400">Auto-saved</span>
+        {!isLast ? (
           <button
-            type="button"
-            onClick={() => setPage((p) => p + 1)}
-            className="rounded-lg bg-[#0B3D6B] px-6 py-2 font-jakarta text-sm font-bold text-white"
+            onClick={() => setCurrentQuestion((c) => Math.min(questions.length - 1, c + 1))}
+            className="px-5 py-2 bg-[#0B3D6B] text-white rounded-[7px] text-sm font-medium
+                       hover:bg-[#0B3D6B]/90 transition-colors"
           >
-            Next Page
+            Next →
           </button>
         ) : (
           <button
-            type="button"
-            disabled={submitting}
             onClick={finishSection}
-            className="rounded-lg bg-[#E8A020] px-6 py-2 font-jakarta text-sm font-bold text-[#0B3D6B] disabled:opacity-60"
+            disabled={submitting}
+            className="px-5 py-2 bg-[#E8A020] text-white rounded-[7px] text-sm font-medium
+                       hover:bg-[#E8A020]/90 transition-colors disabled:opacity-60"
           >
-            {submitting ? 'Saving…' : 'Next Section → Listening'}
+            {submitting ? 'Saving…' : 'Submit section →'}
           </button>
         )}
       </div>

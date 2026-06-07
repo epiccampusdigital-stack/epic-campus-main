@@ -1,9 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { doc, setDoc } from 'firebase/firestore'
-import ExamTimer from '@/components/exam/ExamTimer'
+import ExamTopbar from '@/components/exam/ExamTopbar'
 import { countWords, getAttempt } from '@/lib/exam/helpers'
 import { db } from '@/lib/firebase/client'
 import type { WritingTask } from '@/types'
@@ -14,6 +14,7 @@ interface WritingSectionProps {
   tasks: WritingTask[]
   level: string
   timeLimitMinutes: number
+  paperCode?: string
 }
 
 export default function WritingSection({
@@ -22,6 +23,7 @@ export default function WritingSection({
   tasks,
   level,
   timeLimitMinutes,
+  paperCode = '',
 }: WritingSectionProps) {
   const router = useRouter()
   const sorted = [...tasks].sort((a, b) => a.taskNumber - b.taskNumber)
@@ -33,10 +35,12 @@ export default function WritingSection({
   const [task2Text, setTask2Text] = useState('')
   const [startedAt, setStartedAt] = useState<Date>(new Date())
   const [submitting, setSubmitting] = useState(false)
+  const [timeLeft, setTimeLeft] = useState<number | null>(null)
 
   const activeTask = phase === 1 ? task1 : task2
   const activeText = phase === 1 ? task1Text : task2Text
   const setActiveText = phase === 1 ? setTask1Text : setTask2Text
+  const charCount = activeText.length
 
   useEffect(() => {
     getAttempt(attemptId).then((a) => {
@@ -82,15 +86,8 @@ export default function WritingSection({
       setSubmitting(false)
     }
   }, [
-    attemptId,
-    level,
-    paperId,
-    router,
-    submitting,
-    task1,
-    task1Text,
-    task2,
-    task2Text,
+    attemptId, level, paperId, router, submitting,
+    task1, task1Text, task2, task2Text,
   ])
 
   const handleNext = async () => {
@@ -98,79 +95,118 @@ export default function WritingSection({
     setPhase(2)
   }
 
+  // Timer
+  const finishRef = useRef(submitAll)
+  useEffect(() => { finishRef.current = submitAll })
+
+  useEffect(() => {
+    const elapsed = Math.floor((Date.now() - startedAt.getTime()) / 1000)
+    const remaining = Math.max(0, timeLimitMinutes * 60 - elapsed)
+    setTimeLeft(remaining)
+    if (remaining === 0) { finishRef.current(); return }
+    const t = setInterval(() => {
+      setTimeLeft((p) => {
+        const next = (p ?? 1) - 1
+        if (next <= 0) { finishRef.current(); return 0 }
+        return next
+      })
+    }, 1000)
+    return () => clearInterval(t)
+  }, [startedAt, timeLimitMinutes])
+
   if (!activeTask) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-12 text-center">
         <p className="mb-2 text-lg font-semibold text-[#0B3D6B]">No questions available for this section yet.</p>
-        <p className="mb-6 text-sm text-[#5A6A7A]">
-          An admin needs to import questions using the JSON importer in Admin &gt; Exams.
+        <p className="mb-6 text-sm text-gray-500">
+          An admin needs to import questions using the JSON importer in Admin › Exams.
         </p>
-        <a
-          href="/exams"
-          className="inline-block rounded-lg border border-[#DDE3EC] px-6 py-2.5 text-sm font-semibold text-[#0B3D6B]"
-        >
+        <a href="/exams" className="inline-block rounded-lg border border-gray-200 px-6 py-2.5 text-sm font-semibold text-[#0B3D6B]">
           Return to Exam List
         </a>
       </div>
     )
   }
 
+  const minChars = (activeTask.minWords ?? 0) * 3
+  const charClass =
+    charCount < minChars && minChars > 0
+      ? 'text-red-500'
+      : charCount > 500
+        ? 'text-amber-600'
+        : 'text-green-600'
+
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="font-jakarta text-xl font-bold text-[#0B3D6B]">
-          Writing — Task {phase}
-        </h1>
-        <ExamTimer
-          startedAt={startedAt}
-          timeLimitMinutes={timeLimitMinutes}
-          onExpire={phase === 2 ? submitAll : handleNext}
-        />
-      </div>
+    <div className="flex flex-col min-h-screen">
+      <ExamTopbar
+        paperCode={paperCode}
+        section="writing"
+        timeLeft={timeLeft ?? undefined}
+      />
 
-      <div className="rounded-xl border border-[#DDE3EC] bg-white p-6">
-        <p className="mb-4 font-inter text-[#0D1B2A]">{activeTask.prompt}</p>
-        <textarea
-          value={activeText}
-          onChange={(e) => setActiveText(e.target.value)}
-          spellCheck={false}
-          className="min-h-[280px] w-full resize-y rounded-lg border border-[#DDE3EC] p-4 font-inter text-[#0D1B2A] focus:border-[#0B3D6B] focus:outline-none focus:ring-1 focus:ring-[#0B3D6B]"
-          placeholder="Type your response here…"
-        />
-        <div className="mt-2 flex flex-wrap gap-4 text-sm text-[#5A6A7A]">
-          <span>
-            Characters:{' '}
-            <span className="font-semibold text-[#0B3D6B]">{activeText.length}</span>
-            {activeTask.minWords ? (
-              <span> / minimum {activeTask.minWords}</span>
-            ) : null}
-          </span>
-          <span>
-            Words:{' '}
-            <span className="font-semibold text-[#0B3D6B]">{countWords(activeText)}</span>
-          </span>
+      <div className="max-w-2xl mx-auto px-5 py-6 w-full">
+        <div className="mb-5">
+          <div className="flex items-baseline gap-2 mb-3">
+            <span className="text-[11px] font-semibold text-[#0B3D6B] bg-[#0B3D6B]/[0.07] px-2 py-0.5 rounded">
+              Task {phase}
+            </span>
+            <span className="text-[11px] text-gray-400">
+              {phase === 1 ? 'Short response' : 'Extended response'}
+            </span>
+          </div>
+
+          {/* Instruction box */}
+          <div className="bg-[#E8A020]/[0.06] border border-[#E8A020]/20 rounded-lg px-4 py-3 mb-4">
+            <p className="text-[13px] text-gray-700 leading-relaxed">{activeTask.prompt}</p>
+            {activeTask.minWords > 0 && (
+              <p className="text-[11px] text-gray-400 mt-2">
+                📝 Write at least {activeTask.minWords} words in Japanese
+              </p>
+            )}
+          </div>
+
+          {/* Textarea */}
+          <textarea
+            value={activeText}
+            onChange={(e) => setActiveText(e.target.value)}
+            spellCheck={false}
+            placeholder="ここに日本語で書いてください..."
+            className="w-full min-h-[200px] border border-gray-200 rounded-[8px]
+                       px-4 py-3 text-[14px] font-['Noto_Sans_JP'] leading-[2.2] resize-none
+                       focus:outline-none focus:border-[#1A6BAD] focus:ring-1
+                       focus:ring-[#1A6BAD]/20 bg-white placeholder-gray-300 transition-colors"
+          />
+
+          {/* Character / word count */}
+          <div className="flex justify-between text-[11px] mt-1.5">
+            <span className="text-gray-400">Words: {countWords(activeText)}</span>
+            <span className={charClass}>{charCount} characters</span>
+          </div>
         </div>
-      </div>
 
-      <div className="mt-8 flex justify-end gap-3">
-        {phase === 1 && task2 ? (
-          <button
-            type="button"
-            onClick={handleNext}
-            className="rounded-lg bg-[#0B3D6B] px-6 py-2 font-jakarta text-sm font-bold text-white"
-          >
-            Next → Task 2
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={submitAll}
-            className="rounded-lg bg-[#E8A020] px-6 py-2 font-jakarta text-sm font-bold text-[#0B3D6B] disabled:opacity-60"
-          >
-            {submitting ? 'Submitting…' : 'Submit → Speaking'}
-          </button>
-        )}
+        {/* Actions */}
+        <div className="flex justify-end gap-3">
+          {phase === 1 && task2 ? (
+            <button
+              type="button"
+              onClick={handleNext}
+              className="px-5 py-2 bg-[#0B3D6B] text-white rounded-[7px] text-sm font-medium
+                         hover:bg-[#0B3D6B]/90 transition-colors"
+            >
+              Next → Task 2
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={submitAll}
+              className="px-5 py-2 bg-[#E8A020] text-white rounded-[7px] text-sm font-medium
+                         hover:bg-[#E8A020]/90 transition-colors disabled:opacity-60"
+            >
+              {submitting ? 'Submitting…' : 'Submit → Speaking'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

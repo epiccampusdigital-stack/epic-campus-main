@@ -152,7 +152,7 @@ export default function AdminExamsPage() {
         </p>
       </div>
 
-      <div className="mb-6 flex gap-1 rounded-lg border border-[#DDE3EC] bg-white p-1">
+      <div className="flex gap-0 border-b border-gray-200 bg-white mb-6">
         {(
           [
             ['papers', 'Papers'],
@@ -164,11 +164,11 @@ export default function AdminExamsPage() {
             key={key}
             type="button"
             onClick={() => setTab(key)}
-            className={`flex-1 rounded-md px-4 py-2 text-sm font-semibold transition-colors ${
-              tab === key
-                ? 'bg-[#0B3D6B] text-white'
-                : 'text-[#5A6A7A] hover:bg-[#F5F7FB]'
-            }`}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors cursor-pointer
+              ${tab === key
+                ? 'border-[#E8A020] text-[#0B3D6B]'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
           >
             {label}
           </button>
@@ -207,7 +207,7 @@ export default function AdminExamsPage() {
                 setEditPaper(null)
                 setFormOpen(true)
               }}
-              className="rounded-lg bg-[#E8A020] px-4 py-2 text-sm font-bold text-[#0B3D6B]"
+              className="bg-[#0B3D6B] text-white rounded-[7px] px-4 py-2 text-sm font-medium hover:bg-[#0B3D6B]/90 transition-colors"
             >
               Create New Paper
             </button>
@@ -239,10 +239,10 @@ export default function AdminExamsPage() {
                     <td className="px-4 py-3">{p.title}</td>
                     <td className="px-4 py-3">
                       <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        className={`rounded px-2 py-0.5 text-[11px] font-medium ${
                           p.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-amber-100 text-amber-800'
+                            ? 'bg-green-50 text-green-700'
+                            : 'bg-gray-100 text-gray-500'
                         }`}
                       >
                         {statusLabel(p.status)}
@@ -335,7 +335,7 @@ export default function AdminExamsPage() {
             <button
               type="button"
               onClick={handleExport}
-              className="rounded-lg bg-[#0B3D6B] px-4 py-2 text-sm font-bold text-white"
+              className="bg-[#0B3D6B] text-white rounded-[7px] px-4 py-2 text-sm font-medium hover:bg-[#0B3D6B]/90 transition-colors"
             >
               Export Excel
             </button>

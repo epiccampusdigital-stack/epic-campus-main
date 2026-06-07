@@ -1,10 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { doc, getDoc } from 'firebase/firestore'
-import ResultCard, { GradeBadge } from '@/components/exam/ResultCard'
+import ExamTopbar from '@/components/exam/ExamTopbar'
 import Leaderboard from '@/components/exam/Leaderboard'
 import { useExamPortal } from '@/components/exam/ExamContext'
 import {
@@ -34,7 +33,6 @@ export default function ExamResultsPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [writingFeedback, setWritingFeedback] = useState<WritingFeedback | null>(null)
   const [pollCount, setPollCount] = useState(0)
-  const [showPartialResults, setShowPartialResults] = useState(false)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
 
   const loadData = useCallback(async () => {
@@ -88,157 +86,167 @@ export default function ExamResultsPage() {
   }
 
   const speakingPending = attempt.speakingScore == null
+  const writingPending = attempt.writingScore == null && pollCount < 20
+  const grade = attempt.grade ?? 'D'
+  const overallScore = attempt.totalScore ?? 0
+
+  const gradeColor =
+    grade === 'S' ? 'bg-purple-50 text-purple-600 border-purple-200'
+    : grade === 'A' ? 'bg-green-50 text-green-600 border-green-200'
+    : grade === 'B' ? 'bg-blue-50 text-[#0B3D6B] border-blue-200'
+    : grade === 'C' ? 'bg-amber-50 text-amber-600 border-amber-200'
+    : 'bg-red-50 text-red-500 border-red-200'
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-      <div className="rounded-xl border border-[#DDE3EC] bg-white p-6 sm:p-8">
-        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="font-mono text-sm text-[#5A6A7A]">{attempt.paperCode}</p>
-            <h1 className="font-jakarta text-2xl font-bold text-[#0B3D6B]">
-              Exam Results
-            </h1>
-            <p className="mt-1 text-sm text-[#5A6A7A]">{attempt.studentName}</p>
-          </div>
-          <div className="flex flex-col items-center gap-2">
-            <GradeBadge grade={attempt.grade ?? 'D'} />
-            <p className="font-jakarta text-lg font-bold text-[#0B3D6B]">
-              {attempt.totalScore ?? 0}%
-            </p>
-          </div>
-        </div>
+    <div className="flex flex-col min-h-screen">
+      <ExamTopbar paperCode={attempt.paperCode} section="results" />
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <ResultCard label="Reading" score={attempt.readingScore} />
-          <ResultCard label="Listening" score={attempt.listeningScore} />
-          <ResultCard
-            label="Writing"
-            score={attempt.writingScore}
-            pending={attempt.writingScore == null && pollCount < 20}
-          />
-          <ResultCard label="Speaking" score={attempt.speakingScore} pending={speakingPending} />
-        </div>
+      <div className="max-w-2xl mx-auto px-4 py-8 w-full">
 
-        {writingFeedback && (
-          <div className="mt-8 rounded-lg bg-[#F5F7FB] p-5">
-            <h2 className="font-jakarta font-semibold text-[#0B3D6B]">Writing feedback</h2>
-            {writingFeedback.strengths && writingFeedback.strengths.length > 0 && (
-              <div className="mt-3">
-                <p className="text-xs font-semibold uppercase text-green-700">Strengths</p>
-                <ul className="mt-1 list-inside list-disc text-sm text-[#0D1B2A]">
-                  {writingFeedback.strengths.map((s) => (
-                    <li key={s}>{s}</li>
-                  ))}
-                </ul>
+        {/* Top 2-col grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+
+          {/* Grade card */}
+          <div className="bg-white border border-gray-100 rounded-xl p-6 text-center shadow-sm">
+            <div className="text-[11px] uppercase tracking-[0.06em] text-gray-400 mb-4">Overall Grade</div>
+            <div className={`w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center
+                            text-3xl font-bold border-2 ${gradeColor}`}>
+              {grade}
+            </div>
+            <div className="text-[32px] font-bold text-[#0B3D6B] tabular-nums">{overallScore}%</div>
+            <div className="text-[12px] text-gray-400 mb-5">
+              {attempt.paperCode} · {attempt.studentName}
+            </div>
+
+            {/* 4-section score bars */}
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { label: 'Reading',   score: attempt.readingScore,   color: 'bg-green-500' },
+                { label: 'Listening', score: attempt.listeningScore, color: 'bg-[#0B3D6B]' },
+                { label: 'Writing',   score: attempt.writingScore,   color: 'bg-[#E8A020]' },
+                { label: 'Speaking',  score: attempt.speakingScore,  color: 'bg-purple-500' },
+              ].map((s) => (
+                <div key={s.label} className="text-center">
+                  <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">{s.label}</div>
+                  <div className="text-[18px] font-semibold text-gray-800 tabular-nums">
+                    {s.score != null ? s.score : '—'}
+                  </div>
+                  <div className="h-[3px] bg-gray-100 rounded-full mt-1">
+                    <div
+                      className={`h-[3px] ${s.color} rounded-full transition-all`}
+                      style={{ width: `${s.score ?? 0}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* AI feedback card */}
+          <div className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm">
+            <div className="text-[13px] font-medium text-gray-800 mb-3">AI Feedback</div>
+            {writingPending || speakingPending ? (
+              <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+                ⏳ AI is marking your writing/speaking…
+                {elapsedSeconds >= 60 && (
+                  <p className="text-xs mt-1 text-amber-700">
+                    This may take a few minutes. Partial results shown above.
+                  </p>
+                )}
               </div>
-            )}
-            {writingFeedback.improvements && writingFeedback.improvements.length > 0 && (
-              <div className="mt-3">
-                <p className="text-xs font-semibold uppercase text-amber-700">Improvements</p>
-                <ul className="mt-1 list-inside list-disc text-sm text-[#0D1B2A]">
-                  {writingFeedback.improvements.map((s) => (
-                    <li key={s}>{s}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-
-        {(speakingPending || (attempt.writingScore == null && pollCount >= 20)) && (
-          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4">
-            {elapsedSeconds >= 60 || pollCount >= 20 ? (
+            ) : writingFeedback ? (
               <>
-                <p className="text-sm font-semibold text-amber-800">
-                  Results are being processed. We&apos;ll notify you when ready.
-                </p>
-                <p className="mt-1 text-xs text-amber-700">
-                  Writing/speaking marking may take a few minutes. You can view partial results below.
-                </p>
-                {!showPartialResults && (
-                  <button
-                    type="button"
-                    onClick={() => setShowPartialResults(true)}
-                    className="mt-3 rounded-lg border border-amber-400 px-4 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
-                  >
-                    View Partial Results (Reading + Listening)
-                  </button>
+                {writingFeedback.strengths && writingFeedback.strengths.length > 0 && (
+                  <>
+                    <div className="text-[11px] font-semibold text-green-600 mb-1">✓ Strengths</div>
+                    <p className="text-[12px] text-gray-500 mb-3">
+                      {writingFeedback.strengths.join(' · ')}
+                    </p>
+                  </>
+                )}
+                {writingFeedback.improvements && writingFeedback.improvements.length > 0 && (
+                  <>
+                    <div className="text-[11px] font-semibold text-[#E8A020] mb-1">↑ To improve</div>
+                    <p className="text-[12px] text-gray-500">
+                      {writingFeedback.improvements.join(' · ')}
+                    </p>
+                  </>
                 )}
               </>
             ) : (
-              <p className="text-sm text-amber-800">
-                {speakingPending ? 'Speaking: Pending teacher review. ' : ''}
-                {attempt.writingScore == null ? 'Writing results are being processed…' : ''}
+              <p className="text-[12px] text-gray-400 italic">
+                Feedback will appear here once marking is complete.
               </p>
             )}
           </div>
-        )}
+        </div>
 
-        <div className="mt-8">
-          <h2 className="font-jakarta font-semibold text-[#0B3D6B]">Answer review</h2>
-          <div className="mt-4 space-y-4">
-            {readingQs.map((q) => {
+        {/* Action buttons */}
+        <div className="flex gap-3 justify-center mb-8">
+          <button
+            onClick={() => router.push('/exams')}
+            className="px-5 py-2 border border-gray-200 rounded-[7px] text-sm text-gray-600
+                       hover:bg-gray-50 transition-colors"
+          >
+            ← Back to exams
+          </button>
+          <button
+            onClick={() => router.push(`/exams/${paperId}`)}
+            className="px-5 py-2 bg-[#0B3D6B] text-white rounded-[7px] text-sm font-medium
+                       hover:bg-[#0B3D6B]/90 transition-colors"
+          >
+            Try again →
+          </button>
+        </div>
+
+        {/* Answer review */}
+        <div className="mb-8">
+          <div className="text-[11px] uppercase tracking-[0.08em] text-gray-400 font-semibold
+                          bg-gray-50 px-4 py-2 border-y border-gray-100 mb-0">
+            Answer Review
+          </div>
+          <div className="bg-white border-x border-b border-gray-100 rounded-b-xl overflow-hidden">
+            {[...readingQs.map((q, i) => ({ q, section: 'Reading', i })),
+              ...listeningQs.map((q, i) => ({ q, section: 'Listening', i }))
+            ].map(({ q, section, i }) => {
               const ans = answers[q.id]
               const correct = ans?.toUpperCase() === q.correctAnswer.toUpperCase()
               return (
                 <div
                   key={q.id}
-                  className={`rounded-lg border p-4 ${correct ? 'border-green-200 bg-green-50/50' : 'border-red-200 bg-red-50/50'}`}
+                  className={`px-4 py-3 border-b border-gray-100 text-[13px]
+                              ${correct ? 'bg-green-50/40' : 'bg-red-50/40'}`}
                 >
-                  <p className="text-xs text-[#5A6A7A]">Reading Q{q.questionNumber}</p>
-                  <p className="font-medium text-[#0D1B2A]">{q.questionText}</p>
-                  <p className="mt-1 text-sm">
-                    Your answer: <strong>{ans ?? '—'}</strong> · Correct:{' '}
-                    <strong>{q.correctAnswer}</strong>
-                  </p>
-                  {q.explanation && (
-                    <p className="mt-1 text-xs text-[#5A6A7A]">{q.explanation}</p>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <span className="text-[10px] text-gray-400 uppercase tracking-wider mr-2">
+                        {section} Q{i + 1}
+                      </span>
+                      <span className="text-gray-700">{q.questionText}</span>
+                    </div>
+                    <div className="flex-shrink-0 text-right">
+                      <span className={`text-xs font-semibold ${correct ? 'text-green-600' : 'text-red-500'}`}>
+                        {ans ?? '—'}
+                      </span>
+                      {!correct && (
+                        <span className="text-xs text-gray-400 ml-1">
+                          / {q.correctAnswer}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {'explanation' in q && q.explanation && (
+                    <p className="text-[11px] text-gray-400 mt-1">{q.explanation}</p>
                   )}
                 </div>
               )
             })}
-            {listeningQs.map((q) => {
-              const ans = answers[q.id]
-              const correct = ans?.toUpperCase() === q.correctAnswer.toUpperCase()
-              return (
-                <div
-                  key={q.id}
-                  className={`rounded-lg border p-4 ${correct ? 'border-green-200 bg-green-50/50' : 'border-red-200 bg-red-50/50'}`}
-                >
-                  <p className="text-xs text-[#5A6A7A]">Listening Q{q.questionNumber}</p>
-                  <p className="font-medium text-[#0D1B2A]">{q.questionText}</p>
-                  <p className="mt-1 text-sm">
-                    Your answer: <strong>{ans ?? '—'}</strong> · Correct:{' '}
-                    <strong>{q.correctAnswer}</strong>
-                  </p>
-                </div>
-              )
-            })}
           </div>
         </div>
 
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link
-            href={`/exams/${paperId}`}
-            className="rounded-lg bg-[#E8A020] px-6 py-2.5 font-jakarta text-sm font-bold text-[#0B3D6B]"
-          >
-            Take again
-          </Link>
-          <Link
-            href="/exams"
-            className="rounded-lg border border-[#DDE3EC] px-6 py-2.5 font-jakarta text-sm font-semibold text-[#0B3D6B]"
-          >
-            All exams
-          </Link>
-        </div>
-      </div>
-
-      <div className="mt-6">
         <Leaderboard
           paperId={paperId}
-          currentStudentId={
-            user.role === 'student' ? student?.id ?? user.uid : undefined
-          }
+          currentStudentId={user.role === 'student' ? student?.id ?? user.uid : undefined}
           title="Paper leaderboard"
         />
       </div>

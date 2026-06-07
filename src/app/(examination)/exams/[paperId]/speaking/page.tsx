@@ -38,6 +38,7 @@ export default function SpeakingPage() {
       attemptId={attemptId}
       prompts={prompts}
       timeLimitMinutes={paper.speakingMinutes}
+      paperCode={paper.code}
     />
   )
 }

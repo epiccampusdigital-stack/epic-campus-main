@@ -38,6 +38,7 @@ export default function ReadingPage() {
       attemptId={attemptId}
       questions={questions}
       timeLimitMinutes={paper.readingMinutes}
+      paperCode={paper.code}
     />
   )
 }
