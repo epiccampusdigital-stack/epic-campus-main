@@ -386,22 +386,26 @@ export async function countPaperQuestions(paperId: string): Promise<number> {
 export async function saveExamPaper(
   paper: ExamPaper & { description?: string },
 ): Promise<void> {
-  await setDoc(doc(db, 'examPapers', paper.id), {
-    id: paper.id,
-    code: paper.code,
-    title: paper.title,
-    level: paper.level,
-    description: paper.description ?? '',
-    status: paper.status,
-    readingCount: paper.readingCount,
-    listeningCount: paper.listeningCount,
-    readingMinutes: paper.readingMinutes,
-    listeningMinutes: paper.listeningMinutes,
-    writingMinutes: paper.writingMinutes,
-    speakingMinutes: paper.speakingMinutes,
-    language: paper.language ?? 'bilingual',
-    courseIds: paper.courseIds ?? ['japan-ssw'],
-  })
+  await setDoc(
+    doc(db, 'examPapers', paper.id),
+    {
+      id: paper.id,
+      code: paper.code,
+      title: paper.title,
+      level: paper.level,
+      description: paper.description ?? '',
+      status: paper.status,
+      readingCount: paper.readingCount,
+      listeningCount: paper.listeningCount,
+      readingMinutes: paper.readingMinutes,
+      listeningMinutes: paper.listeningMinutes,
+      writingMinutes: paper.writingMinutes,
+      speakingMinutes: paper.speakingMinutes,
+      language: paper.language ?? 'bilingual',
+      courseIds: paper.courseIds ?? ['japan-ssw'],
+    },
+    { merge: true },
+  )
 }
 
 export async function deleteExamPaper(paperId: string): Promise<void> {

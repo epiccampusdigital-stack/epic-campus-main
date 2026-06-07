@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import {
   codeToPaperId,
-  fetchExamPapers,
   importExamPaper,
   type ExamImportPayload,
 } from '@/lib/exam/helpers'
@@ -57,19 +56,12 @@ const SAMPLE_TEMPLATE: ExamImportPayload = {
   ],
 }
 
-function validatePayload(
-  data: ExamImportPayload,
-  existingCodes: string[],
-): string[] {
+function validatePayload(data: ExamImportPayload): string[] {
   const errors: string[] = []
 
   if (!data.code?.trim()) errors.push('Missing required field: code')
   if (!data.title?.trim()) errors.push('Missing required field: title')
   if (!data.level?.trim()) errors.push('Missing required field: level')
-
-  if (data.code && existingCodes.includes(data.code.toUpperCase())) {
-    errors.push(`Paper code "${data.code}" already exists`)
-  }
 
   if (data.readingQuestions != null && !Array.isArray(data.readingQuestions)) {
     errors.push('readingQuestions must be an array')
@@ -129,9 +121,7 @@ export default function JsonImporter({ onImported }: JsonImporterProps) {
       return
     }
 
-    const papers = await fetchExamPapers()
-    const existingCodes = papers.map((p) => p.code.toUpperCase())
-    const validationErrors = validatePayload(data, existingCodes)
+    const validationErrors = validatePayload(data)
 
     if (validationErrors.length > 0) {
       setErrors(validationErrors)
