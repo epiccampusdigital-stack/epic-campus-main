@@ -28,36 +28,40 @@ export const metadata: Metadata = {
   authors: [{ name: 'EPIC Campus' }],
   creator: 'EPIC Campus',
   publisher: 'EPIC Campus',
-  metadataBase: new URL('https://www.epiccampus.lk'),
+  metadataBase: new URL('https://www.epiccampus.live'),
   themeColor: '#0B3D6B',
   openGraph: {
-    type: 'website',
-    locale: 'en_US',
-    url: 'https://www.epiccampus.lk',
-    siteName: 'EPIC Campus',
     title: 'EPIC Campus — We Create Your Future',
     description:
       "Sri Lanka's trusted gateway to Japan, Korea, China and global careers since 2011.",
+    url: 'https://www.epiccampus.live',
+    siteName: 'EPIC Campus',
     images: [
       {
-        url: '/og-image.png',
+        url: 'https://www.epiccampus.live/og-image.png',
         width: 1200,
         height: 630,
         alt: 'EPIC Campus — We Create Your Future',
+        type: 'image/png',
       },
     ],
+    locale: 'en_US',
+    type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'EPIC Campus — We Create Your Future',
     description:
       "Sri Lanka's trusted gateway to Japan, Korea, China and global careers since 2011.",
-    images: ['/og-image.png'],
+    images: ['https://www.epiccampus.live/og-image.png'],
   },
   icons: {
-    icon: [{ url: '/favicon.ico' }],
-    shortcut: ['/favicon.ico'],
-    apple: [{ url: '/favicon.png' }],
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon.png', type: 'image/png', sizes: '32x32' },
+    ],
+    apple: [{ url: '/favicon.png', sizes: '180x180' }],
+    shortcut: '/favicon.ico',
   },
   robots: {
     index: true,
@@ -73,6 +77,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${plusJakarta.variable} ${inter.variable}`}>
       <head>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/favicon.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/favicon.png" />
         <link
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"
