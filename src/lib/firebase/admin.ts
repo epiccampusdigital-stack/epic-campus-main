@@ -33,7 +33,7 @@ function buildAdminApp(): App {
 function createLazy<T extends object>(factory: () => T): T {
   let instance: T | undefined
   return new Proxy({} as T, {
-    get(_target, prop, _receiver) {
+    get(_target, prop) {
       if (!instance) instance = factory()
       const val = Reflect.get(instance as object, prop)
       if (typeof val === 'function') return (val as (...args: unknown[]) => unknown).bind(instance)
