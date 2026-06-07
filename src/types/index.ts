@@ -422,10 +422,14 @@ export interface ReadingQuestion {
   id: string
   questionNumber: number
   passageText: string
+  passageContext?: string
   questionText: string
   options: string[]
   correctAnswer: string
   explanation?: string
+  imageUrl?: string
+  groupType?: string
+  groupInstruction?: string
 }
 
 export interface ListeningQuestion {
@@ -436,6 +440,8 @@ export interface ListeningQuestion {
   options: string[]
   correctAnswer: string
   explanation?: string
+  transcript?: string
+  playLimit?: number
 }
 
 export interface WritingTask {
@@ -444,6 +450,12 @@ export interface WritingTask {
   prompt: string
   minWords: number
   timeMinutes: number
+  taskType?: string
+  instruction?: string
+  minimumCharacters?: number
+  maximumCharacters?: number
+  imageUrl?: string
+  exampleAnswer?: string
 }
 
 export interface SpeakingPrompt {
@@ -452,6 +464,12 @@ export interface SpeakingPrompt {
   prompt: string
   prepTime: number
   timeLimit: number
+  promptType?: string
+  promptText?: string
+  japaneseCue?: string
+  preparationTime?: number
+  speakingTime?: number
+  imageUrl?: string
 }
 
 export interface ExamAttempt {
