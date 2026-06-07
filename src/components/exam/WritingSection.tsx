@@ -100,7 +100,18 @@ export default function WritingSection({
 
   if (!activeTask) {
     return (
-      <div className="p-8 text-center text-[#5A6A7A]">No writing tasks available.</div>
+      <div className="mx-auto max-w-3xl px-4 py-12 text-center">
+        <p className="mb-2 text-lg font-semibold text-[#0B3D6B]">No questions available for this section yet.</p>
+        <p className="mb-6 text-sm text-[#5A6A7A]">
+          An admin needs to import questions using the JSON importer in Admin &gt; Exams.
+        </p>
+        <a
+          href="/exams"
+          className="inline-block rounded-lg border border-[#DDE3EC] px-6 py-2.5 text-sm font-semibold text-[#0B3D6B]"
+        >
+          Return to Exam List
+        </a>
+      </div>
     )
   }
 
@@ -126,15 +137,19 @@ export default function WritingSection({
           className="min-h-[280px] w-full resize-y rounded-lg border border-[#DDE3EC] p-4 font-inter text-[#0D1B2A] focus:border-[#0B3D6B] focus:outline-none focus:ring-1 focus:ring-[#0B3D6B]"
           placeholder="Type your response here…"
         />
-        <p className="mt-2 text-sm text-[#5A6A7A]">
-          Word count:{' '}
-          <span className="font-semibold text-[#0B3D6B]">
-            {countWords(activeText)}
+        <div className="mt-2 flex flex-wrap gap-4 text-sm text-[#5A6A7A]">
+          <span>
+            Characters:{' '}
+            <span className="font-semibold text-[#0B3D6B]">{activeText.length}</span>
+            {activeTask.minWords ? (
+              <span> / minimum {activeTask.minWords}</span>
+            ) : null}
           </span>
-          {activeTask.minWords ? (
-            <span> (minimum {activeTask.minWords} words)</span>
-          ) : null}
-        </p>
+          <span>
+            Words:{' '}
+            <span className="font-semibold text-[#0B3D6B]">{countWords(activeText)}</span>
+          </span>
+        </div>
       </div>
 
       <div className="mt-8 flex justify-end gap-3">

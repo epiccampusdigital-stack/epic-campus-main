@@ -34,6 +34,8 @@ export default function ExamResultsPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [writingFeedback, setWritingFeedback] = useState<WritingFeedback | null>(null)
   const [pollCount, setPollCount] = useState(0)
+  const [showPartialResults, setShowPartialResults] = useState(false)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
 
   const loadData = useCallback(async () => {
     if (!attemptId) return
@@ -63,6 +65,7 @@ export default function ExamResultsPage() {
     if (!attemptId || attempt?.writingScore != null || pollCount >= 20) return
     const t = setInterval(async () => {
       setPollCount((c) => c + 1)
+      setElapsedSeconds((s) => s + 3)
       const a = await getAttempt(attemptId)
       setAttempt(a)
       if (a?.writingScore != null) {
@@ -142,10 +145,33 @@ export default function ExamResultsPage() {
           </div>
         )}
 
-        {speakingPending && (
-          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Speaking: Pending teacher review
-          </p>
+        {(speakingPending || (attempt.writingScore == null && pollCount >= 20)) && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4">
+            {elapsedSeconds >= 60 || pollCount >= 20 ? (
+              <>
+                <p className="text-sm font-semibold text-amber-800">
+                  Results are being processed. We&apos;ll notify you when ready.
+                </p>
+                <p className="mt-1 text-xs text-amber-700">
+                  Writing/speaking marking may take a few minutes. You can view partial results below.
+                </p>
+                {!showPartialResults && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPartialResults(true)}
+                    className="mt-3 rounded-lg border border-amber-400 px-4 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                  >
+                    View Partial Results (Reading + Listening)
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-amber-800">
+                {speakingPending ? 'Speaking: Pending teacher review. ' : ''}
+                {attempt.writingScore == null ? 'Writing results are being processed…' : ''}
+              </p>
+            )}
+          </div>
         )}
 
         <div className="mt-8">

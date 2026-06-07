@@ -93,7 +93,18 @@ export default function ReadingSection({
 
   if (questions.length === 0) {
     return (
-      <div className="p-8 text-center text-[#5A6A7A]">No reading questions available.</div>
+      <div className="mx-auto max-w-3xl px-4 py-12 text-center">
+        <p className="mb-2 text-lg font-semibold text-[#0B3D6B]">No questions available for this section yet.</p>
+        <p className="mb-6 text-sm text-[#5A6A7A]">
+          An admin needs to import questions using the JSON importer in Admin &gt; Exams.
+        </p>
+        <a
+          href="/exams"
+          className="inline-block rounded-lg border border-[#DDE3EC] px-6 py-2.5 text-sm font-semibold text-[#0B3D6B]"
+        >
+          Return to Exam List
+        </a>
+      </div>
     )
   }
 
