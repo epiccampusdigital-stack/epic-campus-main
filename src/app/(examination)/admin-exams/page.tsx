@@ -154,6 +154,7 @@ export default function AdminExamsPage() {
   const [aiResults, setAiResults] = useState<GeneratedQuestion[]>([])
   const [aiError, setAiError] = useState('')
   const [aiSavingIdx, setAiSavingIdx] = useState<number | null>(null)
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
     const [allPapers, allAttempts] = await Promise.all([
@@ -395,27 +396,56 @@ export default function AdminExamsPage() {
                     </td>
                     <td className="px-4 py-3">{questionCounts[p.id] ?? 0}</td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => { setEditPaper(p); setFormOpen(true) }}
-                          className="text-xs font-semibold text-[#0B3D6B] hover:underline">
-                          Edit
-                        </button>
+                      <div className="flex items-center gap-2">
                         <button type="button" onClick={() => setQuestionEditorPaper(p)}
-                          className="text-xs font-semibold text-[#0B3D6B] hover:underline">
+                          className="rounded-[6px] border border-gray-200 px-3 py-1.5 text-xs font-semibold text-[#0B3D6B] hover:bg-gray-50">
                           Edit Questions
                         </button>
                         <button type="button" onClick={() => setAudioPaper(p)}
-                          className="text-xs font-semibold text-[#0B3D6B] hover:underline">
+                          className="rounded-[6px] border border-gray-200 px-3 py-1.5 text-xs font-semibold text-[#0B3D6B] hover:bg-gray-50">
                           Listening Audio
                         </button>
-                        <button type="button" onClick={() => handleToggleStatus(p.id)}
-                          className="text-xs font-semibold text-[#0B3D6B] hover:underline">
-                          {p.status === 'active' ? 'Unpublish' : 'Publish'}
-                        </button>
-                        <button type="button" onClick={() => handleDelete(p.id)}
-                          className="text-xs font-semibold text-red-600 hover:underline">
-                          Delete
-                        </button>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setOpenDropdown(openDropdown === p.id ? null : p.id)}
+                            className="rounded-[6px] border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-50"
+                          >
+                            ⋮
+                          </button>
+                          {openDropdown === p.id && (
+                            <>
+                              <div className="fixed inset-0 z-40" onClick={() => setOpenDropdown(null)} aria-hidden="true" />
+                              <div className="absolute right-0 z-50 mt-1 w-40 rounded-lg border border-gray-100 bg-white shadow-lg">
+                                <button
+                                  type="button"
+                                  onClick={() => { setEditPaper(p); setFormOpen(true); setOpenDropdown(null) }}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-medium text-blue-600 hover:bg-blue-50"
+                                >
+                                  <span className="ti ti-pencil" /> Edit Paper
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { handleToggleStatus(p.id); setOpenDropdown(null) }}
+                                  className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-medium hover:bg-gray-50 ${
+                                    p.status === 'active' ? 'text-amber-600' : 'text-green-600'
+                                  }`}
+                                >
+                                  <span className={`ti ${p.status === 'active' ? 'ti-eye-off' : 'ti-eye'}`} />
+                                  {p.status === 'active' ? 'Unpublish' : 'Publish'}
+                                </button>
+                                <div className="mx-3 border-t border-gray-100" />
+                                <button
+                                  type="button"
+                                  onClick={() => { handleDelete(p.id); setOpenDropdown(null) }}
+                                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-medium text-red-600 hover:bg-red-50"
+                                >
+                                  <span className="ti ti-trash" /> Delete
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>

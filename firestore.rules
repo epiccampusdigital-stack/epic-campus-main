@@ -140,5 +140,19 @@ service cloud.firestore {
       allow update: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'reception'];
     }
+
+    // Public chatbot logs — admin/owner read only, only server writes
+    match /publicChatLogs/{docId} {
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner'];
+      allow write: if false;
+    }
+
+    // Study materials — any authenticated user can read, staff can write
+    match /studyMaterials/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'teacher'];
+    }
   }
 }

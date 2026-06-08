@@ -20,11 +20,10 @@ const ReceiptModal = dynamic(() => import('@/components/payments/ReceiptModal'),
   ssr: false,
 })
 
-const PAY_OPTIONS = [
-  { label: 'Registration Fee', amount: 50, desc: 'EPIC Campus Registration' },
-  { label: 'Language Course Fee', amount: 200, desc: 'Language Training Program' },
-  { label: 'Visa Processing Fee', amount: 150, desc: 'Visa Application Support' },
-  { label: 'Full Program Fee', amount: 500, desc: 'Complete Program Package' },
+const DEFAULT_FEE_OPTIONS = [
+  { label: 'Registration Fee', amount: 25000, desc: 'EPIC Campus Registration' },
+  { label: 'Course Fee', amount: 60000, desc: 'Language Training Program' },
+  { label: 'Full Program Fee', amount: 85000, desc: 'Complete Program Package' },
 ]
 
 function StatCard({ label, value }: { label: string; value: string }) {
@@ -38,6 +37,8 @@ function StatCard({ label, value }: { label: string; value: string }) {
   )
 }
 
+interface FeeOption { label: string; amount: number; desc: string }
+
 export default function StudentPaymentsPage() {
   const { user, student } = useStudentPortal()
   const searchParams = useSearchParams()
@@ -45,6 +46,20 @@ export default function StudentPaymentsPage() {
   const [loading, setLoading] = useState(true)
   const [receiptPayment, setReceiptPayment] = useState<Payment | null>(null)
   const [payLoading, setPayLoading] = useState(false)
+
+  // Build fee options from student's feeSchedule or fall back to defaults
+  const feeOptions: FeeOption[] = (() => {
+    const fs = (student as (typeof student & { feeSchedule?: { registrationFee?: number; courseFee?: number; otherFees?: { label: string; amount: number }[] } }) | null)?.feeSchedule
+    if (!fs) return DEFAULT_FEE_OPTIONS
+    const opts: FeeOption[] = [
+      { label: 'Registration Fee', amount: fs.registrationFee ?? 25000, desc: 'EPIC Campus Registration' },
+      { label: 'Course Fee', amount: fs.courseFee ?? 60000, desc: 'Language Training Program' },
+    ]
+    if (fs.otherFees?.length) {
+      fs.otherFees.forEach((f) => opts.push({ label: f.label, amount: f.amount, desc: f.label }))
+    }
+    return opts
+  })()
 
   const success = searchParams.get('success') === 'true'
   const cancelled = searchParams.get('cancelled') === 'true'
@@ -81,7 +96,7 @@ export default function StudentPaymentsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount,
-          currency: 'usd',
+          currency: 'lkr',
           studentId: student.id,
           studentName: student.name,
           description,
@@ -121,10 +136,10 @@ export default function StudentPaymentsPage() {
       <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <h3 className="text-lg font-semibold text-[#0B3D6B]">Make a Payment</h3>
         <p className="mb-4 text-sm text-gray-500">
-          Pay your program fees securely via Stripe. Payments are processed in USD.
+          Pay your program fees securely via Stripe. Payments are processed in LKR.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {PAY_OPTIONS.map((item) => (
+          {feeOptions.map((item) => (
             <button
               key={item.label}
               type="button"
@@ -133,7 +148,7 @@ export default function StudentPaymentsPage() {
               className="rounded-xl border border-gray-200 p-4 text-left transition-all hover:border-[#E8A020] hover:shadow-sm disabled:opacity-60"
             >
               <div className="font-semibold text-[#0B3D6B]">{item.label}</div>
-              <div className="mt-1 text-2xl font-black text-[#E8A020]">${item.amount}</div>
+              <div className="mt-1 text-2xl font-black text-[#E8A020]">LKR {item.amount.toLocaleString()}</div>
               <div className="mt-1 text-xs text-gray-400">{item.desc}</div>
             </button>
           ))}

@@ -28,6 +28,17 @@ BEHAVIOR:
 - Keep responses concise — 2-4 sentences unless more detail is needed
 - Always end with an offer to help further or a call to action`
 
+function getOrCreateSessionId(): string {
+  if (typeof window === 'undefined') return 'ssr'
+  const key = 'epic_chat_session'
+  let id = localStorage.getItem(key)
+  if (!id) {
+    id = `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+    localStorage.setItem(key, id)
+  }
+  return id
+}
+
 export default function ChatBot() {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
@@ -40,6 +51,11 @@ export default function ChatBot() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const sessionId = useRef<string>('')
+
+  useEffect(() => {
+    sessionId.current = getOrCreateSessionId()
+  }, [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -62,6 +78,8 @@ export default function ChatBot() {
           max_tokens: 1024,
           system: SYSTEM_PROMPT,
           messages: nextMessages.map((m) => ({ role: m.role, content: m.content })),
+          sessionId: sessionId.current,
+          userMessage: userMsg.content,
         }),
       })
       const data = await response.json()
@@ -89,9 +107,7 @@ export default function ChatBot() {
         <div className="fixed bottom-24 right-6 z-50 flex h-[500px] w-80 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl sm:w-96">
           <div className="flex items-center justify-between bg-[#0B3D6B] px-4 py-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#E8A020] text-sm font-bold text-white">
-                E
-              </div>
+              <img src="/favicon.png" alt="EPIC Campus" className="h-8 w-8 rounded-full object-cover" />
               <div>
                 <div className="text-sm font-semibold text-white">EPIC Campus Assistant</div>
                 <div className="text-xs text-green-300">● Online</div>
@@ -166,9 +182,13 @@ export default function ChatBot() {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#0B3D6B] text-2xl text-white shadow-lg transition-all hover:scale-110 hover:bg-[#0a3460]"
+        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#0B3D6B] shadow-lg transition-all hover:scale-110 hover:bg-[#0a3460]"
       >
-        {open ? '✕' : '💬'}
+        {open ? (
+          <span className="text-2xl text-white">✕</span>
+        ) : (
+          <img src="/favicon.png" alt="EPIC Campus" className="h-10 w-10 rounded-full object-cover" />
+        )}
       </button>
     </>
   )

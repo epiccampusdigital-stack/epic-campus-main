@@ -9,6 +9,7 @@ import {
   getDoc,
   getDocs,
   query,
+  updateDoc,
   where,
   orderBy,
 } from 'firebase/firestore'
@@ -82,6 +83,16 @@ export default function StudentProfilePage() {
   const [tab, setTab] = useState<TabId>('overview')
   const [formOpen, setFormOpen] = useState(false)
 
+  // Fee schedule state
+  const [feeSchedule, setFeeSchedule] = useState<{
+    registrationFee: number
+    courseFee: number
+    otherFees: { label: string; amount: number }[]
+    currency: string
+  }>({ registrationFee: 25000, courseFee: 60000, otherFees: [], currency: 'LKR' })
+  const [feeSaving, setFeeSaving] = useState(false)
+  const [feeSaved, setFeeSaved] = useState(false)
+
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
@@ -92,6 +103,17 @@ export default function StudentProfilePage() {
       }
       const s = parseStudent(studentSnap.id, studentSnap.data() as Record<string, unknown>)
       setStudent(s)
+      const rawFs = (studentSnap.data() as Record<string, unknown>).feeSchedule as Record<string, unknown> | undefined
+      if (rawFs) {
+        setFeeSchedule({
+          registrationFee: Number(rawFs.registrationFee ?? 25000),
+          courseFee: Number(rawFs.courseFee ?? 60000),
+          otherFees: Array.isArray(rawFs.otherFees)
+            ? (rawFs.otherFees as { label: string; amount: number }[])
+            : [],
+          currency: String(rawFs.currency ?? 'LKR'),
+        })
+      }
 
       const [paymentsSnap, attendanceSnap, examsSnap, docsSnap] = await Promise.all([
         getDocs(
@@ -272,6 +294,94 @@ export default function StudentProfilePage() {
           <div className="space-y-6">
             <StudentAgentSection student={student} onUpdated={loadData} />
             <ParentAccessSection student={student} onUpdated={loadData} />
+
+            {/* Fee Schedule */}
+            <div className="rounded-lg border border-[#DDE3EC] p-5">
+              <h3 className="mb-4 font-jakarta text-sm font-bold uppercase tracking-wide text-[#0B3D6B]">
+                Fee Schedule (LKR)
+              </h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[#5A6A7A]">Registration Fee (LKR)</label>
+                  <input
+                    type="number"
+                    value={feeSchedule.registrationFee}
+                    onChange={(e) => setFeeSchedule((f) => ({ ...f, registrationFee: Number(e.target.value) }))}
+                    className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2 text-sm focus:border-[#0B3D6B] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[#5A6A7A]">Course Fee (LKR)</label>
+                  <input
+                    type="number"
+                    value={feeSchedule.courseFee}
+                    onChange={(e) => setFeeSchedule((f) => ({ ...f, courseFee: Number(e.target.value) }))}
+                    className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2 text-sm focus:border-[#0B3D6B] focus:outline-none"
+                  />
+                </div>
+              </div>
+              {feeSchedule.otherFees.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {feeSchedule.otherFees.map((f, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input
+                        value={f.label}
+                        onChange={(e) => setFeeSchedule((fs) => {
+                          const arr = [...fs.otherFees]; arr[i] = { ...arr[i], label: e.target.value }; return { ...fs, otherFees: arr }
+                        })}
+                        placeholder="Fee label"
+                        className="flex-1 rounded-lg border border-[#DDE3EC] px-3 py-2 text-sm focus:border-[#0B3D6B] focus:outline-none"
+                      />
+                      <input
+                        type="number"
+                        value={f.amount}
+                        onChange={(e) => setFeeSchedule((fs) => {
+                          const arr = [...fs.otherFees]; arr[i] = { ...arr[i], amount: Number(e.target.value) }; return { ...fs, otherFees: arr }
+                        })}
+                        placeholder="Amount"
+                        className="w-32 rounded-lg border border-[#DDE3EC] px-3 py-2 text-sm focus:border-[#0B3D6B] focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFeeSchedule((fs) => ({ ...fs, otherFees: fs.otherFees.filter((_, j) => j !== i) }))}
+                        className="rounded-lg px-2 text-red-400 hover:text-red-600"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFeeSchedule((f) => ({ ...f, otherFees: [...f.otherFees, { label: '', amount: 0 }] }))}
+                  className="text-xs font-medium text-[#0B3D6B] hover:underline"
+                >
+                  + Add fee item
+                </button>
+                <div className="ml-auto flex items-center gap-3">
+                  {feeSaved && <span className="text-xs text-green-600">✓ Saved</span>}
+                  <button
+                    type="button"
+                    disabled={feeSaving}
+                    onClick={async () => {
+                      setFeeSaving(true)
+                      try {
+                        await updateDoc(doc(db, 'students', studentId), { feeSchedule: { ...feeSchedule, currency: 'LKR' } })
+                        setFeeSaved(true)
+                        setTimeout(() => setFeeSaved(false), 3000)
+                      } finally {
+                        setFeeSaving(false)
+                      }
+                    }}
+                    className="rounded-lg bg-[#0B3D6B] px-4 py-2 text-xs font-semibold text-white hover:bg-[#0B3D6B]/90 disabled:opacity-60"
+                  >
+                    {feeSaving ? 'Saving…' : 'Save Fee Schedule'}
+                  </button>
+                </div>
+              </div>
+            </div>
             <div className="grid gap-8 lg:grid-cols-2">
             <div>
               <h3 className="mb-4 font-jakarta text-sm font-bold uppercase tracking-wide text-[#0B3D6B]">

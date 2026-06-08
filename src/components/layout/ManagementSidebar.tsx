@@ -41,6 +41,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Broadcast', href: '/broadcast', icon: 'ti-speakerphone', roles: ['admin', 'owner', 'reception'] },
   { label: 'Enrollments', href: '/enrollments', icon: 'ti-clipboard-list', roles: ['admin', 'owner', 'reception'] },
   { label: 'Exams', href: '/admin-exams', icon: 'ti-writing', roles: ['admin', 'owner', 'examCoordinator', 'teacher'] },
+  { label: 'Materials', href: '/materials', icon: 'ti-book', roles: ['admin', 'owner', 'teacher'] },
+  { label: 'Chat Logs', href: '/chat-logs', icon: 'ti-message-dots', roles: ['admin', 'owner'] },
 ]
 
 export default function ManagementSidebar() {
