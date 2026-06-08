@@ -48,7 +48,7 @@ const PAYMENT_STATUS_STYLES: Record<Payment['status'], string> = {
 
 function StatSkeleton() {
   return (
-    <div className="animate-pulse rounded-[12px] border border-white/90 dark:border-white/[0.08] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl p-[14px] transition-all duration-300">
+    <div className="animate-pulse rounded-[12px] border border-white/90 dark:border-white/[0.08] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl p-3 sm:p-[14px] transition-all duration-300">
       <div className="mb-3 h-3 w-24 rounded bg-[#DDE3EC] dark:bg-white/10" />
       <div className="mb-2 h-8 w-32 rounded bg-[#DDE3EC] dark:bg-white/10" />
       <div className="h-3 w-20 rounded bg-[#DDE3EC] dark:bg-white/10" />
@@ -330,12 +330,12 @@ export default function DashboardPage() {
           : statCards.map((card) => (
               <div
                 key={card.label}
-                className="rounded-[12px] p-[14px] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl border border-white/90 dark:border-white/[0.08] transition-all duration-300"
+                className="rounded-[12px] p-3 sm:p-[14px] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl border border-white/90 dark:border-white/[0.08] transition-all duration-300"
               >
                 <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-gray-400 dark:text-white/40">
                   {card.label}
                 </p>
-                <p className="mt-2 text-[24px] font-semibold leading-tight text-[#0B3D6B] dark:text-[#E8A020] transition-colors duration-300">
+                <p className="mt-2 text-[18px] font-semibold leading-tight text-[#0B3D6B] dark:text-[#E8A020] transition-colors duration-300 sm:text-[24px]">
                   {card.value}
                 </p>
                 <p className="mt-1 text-[10px] text-green-500 dark:text-green-400">{card.sub}</p>

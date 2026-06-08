@@ -183,14 +183,14 @@ export default function HomePage() {
             Japan · Korea · China · IELTS · NVQ
           </p>
           <h1 className="mt-6 font-jakarta leading-[1.1]">
-            <span className="block text-[42px] font-semibold text-white sm:text-[52px]">Your Future</span>
-            <span className="block text-[42px] font-bold text-[#E8A020] sm:text-[52px]">Starts Here</span>
+            <span className="block text-[28px] font-semibold text-white sm:text-[42px] lg:text-[52px]">Your Future</span>
+            <span className="block text-[28px] font-bold text-[#E8A020] sm:text-[42px] lg:text-[52px]">Starts Here</span>
           </h1>
-          <p className="mx-auto mt-6 max-w-md text-[15px] leading-relaxed text-white/70">
+          <p className="mx-auto mt-6 max-w-md text-[13px] leading-relaxed text-white/70 sm:text-[15px]">
             Epic Campus opens doors to Japan, Korea, China and beyond. Study, work, and build
             your global career from Sri Lanka.
           </p>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+          <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4">
             <a
               href="#programs"
               className="inline-flex rounded-full bg-[#E8A020] px-6 py-3 font-semibold text-[#0B3D6B] transition-all duration-300 hover:bg-[#F5B942] hover:shadow-lg"
@@ -218,7 +218,7 @@ export default function HomePage() {
                   i < 2 ? 'border-b border-gray-100 lg:border-b-0' : ''
                 }`}
               >
-                <p className="font-jakarta text-3xl font-black text-[#0B3D6B] sm:text-4xl">
+                <p className="font-jakarta text-[16px] font-black text-[#0B3D6B] sm:text-[22px] lg:text-4xl">
                   {s.value}
                 </p>
                 <p className="mt-2 text-xs font-medium uppercase tracking-widest text-gray-500">
@@ -237,7 +237,7 @@ export default function HomePage() {
             title="Choose Your Path"
             subtitle="Five proven pathways to study and work abroad — each backed by Epic Campus training and visa support."
           />
-          <div className="mt-16 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-16 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {PROGRAMS.map((p) => (
               <div
                 key={p.href}
