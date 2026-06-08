@@ -40,10 +40,9 @@ interface PracticeQuestion {
 const MODEL = 'claude-sonnet-4-20250514'
 const MAX_HISTORY = 30
 
-async function streamChat(
+async function chatRequest(
   messages: { role: string; content: string }[],
   system: string,
-  onDelta: (text: string) => void,
 ): Promise<string> {
   const response = await fetch('/api/chat/stream', {
     method: 'POST',
@@ -56,43 +55,13 @@ async function streamChat(
     }),
   })
 
-  if (!response.ok || !response.body) {
-    throw new Error('Stream request failed')
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`)
   }
 
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  let fullText = ''
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
-
-    for (const line of lines) {
-      if (!line.startsWith('data: ')) continue
-      const data = line.slice(6).trim()
-      if (!data) continue
-      try {
-        const event = JSON.parse(data) as {
-          type: string
-          delta?: { type: string; text: string }
-        }
-        if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
-          fullText += event.delta.text
-          onDelta(fullText)
-        }
-      } catch {
-        // ignore malformed lines
-      }
-    }
-  }
-
-  return fullText
+  const data = await response.json() as { content?: string; error?: string }
+  if (data.error) throw new Error(data.error)
+  return data.content ?? ''
 }
 
 export default function StudentAssistantPage() {
@@ -258,9 +227,7 @@ export default function StudentAssistantPage() {
       .map((m) => ({ role: m.role, content: m.content }))
 
     try {
-      const reply = await streamChat(apiMessages, modeConfig.systemPrompt, (partial) => {
-        setStreamingText(partial)
-      })
+      const reply = await chatRequest(apiMessages, modeConfig.systemPrompt)
 
       const aiMsg: ChatMessage = { id: `a-${Date.now()}`, role: 'assistant', content: reply }
       setMessages((prev) => [...prev, aiMsg])
@@ -339,7 +306,7 @@ Do not include answers yet — just the questions.`
     ]
 
     try {
-      const reply = await streamChat(apiMessages, modeConfig.systemPrompt, () => {})
+      const reply = await chatRequest(apiMessages, modeConfig.systemPrompt)
 
       // Parse questions from response
       const lines = reply.split('\n').filter((l) => /^Q\d/.test(l.trim()))

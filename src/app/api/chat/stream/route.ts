@@ -1,19 +1,22 @@
-import { NextRequest } from 'next/server'
-
 export const dynamic = 'force-dynamic'
 
+import { NextRequest, NextResponse } from 'next/server'
+
 export async function POST(req: NextRequest) {
-  const body = await req.json()
   const apiKey = process.env.ANTHROPIC_API_KEY
 
   if (!apiKey || apiKey === 'your_anthropic_api_key_here') {
-    return new Response(
-      JSON.stringify({ error: 'Anthropic API key not configured' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } },
-    )
+    return NextResponse.json({ error: 'Anthropic API key not configured' }, { status: 500 })
   }
 
   try {
+    const body = await req.json() as {
+      model?: string
+      max_tokens?: number
+      system?: string
+      messages?: { role: string; content: string }[]
+    }
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -21,27 +24,26 @@ export async function POST(req: NextRequest) {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
       },
-      body: JSON.stringify({ ...body, stream: true }),
+      body: JSON.stringify({
+        model: body.model ?? 'claude-haiku-4-5-20251001',
+        max_tokens: body.max_tokens ?? 1024,
+        system: body.system ?? 'You are a helpful study assistant at EPIC Campus Sri Lanka.',
+        messages: body.messages ?? [],
+        stream: false,
+      }),
     })
 
-    if (!response.ok || !response.body) {
-      const err = await response.text()
-      return new Response(err, { status: response.status, headers: { 'Content-Type': 'application/json' } })
+    const data = await response.json() as { content?: { type: string; text: string }[]; error?: unknown }
+
+    if (!response.ok) {
+      console.error('[chat/stream] Anthropic error:', response.status, data)
+      return NextResponse.json({ error: 'AI service error' }, { status: response.status })
     }
 
-    return new Response(response.body, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        'X-Accel-Buffering': 'no',
-      },
-    })
+    const text = data.content?.[0]?.type === 'text' ? data.content[0].text : ''
+    return NextResponse.json({ content: text })
   } catch (err) {
     console.error('[chat/stream]', err)
-    return new Response(
-      JSON.stringify({ error: 'Failed to connect to AI service' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } },
-    )
+    return NextResponse.json({ error: 'Failed to connect to AI service' }, { status: 500 })
   }
 }
