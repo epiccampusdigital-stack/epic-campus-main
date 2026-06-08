@@ -37,6 +37,44 @@ jobs:
           FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
           FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
 
+      # Patch firebase.json so the Cloud Run backend gets all runtime secrets
+      - name: Inject runtime env vars into firebase.json
+        run: |
+          node -e "
+            const fs = require('fs');
+            const config = JSON.parse(fs.readFileSync('firebase.json', 'utf8'));
+            config.hosting.frameworksBackend = config.hosting.frameworksBackend || {};
+            config.hosting.frameworksBackend.runConfig = {
+              environmentVariables: {
+                ANTHROPIC_API_KEY:                    process.env.ANTHROPIC_API_KEY,
+                FB_PROJECT_ID:                        process.env.FIREBASE_PROJECT_ID,
+                FB_CLIENT_EMAIL:                      process.env.FIREBASE_CLIENT_EMAIL,
+                FB_PRIVATE_KEY:                       process.env.FIREBASE_PRIVATE_KEY,
+                FIREBASE_PROJECT_ID:                  process.env.FIREBASE_PROJECT_ID,
+                FIREBASE_CLIENT_EMAIL:                process.env.FIREBASE_CLIENT_EMAIL,
+                FIREBASE_PRIVATE_KEY:                 process.env.FIREBASE_PRIVATE_KEY,
+                TWILIO_ACCOUNT_SID:                   process.env.TWILIO_ACCOUNT_SID,
+                TWILIO_AUTH_TOKEN:                    process.env.TWILIO_AUTH_TOKEN,
+                TWILIO_WHATSAPP_FROM:                 process.env.TWILIO_WHATSAPP_FROM,
+                STRIPE_SECRET_KEY:                    process.env.STRIPE_SECRET_KEY,
+                STRIPE_WEBHOOK_SECRET:                process.env.STRIPE_WEBHOOK_SECRET,
+                NEXT_PUBLIC_APP_URL:                  'https://www.epiccampus.live',
+              }
+            };
+            fs.writeFileSync('firebase.json', JSON.stringify(config, null, 2));
+            console.log('firebase.json patched with runtime env vars');
+          "
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+
       - name: Deploy to Firebase
         run: npx firebase deploy --only hosting --project epic-campus --token "$FIREBASE_TOKEN" --non-interactive
         env:

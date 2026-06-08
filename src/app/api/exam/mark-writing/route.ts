@@ -5,10 +5,15 @@ import Anthropic from '@anthropic-ai/sdk'
 import { adminDb } from '@/lib/firebase/admin'
 import { computeTotalScore, getGrade } from '@/lib/exam/helpers'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
 export async function POST(req: NextRequest) {
   try {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    console.log('[mark-writing] API key present:', !!apiKey, 'length:', apiKey?.length ?? 0)
+    if (!apiKey) {
+      return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 })
+    }
+    const client = new Anthropic({ apiKey })
+
     const {
       attemptId,
       task1Id,

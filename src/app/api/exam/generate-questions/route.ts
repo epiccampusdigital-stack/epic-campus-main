@@ -3,8 +3,6 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
 const SYSTEM_PROMPT = `You are a Japanese language exam creator for the Irodori series at EPIC Campus, Sri Lanka.
 Create exam questions for Sri Lankan students learning Japanese for the SSW (Specified Skilled Worker) program in Japan.
 Always return valid JSON only — no markdown, no explanation text, no code blocks.
@@ -104,6 +102,13 @@ Return a JSON array:
 
 export async function POST(req: NextRequest) {
   try {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    console.log('[generate-questions] API key present:', !!apiKey, 'length:', apiKey?.length ?? 0)
+    if (!apiKey) {
+      return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 })
+    }
+    const client = new Anthropic({ apiKey })
+
     const { topic, level, section, count, language } = await req.json() as {
       topic: string
       level: string
