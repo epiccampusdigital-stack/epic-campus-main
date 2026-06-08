@@ -46,7 +46,7 @@ async function loadStudentProfile(
 
 function PortalLoadingScreen() {
   return (
-    <div className="flex h-screen flex-col items-center justify-center bg-[#F5F7FB] px-6">
+    <div className="flex h-screen flex-col items-center justify-center bg-[#eef2f7] dark:bg-[#080d18] px-6 transition-colors duration-300">
       <div className="mb-8 flex items-center justify-center rounded-xl bg-[#0B3D6B] px-6 py-4">
         <img
           src="/images/logo-transparent.png"
@@ -73,7 +73,7 @@ function ProfileSetupError() {
   )}`
 
   return (
-    <div className="flex h-screen flex-col items-center justify-center bg-[#F5F7FB] px-6 text-center">
+    <div className="flex h-screen flex-col items-center justify-center bg-[#eef2f7] dark:bg-[#080d18] px-6 text-center transition-colors duration-300">
       <div className="mb-6 flex items-center justify-center rounded-xl bg-[#0B3D6B] px-6 py-4">
         <img
           src="/images/logo-transparent.png"
@@ -110,15 +110,7 @@ function ProfileSetupError() {
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
-  useEffect(() => {
-    const root = document.documentElement
-    root.classList.remove('dark')
-    root.classList.add('light')
-    root.style.colorScheme = 'light'
-    return () => {
-      root.style.colorScheme = ''
-    }
-  }, [])
+  // Dark mode is managed by useDarkMode hook via localStorage
   const [user, setUser] = useState<EpicUser | null>(null)
   const [student, setStudent] = useState<Student | null>(null)
   const [status, setStatus] = useState<StudentPortalStatus>('idle')
@@ -234,11 +226,11 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         refreshStudent,
       }}
     >
-      <div className="light flex h-screen overflow-hidden bg-[#F5F7FB] text-[#0D1B2A]">
+      <div className="flex h-screen overflow-hidden bg-[#eef2f7] dark:bg-[#080d18] text-[#0D1B2A] dark:text-white/90 transition-colors duration-300 font-['DM_Sans']">
         <StudentSidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
           <StudentTopBar />
-          <main className="flex-1 overflow-y-auto bg-[#F5F7FB] p-4 pb-24 sm:p-6 md:pb-6">
+          <main className="flex-1 overflow-y-auto bg-[#eef2f7] dark:bg-[#080d18] p-4 pb-24 sm:p-6 md:pb-6 transition-colors duration-300">
             {children}
           </main>
         </div>

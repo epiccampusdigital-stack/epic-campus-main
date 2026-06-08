@@ -12,10 +12,10 @@ function SectionTitle({
 }) {
   return (
     <div className="text-center">
-      <h2 className="font-jakarta text-4xl font-bold text-[#0B3D6B]">{title}</h2>
+      <h2 className="font-jakarta text-4xl font-bold text-[#0B3D6B] dark:text-white">{title}</h2>
       <div className="mx-auto mt-4 h-1 w-16 rounded-full bg-[#E8A020]" />
       {subtitle && (
-        <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-gray-600">
+        <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-gray-600 dark:text-white/60">
           {subtitle}
         </p>
       )}
@@ -33,15 +33,15 @@ function getInitials(name: string) {
 }
 
 const STATS = [
-  { value: '15+', label: 'Years Experience' },
   { value: '1,500+', label: 'Students Placed' },
-  { value: '98%', label: 'Visa Success' },
-  { value: '50+', label: 'Partner Institutions' },
+  { value: '15 Years', label: 'Since 2011' },
+  { value: '98%', label: 'Visa Success Rate' },
+  { value: '50+', label: 'Partner Companies' },
 ]
 
 const PROGRAMS = [
   {
-    flag: '🇯🇵',
+    accentStyle: { background: 'linear-gradient(90deg, #bc002d, #0B3D6B)' },
     country: 'Japan',
     title: 'Japan SSW',
     description:
@@ -50,7 +50,7 @@ const PROGRAMS = [
     href: '/japan',
   },
   {
-    flag: '🇰🇷',
+    accentStyle: { background: 'linear-gradient(90deg, #003478, #cd2e3a)' },
     country: 'Korea',
     title: 'Korea D2/D4',
     description:
@@ -59,7 +59,7 @@ const PROGRAMS = [
     href: '/korea',
   },
   {
-    flag: '🇨🇳',
+    accentStyle: { background: 'linear-gradient(90deg, #de2910, #ffde00)' },
     country: 'China',
     title: 'China Programs',
     description:
@@ -68,7 +68,7 @@ const PROGRAMS = [
     href: '/china',
   },
   {
-    flag: '🎓',
+    accentStyle: { background: 'linear-gradient(90deg, #003087, #CF142B)' },
     country: 'English',
     title: 'IELTS Residential',
     description: 'Intensive 10-day residential IELTS program. Target band 6.0 to 7.0+',
@@ -76,7 +76,7 @@ const PROGRAMS = [
     href: '/ielts',
   },
   {
-    flag: '📜',
+    accentStyle: { background: 'linear-gradient(90deg, #0B3D6B, #E8A020)' },
     country: 'Sri Lanka',
     title: 'NVQ Qualifications',
     description:
@@ -167,60 +167,61 @@ export default function HomePage() {
       <PublicNav />
 
       {/* Hero */}
-      <section className="relative overflow-hidden pb-32 pt-20 text-white sm:pt-28">
-        <div className="hero-gradient-animated absolute inset-0" />
+      <section className="relative overflow-hidden pb-32 pt-20 sm:pt-28" style={{ background: 'linear-gradient(135deg, #0B3D6B 0%, #1A6BAD 50%, #0B3D6B 100%)' }}>
+        {/* Glowing blobs */}
         <div
-          className="pointer-events-none absolute inset-0 opacity-[0.06]"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }}
+          className="pointer-events-none absolute -left-20 top-10 h-72 w-72 rounded-full opacity-30"
+          style={{ background: '#E8A020', filter: 'blur(60px)' }}
+        />
+        <div
+          className="pointer-events-none absolute -right-20 bottom-10 h-80 w-80 rounded-full opacity-20"
+          style={{ background: '#1A6BAD', filter: 'blur(60px)' }}
         />
 
         <div className="relative mx-auto max-w-6xl px-4 text-center sm:px-6 lg:px-8">
           <p className="font-jakarta text-xs font-semibold uppercase tracking-[0.35em] text-[#E8A020] sm:text-sm">
-            We Create Your Future
+            Japan · Korea · China · IELTS · NVQ
           </p>
-          <h1 className="mt-8 font-jakarta text-5xl font-normal leading-[1.1] sm:text-6xl lg:text-7xl">
-            Your Future Has
-            <br />
-            <span className="font-bold text-[#E8A020]">No Limit.</span>
+          <h1 className="mt-6 font-jakarta leading-[1.1]">
+            <span className="block text-[42px] font-semibold text-white sm:text-[52px]">Your Future</span>
+            <span className="block text-[42px] font-bold text-[#E8A020] sm:text-[52px]">Starts Here</span>
           </h1>
-          <p className="mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-white/80">
+          <p className="mx-auto mt-6 max-w-md text-[15px] leading-relaxed text-white/70">
             Epic Campus opens doors to Japan, Korea, China and beyond. Study, work, and build
             your global career from Sri Lanka.
           </p>
-          <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <a
               href="#programs"
-              className="inline-flex rounded-full bg-[#E8A020] px-8 py-4 font-semibold text-white transition-all duration-300 hover:bg-[#d4911c] hover:shadow-lg"
+              className="inline-flex rounded-full bg-[#E8A020] px-6 py-3 font-semibold text-[#0B3D6B] transition-all duration-300 hover:bg-[#F5B942] hover:shadow-lg"
             >
               Explore Programs
             </a>
             <Link
               href="/login"
-              className="inline-flex rounded-full border-2 border-white/80 px-8 py-4 font-semibold text-white transition-all duration-300 hover:bg-white/10"
+              className="inline-flex rounded-full border border-white/25 bg-white/15 px-6 py-3 font-semibold text-white backdrop-blur-sm transition-all duration-300 hover:bg-white/20"
             >
               Login to Portal
             </Link>
           </div>
         </div>
 
-        {/* Floating stats strip */}
-        <div className="relative z-10 mx-auto -mb-16 mt-20 max-w-6xl px-4 sm:px-6 lg:px-8">
+        {/* Stats Bar */}
+        <div className="relative z-10 mx-auto -mb-16 mt-20 max-w-5xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 overflow-hidden rounded-2xl bg-white shadow-xl lg:grid-cols-4">
             {STATS.map((s, i) => (
               <div
                 key={s.label}
-                className={`px-6 py-10 text-center sm:px-8 sm:py-12 ${
-                  i < STATS.length - 1 ? 'lg:border-r lg:border-gray-200' : ''
-                } ${i % 2 === 0 ? 'border-r border-gray-200 lg:border-r' : ''} ${
-                  i < 2 ? 'border-b border-gray-200 lg:border-b-0' : ''
+                className={`px-6 py-8 text-center sm:px-8 sm:py-10 ${
+                  i < STATS.length - 1 ? 'lg:border-r lg:border-gray-100' : ''
+                } ${i % 2 === 0 ? 'border-r border-gray-100 lg:border-r' : ''} ${
+                  i < 2 ? 'border-b border-gray-100 lg:border-b-0' : ''
                 }`}
               >
-                <p className="font-jakarta text-4xl font-black text-[#0B3D6B] sm:text-5xl">
+                <p className="font-jakarta text-3xl font-black text-[#0B3D6B] sm:text-4xl">
                   {s.value}
                 </p>
-                <p className="mt-3 text-xs font-medium uppercase tracking-widest text-gray-500">
+                <p className="mt-2 text-xs font-medium uppercase tracking-widest text-gray-500">
                   {s.label}
                 </p>
               </div>
@@ -230,29 +231,37 @@ export default function HomePage() {
       </section>
 
       {/* Programs */}
-      <section id="programs" className="bg-[#F5F7FB] py-24 pt-32">
+      <section id="programs" className="bg-[#F5F7FB] dark:bg-[#080d18] py-24 pt-32 transition-colors duration-300">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <SectionTitle
             title="Choose Your Path"
-            subtitle="Six proven pathways to study and work abroad — each backed by Epic Campus training and visa support."
+            subtitle="Five proven pathways to study and work abroad — each backed by Epic Campus training and visa support."
           />
           <div className="mt-16 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {PROGRAMS.map((p) => (
               <div
                 key={p.href}
-                className="flex flex-col rounded-2xl border border-white/10 bg-[#1a2744] p-8 transition-all duration-300 hover:-translate-y-1 hover:border-[#E8A020]/50 hover:shadow-lg"
+                className="flex flex-col rounded-[14px] border border-[#0B3D6B]/[0.08] dark:border-white/[0.07] bg-white dark:bg-white/[0.04] p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(11,61,107,0.1)] cursor-pointer"
               >
-                <span className="mb-4 block text-center text-5xl">{p.flag}</span>
-                <p className="mb-1 text-center text-xs uppercase tracking-widest text-gray-400">
+                {/* Colored accent bar */}
+                <div
+                  className="mb-4 h-[3px] w-full rounded-[3px]"
+                  style={p.accentStyle}
+                />
+                <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-400 dark:text-white/40">
                   {p.country}
                 </p>
-                <h3 className="mb-3 text-center text-xl font-bold text-white">{p.title}</h3>
-                <p className="flex-1 text-center text-sm text-gray-300">{p.description}</p>
-                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <h3 className="mt-1 text-[15px] font-semibold text-[#0B3D6B] dark:text-white">
+                  {p.title}
+                </h3>
+                <p className="mt-2 flex-1 text-[12px] leading-relaxed text-gray-500 dark:text-white/55">
+                  {p.description}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
                   {p.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="rounded-full bg-white/10 px-3 py-1 text-xs text-gray-300"
+                      className="rounded-[8px] bg-[#0B3D6B]/[0.06] dark:bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-[#0B3D6B] dark:text-white/70"
                     >
                       {tag}
                     </span>
@@ -260,7 +269,7 @@ export default function HomePage() {
                 </div>
                 <Link
                   href={p.href}
-                  className="mt-6 text-center text-sm font-semibold text-[#E8A020] transition-colors hover:text-[#d4911c]"
+                  className="mt-4 text-[12px] font-semibold text-[#E8A020] transition-colors hover:text-[#d4911c]"
                 >
                   Learn More →
                 </Link>
@@ -272,26 +281,26 @@ export default function HomePage() {
       </section>
 
       {/* Process */}
-      <section className="bg-white py-24">
+      <section className="bg-white dark:bg-[#0d1a2e] py-24 transition-colors duration-300">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <SectionTitle
             title="From Dream to Departure"
             subtitle="A clear, guided pathway from your first consultation to boarding your flight abroad."
           />
           <div className="relative mt-20 hidden lg:block">
-            <div className="absolute left-0 right-0 top-8 h-0.5 bg-gray-200" />
+            <div className="absolute left-0 right-0 top-8 h-0.5 bg-gray-200 dark:bg-white/10" />
             <div className="relative grid grid-cols-5 gap-6">
               {STEPS.map((step, i) => (
                 <div key={step.title} className="text-center">
-                  <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-[#E8A020] bg-white shadow-sm">
+                  <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-[#E8A020] bg-white dark:bg-[#0d1a2e] shadow-sm">
                     <span className="font-jakarta text-lg font-bold text-[#E8A020]">
                       {i + 1}
                     </span>
                   </div>
-                  <p className="mt-6 font-jakarta text-sm font-semibold text-[#0B3D6B]">
+                  <p className="mt-6 font-jakarta text-sm font-semibold text-[#0B3D6B] dark:text-white">
                     {step.title}
                   </p>
-                  <p className="mt-2 text-sm leading-relaxed text-gray-500">
+                  <p className="mt-2 text-sm leading-relaxed text-gray-500 dark:text-white/50">
                     {step.description}
                   </p>
                 </div>
@@ -301,12 +310,12 @@ export default function HomePage() {
           <div className="mt-12 space-y-10 lg:hidden">
             {STEPS.map((step, i) => (
               <div key={step.title} className="flex gap-5">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-[3px] border-[#E8A020] bg-white shadow-sm">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-[3px] border-[#E8A020] bg-white dark:bg-[#0d1a2e] shadow-sm">
                   <span className="font-jakarta font-bold text-[#E8A020]">{i + 1}</span>
                 </div>
                 <div>
-                  <p className="font-jakarta font-semibold text-[#0B3D6B]">{step.title}</p>
-                  <p className="mt-1 text-sm text-gray-500">{step.description}</p>
+                  <p className="font-jakarta font-semibold text-[#0B3D6B] dark:text-white">{step.title}</p>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-white/50">{step.description}</p>
                 </div>
               </div>
             ))}
@@ -315,24 +324,24 @@ export default function HomePage() {
       </section>
 
       {/* Why Epic Campus */}
-      <section className="bg-[#F5F7FB] py-24">
+      <section className="bg-[#F5F7FB] dark:bg-[#080d18] py-24 transition-colors duration-300">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <SectionTitle title="Why Choose Epic Campus?" />
           <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {FEATURES.map((f) => (
               <div
                 key={f.title}
-                className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+                className="rounded-2xl border border-gray-100 dark:border-white/[0.07] bg-white dark:bg-white/[0.04] p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
               >
                 <div
                   className={`flex h-14 w-14 items-center justify-center rounded-2xl ${f.bg}`}
                 >
                   <span className={`ti ${f.icon} text-2xl ${f.iconColor}`} />
                 </div>
-                <h3 className="mt-6 font-jakarta text-lg font-bold text-[#0B3D6B]">
+                <h3 className="mt-6 font-jakarta text-lg font-bold text-[#0B3D6B] dark:text-white">
                   {f.title}
                 </h3>
-                <p className="mt-3 text-sm leading-relaxed text-gray-600">{f.desc}</p>
+                <p className="mt-3 text-sm leading-relaxed text-gray-600 dark:text-white/55">{f.desc}</p>
               </div>
             ))}
           </div>
@@ -340,26 +349,26 @@ export default function HomePage() {
       </section>
 
       {/* Testimonials */}
-      <section className="bg-white py-24">
+      <section className="bg-white dark:bg-[#0d1a2e] py-24 transition-colors duration-300">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <SectionTitle title="Student Success Stories" />
           <div className="mt-16 grid gap-8 lg:grid-cols-3">
             {TESTIMONIALS.map((t) => (
               <blockquote
                 key={t.name}
-                className="flex flex-col rounded-2xl border border-gray-100 bg-white p-8 shadow-sm transition-all duration-300 hover:shadow-md"
+                className="flex flex-col rounded-2xl border border-gray-100 dark:border-white/[0.07] bg-white dark:bg-white/[0.04] p-8 shadow-sm transition-all duration-300 hover:shadow-md"
               >
                 <span className="font-serif text-5xl leading-none text-[#E8A020]">❝</span>
-                <p className="mt-4 flex-1 text-sm italic leading-relaxed text-gray-700">
+                <p className="mt-4 flex-1 text-sm italic leading-relaxed text-gray-700 dark:text-white/60">
                   {t.quote}
                 </p>
-                <footer className="mt-8 flex items-center gap-4 border-t border-gray-100 pt-6">
+                <footer className="mt-8 flex items-center gap-4 border-t border-gray-100 dark:border-white/[0.06] pt-6">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0B3D6B] font-jakarta text-sm font-bold text-white">
                     {getInitials(t.name)}
                   </div>
                   <div>
-                    <p className="font-jakarta font-semibold text-[#0B3D6B]">{t.name}</p>
-                    <p className="text-xs text-gray-500">{t.program}</p>
+                    <p className="font-jakarta font-semibold text-[#0B3D6B] dark:text-white">{t.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-white/40">{t.program}</p>
                   </div>
                 </footer>
               </blockquote>
@@ -394,7 +403,7 @@ export default function HomePage() {
       </section>
 
       {/* Enroll Now CTA */}
-      <section className="bg-white py-20">
+      <section className="bg-white dark:bg-[#0d1a2e] py-20 transition-colors duration-300">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B3D6B] to-[#1A6BAD] p-10 sm:p-14">
             <div className="flex flex-col items-center gap-6 text-center lg:flex-row lg:text-left">
@@ -429,14 +438,14 @@ export default function HomePage() {
       </section>
 
       {/* Contact strip */}
-      <section className="border-t border-gray-100 bg-[#F5F7FB] py-12">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-8 px-4 text-sm text-gray-600 sm:px-6">
-          <span>📍 No. 59/2, Sri Dewamitta Road, China Garden, Galle</span>
-          <a href="tel:+94912228383" className="transition-colors hover:text-[#0B3D6B]">
-            📞 +94 91 222 83 83
+      <section className="border-t border-gray-100 dark:border-white/[0.06] bg-[#F5F7FB] dark:bg-[#080d18] py-12 transition-colors duration-300">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-8 px-4 text-sm text-gray-600 dark:text-white/50 sm:px-6">
+          <span>No. 59/2, Sri Dewamitta Road, China Garden, Galle</span>
+          <a href="tel:+94912228383" className="transition-colors hover:text-[#0B3D6B] dark:hover:text-white">
+            +94 91 222 83 83
           </a>
-          <a href="mailto:info@epiccampus.lk" className="transition-colors hover:text-[#0B3D6B]">
-            📧 info@epiccampus.lk
+          <a href="mailto:info@epiccampus.lk" className="transition-colors hover:text-[#0B3D6B] dark:hover:text-white">
+            info@epiccampus.lk
           </a>
         </div>
       </section>

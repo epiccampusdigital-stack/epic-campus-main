@@ -17,6 +17,23 @@
   --text-primary: #0D1B2A;
   --text-muted:   #5A6A7A;
   --border:       #DDE3EC;
+
+  /* Glass morphism */
+  --glass-bg:      rgba(255, 255, 255, 0.65);
+  --glass-border:  rgba(255, 255, 255, 0.85);
+  --glass-blur:    blur(24px);
+  --sidebar-bg:    rgba(255, 255, 255, 0.6);
+  --card-bg:       rgba(255, 255, 255, 0.65);
+  --page-bg:       #eef2f7;
+}
+
+.dark {
+  --glass-bg:      rgba(255, 255, 255, 0.05);
+  --glass-border:  rgba(255, 255, 255, 0.08);
+  --glass-blur:    blur(24px);
+  --sidebar-bg:    rgba(11, 61, 107, 0.2);
+  --card-bg:       rgba(255, 255, 255, 0.04);
+  --page-bg:       #080d18;
 }
 
 * {
@@ -27,6 +44,11 @@ body {
   font-family: var(--font-inter);
   background: var(--bg);
   color: var(--text-primary);
+}
+
+.dark body {
+  background-color: #080d18;
+  color: #e2e8f0;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -75,187 +97,4 @@ h1, h2, h3, h4, h5, h6 {
   .no-print {
     display: none !important;
   }
-}
-
-.dark body {
-  background-color: #0f172a;
-  color: #e2e8f0;
-}
-.dark .bg-white {
-  background-color: #1e293b !important;
-}
-.dark .bg-\[#F5F7FB\] {
-  background-color: #0f172a !important;
-}
-.dark .text-gray-600 {
-  color: #94a3b8 !important;
-}
-.dark .text-gray-500 {
-  color: #64748b !important;
-}
-.dark .border-gray-100 {
-  border-color: #334155 !important;
-}
-.dark .shadow-sm {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
-}
-
-/* Fix blue text on dark backgrounds */
-.dark .text-\[#0B3D6B\] {
-  color: #e2e8f0 !important;
-}
-.dark .text-\[#1A6BAD\] {
-  color: #93c5fd !important;
-}
-.dark h1,
-.dark h2,
-.dark h3 {
-  color: #f1f5f9 !important;
-}
-.dark p {
-  color: #cbd5e1 !important;
-}
-.dark .text-blue-600,
-.dark .text-blue-700,
-.dark .text-blue-800,
-.dark .text-blue-900 {
-  color: #93c5fd !important;
-}
-.dark .text-gray-800 {
-  color: #e2e8f0 !important;
-}
-.dark .text-gray-700 {
-  color: #cbd5e1 !important;
-}
-.dark nav a {
-  color: #e2e8f0 !important;
-}
-.dark nav a:hover {
-  color: #E8A020 !important;
-}
-/* Keep gold text gold in dark mode */
-.dark .text-\[#E8A020\] {
-  color: #E8A020 !important;
-}
-/* Cards in dark mode */
-.dark .border-gray-200 {
-  border-color: #334155 !important;
-}
-.dark input,
-.dark textarea,
-.dark select {
-  background-color: #1e293b !important;
-  color: #e2e8f0 !important;
-  border-color: #475569 !important;
-}
-/* Navbar dark mode */
-.dark header {
-  background-color: #0f172a !important;
-  border-color: #1e293b !important;
-}
-/* Stats bar dark mode */
-.dark .shadow-xl {
-  background-color: #1e293b !important;
-}
-
-/* ========================================
-   DARK MODE OVERRIDES — EPIC CAMPUS
-   ======================================== */
-
-/* Fix invisible navy text on dark backgrounds */
-.dark .text-\[#0B3D6B\] {
-  color: #e2e8f0 !important;
-}
-.dark .text-\[#1A6BAD\] {
-  color: #93c5fd !important;
-}
-.dark h1,
-.dark h2,
-.dark h3,
-.dark h4 {
-  color: #f1f5f9 !important;
-}
-.dark p {
-  color: #cbd5e1 !important;
-}
-.dark .text-blue-600,
-.dark .text-blue-700,
-.dark .text-blue-800,
-.dark .text-blue-900 {
-  color: #93c5fd !important;
-}
-.dark .text-gray-900 {
-  color: #f1f5f9 !important;
-}
-.dark .text-gray-800 {
-  color: #e2e8f0 !important;
-}
-.dark .text-gray-700 {
-  color: #cbd5e1 !important;
-}
-.dark .text-gray-600 {
-  color: #94a3b8 !important;
-}
-.dark .text-gray-500 {
-  color: #64748b !important;
-}
-/* Nav links */
-.dark nav a {
-  color: #e2e8f0 !important;
-}
-.dark nav a:hover {
-  color: #E8A020 !important;
-}
-/* Keep gold text gold */
-.dark .text-\[#E8A020\] {
-  color: #E8A020 !important;
-}
-/* Keep white text white */
-.dark .text-white {
-  color: #ffffff !important;
-}
-.dark .text-white\/80 {
-  color: rgba(255,255,255,0.8) !important;
-}
-.dark .text-white\/70 {
-  color: rgba(255,255,255,0.7) !important;
-}
-/* Cards */
-.dark .bg-white {
-  background-color: #1e293b !important;
-}
-.dark .bg-\[#F5F7FB\] {
-  background-color: #0f172a !important;
-}
-.dark .border-gray-100 {
-  border-color: #334155 !important;
-}
-.dark .border-gray-200 {
-  border-color: #334155 !important;
-}
-/* Inputs */
-.dark input,
-.dark textarea,
-.dark select {
-  background-color: #1e293b !important;
-  color: #e2e8f0 !important;
-  border-color: #475569 !important;
-}
-/* Navbar */
-.dark header {
-  background-color: #0f172a !important;
-  border-color: #1e293b !important;
-}
-/* Stats bar */
-.dark .shadow-xl {
-  background-color: #1e293b !important;
-}
-/* Body */
-.dark body {
-  background-color: #0f172a !important;
-  color: #e2e8f0 !important;
-}
-/* Shadows */
-.dark .shadow-sm {
-  box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
 }

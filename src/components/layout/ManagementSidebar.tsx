@@ -9,7 +9,7 @@ import { auth, db } from '@/lib/firebase/client'
 import { ROLE_LABELS } from '@/lib/constants/roles'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { logAuditEvent } from '@/lib/audit/helpers'
-import ThemeToggle from '@/components/ui/ThemeToggle'
+import DarkModeToggle from '@/components/ui/DarkModeToggle'
 import type { Role } from '@/types'
 
 interface NavItem {
@@ -92,23 +92,20 @@ export default function ManagementSidebar() {
   }
 
   const sidebarContent = (
-    <div className="flex h-full w-[260px] flex-col bg-[#0B3D6B]">
+    <div className="flex h-full w-[240px] flex-col bg-white/60 dark:bg-[#0B3D6B]/20 backdrop-blur-2xl border-r border-white/80 dark:border-white/[0.06] transition-all duration-300">
+      {/* Logo */}
       <div className="px-4 py-4">
-        <div
-          className="flex items-center justify-center rounded-lg px-3 py-2"
-          style={{ background: '#0B3D6B' }}
-        >
-          <img
-            src="/images/logo-transparent.png"
-            alt="Epic Campus"
-            style={{ height: 60, width: 'auto' }}
-          />
+        <div className="flex items-center gap-2 px-2 py-1">
+          <img src="/favicon.png" alt="EPIC Campus" className="h-7 w-7 rounded-md object-cover" />
+          <span className="text-[14px] font-semibold text-[#0B3D6B] dark:text-[#E8A020] transition-colors duration-300">
+            EPIC Campus
+          </span>
         </div>
       </div>
 
-      <div className="mx-4 border-t border-white/10" />
+      <div className="mx-4 border-t border-[#0B3D6B]/10 dark:border-white/[0.06]" />
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
         {visibleItems.map((item) => {
           const active = isActive(item.href)
           return (
@@ -116,16 +113,16 @@ export default function ManagementSidebar() {
               key={item.href}
               href={item.href}
               onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+              className={`flex items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] font-medium transition-all duration-200 ${
                 active
-                  ? 'border-l-[3px] border-[#E8A020] bg-white/12 pl-[9px] font-medium text-white'
-                  : 'border-l-[3px] border-transparent text-white/75 hover:bg-white/[0.08] hover:text-white'
+                  ? 'bg-[#0B3D6B]/[0.09] text-[#0B3D6B] dark:bg-[#E8A020]/[0.13] dark:text-[#E8A020]'
+                  : 'text-gray-500 dark:text-white/45 hover:bg-[#0B3D6B]/[0.06] dark:hover:bg-white/[0.05] hover:text-[#0B3D6B] dark:hover:text-white/70'
               }`}
             >
-              <span className={`ti ${item.icon} text-lg leading-none`} aria-hidden="true" />
+              <span className={`ti ${item.icon} text-[14px] leading-none`} aria-hidden="true" />
               {item.label}
               {item.href === '/messages' && unreadMessages > 0 && (
-                <span className="ml-auto rounded-full bg-[#E8A020] px-2 py-0.5 text-xs font-bold text-[#0B3D6B]">
+                <span className="ml-auto rounded-full bg-[#E8A020] px-2 py-0.5 text-[10px] font-bold text-[#0B3D6B]">
                   {unreadMessages}
                 </span>
               )}
@@ -134,28 +131,28 @@ export default function ManagementSidebar() {
         })}
       </nav>
 
-      <div className="mx-4 border-t border-white/10" />
+      <div className="mx-4 border-t border-[#0B3D6B]/10 dark:border-white/[0.06]" />
 
-      <div className="p-4">
+      <div className="p-3">
         {user && (
-          <div className="mb-3">
-            <p className="truncate text-sm font-medium text-white">{user.displayName}</p>
-            <span className="mt-1 inline-block rounded-full bg-[#E8A020]/20 px-2 py-0.5 text-xs font-medium text-[#E8A020]">
+          <div className="mb-2 px-1">
+            <p className="truncate text-[12px] font-medium text-[#0B3D6B] dark:text-white/80">{user.displayName}</p>
+            <span className="mt-0.5 inline-block rounded-full bg-[#E8A020]/15 px-2 py-0.5 text-[10px] font-medium text-[#E8A020]">
               {ROLE_LABELS[user.role] ?? user.role}
             </span>
           </div>
         )}
-        <div className="mb-3 flex justify-center">
-          <ThemeToggle />
+        <div className="flex items-center gap-2 px-1">
+          <DarkModeToggle />
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex flex-1 items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] font-medium text-gray-500 dark:text-white/45 transition-all duration-200 hover:bg-[#0B3D6B]/[0.06] dark:hover:bg-white/[0.05] hover:text-[#0B3D6B] dark:hover:text-white/70"
+          >
+            <span className="ti ti-logout text-[14px]" aria-hidden="true" />
+            Logout
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-white/75 transition-colors hover:bg-white/[0.08] hover:text-white"
-        >
-          <span className="ti ti-logout text-lg" aria-hidden="true" />
-          Logout
-        </button>
       </div>
     </div>
   )

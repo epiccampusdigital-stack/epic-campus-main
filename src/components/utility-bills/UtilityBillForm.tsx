@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import {
@@ -131,7 +131,7 @@ export default function UtilityBillForm({ open, onClose, onSaved }: UtilityBillF
         onClick={onClose}
         aria-hidden="true"
       />
-      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-white shadow-2xl dark:bg-gray-800">
+      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-white/90 dark:bg-[#0d1a2e]/90 backdrop-blur-2xl border-l border-white/80 dark:border-white/[0.08] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[#DDE3EC] px-6 py-4">
           <h2 className="font-jakarta text-lg font-bold text-[#0B3D6B]">Add Utility Bill</h2>
           <button

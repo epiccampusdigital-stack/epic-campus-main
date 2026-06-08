@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useRef, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
@@ -249,8 +249,8 @@ export default function MaterialsPage() {
       {/* Slide-over form */}
       {slideOpen && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setSlideOpen(false)} aria-hidden="true" />
-          <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-xl">
+          <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setSlideOpen(false)} aria-hidden="true" />
+          <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white/90 dark:bg-[#0d1a2e]/90 backdrop-blur-2xl border-l border-white/80 dark:border-white/[0.08] shadow-2xl">
             <div className="flex items-center justify-between border-b border-[#DDE3EC] px-6 py-4">
               <h2 className="font-jakarta text-lg font-bold text-[#0B3D6B]">
                 {editId ? 'Edit Material' : 'Add Material'}

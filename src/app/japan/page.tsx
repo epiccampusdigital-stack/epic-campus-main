@@ -81,7 +81,7 @@ export default function JapanPage() {
     <>
       <PublicNav />
       <PageHero
-        flag="🇯🇵"
+        accentGradient="linear-gradient(90deg, #bc002d, #0B3D6B)"
         overline="JAPAN SSW & STUDY PROGRAMS"
         headline="Work & Study in Japan"
         subtext="Enter Japan legally through the Specified Skilled Worker (SSW) program. No university degree required for many categories."

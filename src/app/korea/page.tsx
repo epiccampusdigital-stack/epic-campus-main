@@ -111,7 +111,7 @@ export default function KoreaPage() {
     <>
       <PublicNav />
       <PageHero
-        flag="🇰🇷"
+        accentGradient="linear-gradient(90deg, #003478, #cd2e3a)"
         overline="KOREA STUDY PROGRAMS"
         headline="Study & Build Your Future in Korea"
         subtext="Access world-class Korean universities through our D-4 to D-2 pathway. Full and partial scholarships available."

@@ -90,7 +90,7 @@ export default function ChinaPage() {
     <>
       <PublicNav />
       <PageHero
-        flag="🇨🇳"
+        accentGradient="linear-gradient(90deg, #de2910, #ffde00)"
         overline="CHINA STUDY PROGRAMS"
         headline="World-Class Education, Affordable Costs"
         subtext="Study at top Chinese universities with full and partial scholarships. Medicine, Business, IT, Engineering and more."

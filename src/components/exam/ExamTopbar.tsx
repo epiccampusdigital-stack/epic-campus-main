@@ -1,5 +1,7 @@
 'use client'
 
+import DarkModeToggle from '@/components/ui/DarkModeToggle'
+
 const SECTION_LABELS: Record<string, { jp: string; en: string }> = {
   reading:   { jp: '読む',  en: 'Reading'   },
   listening: { jp: '聞く',  en: 'Listening' },
@@ -62,7 +64,7 @@ export default function ExamTopbar({
         </div>
       )}
 
-      {/* Right: section pill + timer */}
+      {/* Right: section pill + timer + dark toggle */}
       <div className="flex items-center gap-2">
         <span className="rounded-full px-3 py-1 text-[11px] font-medium
                          bg-[#E8A020]/15 border border-[#E8A020]/30 text-[#E8A020]">
@@ -73,6 +75,7 @@ export default function ExamTopbar({
             ⏱ {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
           </span>
         )}
+        <DarkModeToggle />
       </div>
     </header>
   )

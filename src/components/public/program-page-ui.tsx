@@ -20,20 +20,37 @@ export function SectionTitle({
 }
 
 export function PageHero({
-  flag,
+  flag: _flag,
+  accentGradient,
   overline,
   headline,
   subtext,
 }: {
-  flag: string
+  flag?: string
+  accentGradient?: string
   overline: string
   headline: string
   subtext: string
 }) {
   return (
-    <section className="relative bg-gradient-to-br from-[#0B3D6B] via-[#1A6BAD] to-[#0B3D6B] pb-48 pt-32">
-      <div className="mx-auto max-w-6xl px-4 text-center">
-        <div className="mb-6 text-6xl">{flag}</div>
+    <section className="relative overflow-hidden bg-gradient-to-br from-[#0B3D6B] via-[#1A6BAD] to-[#0B3D6B] pb-48 pt-28">
+      {/* Glowing blobs */}
+      <div
+        className="pointer-events-none absolute -left-20 top-10 h-72 w-72 rounded-full opacity-25"
+        style={{ background: '#E8A020', filter: 'blur(60px)' }}
+      />
+      <div
+        className="pointer-events-none absolute -right-20 bottom-10 h-80 w-80 rounded-full opacity-20"
+        style={{ background: '#1A6BAD', filter: 'blur(60px)' }}
+      />
+      <div className="relative mx-auto max-w-6xl px-4 text-center">
+        {/* Colored accent bar */}
+        {accentGradient && (
+          <div
+            className="mx-auto mb-8 h-[4px] w-24 rounded-full"
+            style={{ background: accentGradient }}
+          />
+        )}
         <p className="mb-4 text-sm font-semibold uppercase tracking-widest text-[#E8A020]">
           {overline}
         </p>
@@ -48,7 +65,7 @@ export function PageHero({
           </Link>
           <a
             href="#programs"
-            className="rounded-full border-2 border-white px-8 py-4 font-semibold text-white transition-all hover:bg-white hover:text-[#0B3D6B]"
+            className="rounded-full border border-white/25 bg-white/15 px-8 py-4 font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20"
           >
             Explore Programs
           </a>

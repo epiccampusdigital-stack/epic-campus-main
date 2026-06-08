@@ -48,10 +48,10 @@ const PAYMENT_STATUS_STYLES: Record<Payment['status'], string> = {
 
 function StatSkeleton() {
   return (
-    <div className="animate-pulse rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
-      <div className="mb-3 h-3 w-24 rounded bg-[#DDE3EC]" />
-      <div className="mb-2 h-8 w-32 rounded bg-[#DDE3EC]" />
-      <div className="h-3 w-20 rounded bg-[#DDE3EC]" />
+    <div className="animate-pulse rounded-[12px] border border-white/90 dark:border-white/[0.08] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl p-[14px] transition-all duration-300">
+      <div className="mb-3 h-3 w-24 rounded bg-[#DDE3EC] dark:bg-white/10" />
+      <div className="mb-2 h-8 w-32 rounded bg-[#DDE3EC] dark:bg-white/10" />
+      <div className="h-3 w-20 rounded bg-[#DDE3EC] dark:bg-white/10" />
     </div>
   )
 }
@@ -275,7 +275,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 rounded-xl border border-[#DDE3EC] bg-white p-4 dark:border-gray-600 dark:bg-gray-800 sm:flex-row sm:flex-wrap sm:items-end">
+      <div className="flex flex-col gap-4 rounded-[12px] border border-white/90 dark:border-white/[0.08] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl p-4 transition-all duration-300 sm:flex-row sm:flex-wrap sm:items-end">
         <div>
           <label className="mb-1.5 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
             Location
@@ -330,22 +330,22 @@ export default function DashboardPage() {
           : statCards.map((card) => (
               <div
                 key={card.label}
-                className="rounded-xl border border-[#DDE3EC] border-l-[3px] border-l-[#E8A020] bg-white p-5 dark:bg-gray-800"
+                className="rounded-[12px] p-[14px] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl border border-white/90 dark:border-white/[0.08] transition-all duration-300"
               >
-                <p className="font-inter text-xs uppercase tracking-wide text-[#5A6A7A]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-gray-400 dark:text-white/40">
                   {card.label}
                 </p>
-                <p className="font-jakarta mt-2 text-[28px] font-bold leading-tight text-[#0D1B2A] dark:text-white">
+                <p className="mt-2 text-[24px] font-semibold leading-tight text-[#0B3D6B] dark:text-[#E8A020] transition-colors duration-300">
                   {card.value}
                 </p>
-                <p className="mt-1 font-inter text-xs text-[#5A6A7A]">{card.sub}</p>
+                <p className="mt-1 text-[10px] text-green-500 dark:text-green-400">{card.sub}</p>
               </div>
             ))}
       </section>
 
-      <section className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:border-gray-600 dark:bg-gray-800">
-        <div className="flex flex-col gap-3 border-b border-[#DDE3EC] px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-gray-600">
-          <h2 className="font-jakarta text-base font-bold text-[#0D1B2A] dark:text-white">
+      <section className="overflow-hidden rounded-[12px] border border-white/90 dark:border-white/[0.08] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl transition-all duration-300">
+          <div className="flex flex-col gap-3 border-b border-white/80 dark:border-white/[0.06] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="font-jakarta text-base font-bold text-[#0D1B2A] dark:text-white/90">
             Pending & follow-up
           </h2>
           <select
@@ -369,7 +369,7 @@ export default function DashboardPage() {
           partnerNotifications.length === 0 ? (
           <p className="p-8 text-center text-sm text-[#5A6A7A]">No pending items for this course.</p>
         ) : (
-          <div className="divide-y divide-[#DDE3EC] dark:divide-gray-600">
+          <div className="divide-y divide-white/80 dark:divide-white/[0.06]">
             {partnerNotifications.map((n) => (
               <div
                 key={n.id}

@@ -91,7 +91,7 @@ export default function NvqPage() {
     <>
       <PublicNav />
       <PageHero
-        flag="🎓"
+        accentGradient="linear-gradient(90deg, #0B3D6B, #E8A020)"
         overline="NVQ & SKILL DEVELOPMENT"
         headline="Nationally Recognized Qualifications for Global Careers"
         subtext="TVEC-approved NVQ training programs. Build practical skills for local employment and international career pathways."

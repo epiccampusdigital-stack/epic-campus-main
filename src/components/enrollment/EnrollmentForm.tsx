@@ -310,7 +310,7 @@ export default function EnrollmentForm() {
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <span className="mt-0.5 text-2xl">{p.flag}</span>
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#0B3D6B]/10 text-[10px] font-bold text-[#0B3D6B]">{p.flag}</span>
                     <div>
                       <p className="font-semibold text-[#0B3D6B]">{p.label}</p>
                       <p className="mt-0.5 text-xs text-gray-500">{p.subtitle}</p>

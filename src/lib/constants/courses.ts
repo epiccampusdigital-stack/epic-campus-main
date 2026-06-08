@@ -1,8 +1,8 @@
 export const COURSES = [
-  { id: 'japan-ssw',        label: 'Japan SSW (Japanese Language)',  flag: '🇯🇵' },
-  { id: 'korea-d2d4',       label: 'Korea D2/D4 (Korean Language)',  flag: '🇰🇷' },
-  { id: 'china',            label: 'China Program',                  flag: '🇨🇳' },
-  { id: 'ielts',            label: 'IELTS Residential',              flag: '🇬🇧' },
+  { id: 'japan-ssw',        label: 'Japan SSW (Japanese Language)',  flag: 'JP' },
+  { id: 'korea-d2d4',       label: 'Korea D2/D4 (Korean Language)',  flag: 'KR' },
+  { id: 'china',            label: 'China Program',                  flag: 'CN' },
+  { id: 'ielts',            label: 'IELTS Residential',              flag: 'GB' },
   { id: 'nvq-it',           label: 'NVQ — Information Technology',   flag: '💻' },
   { id: 'nvq-hospitality',  label: 'NVQ — Hospitality',              flag: '🏨' },
   { id: 'nvq-caregiving',   label: 'NVQ — Caregiving',               flag: '🏥' },

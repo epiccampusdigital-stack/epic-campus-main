@@ -120,7 +120,7 @@ export default function IeltsPage() {
         </div>
       </div>
       <PageHero
-        flag="🎓"
+        accentGradient="linear-gradient(90deg, #003087, #CF142B)"
         overline="IELTS RESIDENTIAL PROGRAM"
         headline="Fast-Track Your English to Global Success"
         subtext="Intensive 10-day residential IELTS training. Expert trainers, daily mock exams, personalized band score guidance."

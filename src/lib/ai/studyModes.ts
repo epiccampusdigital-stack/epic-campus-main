@@ -226,7 +226,7 @@ Start by asking "Shall we begin with Part 1?" and proceed naturally through the 
     icon: 'ti-letter-k',
     description: 'Hangul, vocabulary, TOPIK preparation for Korea D2/D4 students',
     greeting:
-      '안녕하세요! (Annyeonghaseyo — Hello!) 🇰🇷 I\'m your Korean language tutor. Are you a complete beginner or have you started learning already?',
+      '안녕하세요! (Annyeonghaseyo — Hello!) I\'m your Korean language tutor. Are you a complete beginner or have you started learning already?',
     hasPracticeQuestions: false,
     systemPrompt: `${BASE_CONTEXT}
 

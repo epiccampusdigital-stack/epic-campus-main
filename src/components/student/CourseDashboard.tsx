@@ -138,8 +138,9 @@ export default function CourseDashboard({
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A]">
-            🇯🇵 Your Japan Journey
+          <div className="mb-1 h-[3px] w-16 rounded-full" style={{ background: 'linear-gradient(90deg, #bc002d, #0B3D6B)' }} />
+          <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white/90">
+            Your Japan Journey
           </h2>
           <p className="text-sm text-[#5A6A7A]">{course?.label}</p>
         </div>
@@ -173,8 +174,9 @@ export default function CourseDashboard({
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A]">
-            🇰🇷 Your Korea Journey
+          <div className="mb-1 h-[3px] w-16 rounded-full" style={{ background: 'linear-gradient(90deg, #003478, #cd2e3a)' }} />
+          <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white/90">
+            Your Korea Journey
           </h2>
           <p className="text-sm text-[#5A6A7A]">{course?.label}</p>
         </div>
@@ -215,8 +217,9 @@ export default function CourseDashboard({
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A]">
-            🇨🇳 Your China Journey
+          <div className="mb-1 h-[3px] w-16 rounded-full" style={{ background: 'linear-gradient(90deg, #de2910, #ffde00)' }} />
+          <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white/90">
+            Your China Journey
           </h2>
           <p className="text-sm text-[#5A6A7A]">{course?.label}</p>
         </div>
@@ -238,8 +241,9 @@ export default function CourseDashboard({
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A]">
-            🇬🇧 Your IELTS Journey
+          <div className="mb-1 h-[3px] w-16 rounded-full" style={{ background: 'linear-gradient(90deg, #003087, #CF142B)' }} />
+          <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white/90">
+            Your IELTS Journey
           </h2>
           <p className="text-sm text-[#5A6A7A]">{course?.label}</p>
         </div>

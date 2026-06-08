@@ -69,10 +69,10 @@ export default function ManagementLayout({
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#F5F7FB]">
+      <div className="flex h-screen items-center justify-center bg-[#eef2f7] dark:bg-[#080d18] transition-colors duration-300">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-[#0B3D6B] border-t-[#E8A020]" />
-          <p className="font-inter text-sm text-[#5A6A7A]">Loading dashboard…</p>
+          <p className="font-inter text-sm text-[#5A6A7A] dark:text-white/50">Loading dashboard…</p>
         </div>
       </div>
     )
@@ -84,11 +84,11 @@ export default function ManagementLayout({
     <ManagementContext.Provider
       value={{ user, loading, sidebarOpen, setSidebarOpen }}
     >
-      <div className="flex h-screen overflow-hidden bg-[#F5F7FB] dark:bg-gray-900">
+      <div className="flex h-screen overflow-hidden bg-[#eef2f7] dark:bg-[#080d18] transition-colors duration-300 font-['DM_Sans']">
         <ManagementSidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
           <TopBar />
-          <main className="flex-1 overflow-y-auto bg-[#F5F7FB] p-6 dark:bg-gray-900">
+          <main className="flex-1 overflow-y-auto bg-[#eef2f7] dark:bg-[#080d18] p-6 transition-colors duration-300">
             {children}
           </main>
         </div>

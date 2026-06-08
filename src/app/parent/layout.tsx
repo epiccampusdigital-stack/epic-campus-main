@@ -16,16 +16,9 @@ import type { EpicUser, ParentAccount, Student } from '@/types'
 
 function LoadingScreen() {
   return (
-    <div className="flex h-screen flex-col items-center justify-center bg-[#F5F7FB] px-6">
-      <div className="mb-6 flex items-center justify-center rounded-xl bg-[#0B3D6B] px-6 py-4">
-        <img
-          src="/images/logo-transparent.png"
-          alt="Epic Campus"
-          className="h-12 w-auto"
-        />
-      </div>
+    <div className="flex h-screen flex-col items-center justify-center bg-[#eef2f7] dark:bg-[#080d18] px-6 transition-colors duration-300">
       <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#0B3D6B]/20 border-t-[#0B3D6B]" />
-      <p className="mt-6 font-jakarta text-base font-semibold text-[#0B3D6B]">
+      <p className="mt-6 font-jakarta text-base font-semibold text-[#0B3D6B] dark:text-white/80">
         Loading parent portal…
       </p>
     </div>
@@ -34,8 +27,8 @@ function LoadingScreen() {
 
 function UnavailableScreen() {
   return (
-    <div className="flex h-screen items-center justify-center bg-[#F5F7FB] px-6">
-      <div className="max-w-md rounded-xl border border-[#DDE3EC] bg-white p-8 text-center">
+    <div className="flex h-screen items-center justify-center bg-[#eef2f7] dark:bg-[#080d18] px-6 transition-colors duration-300">
+      <div className="max-w-md rounded-xl border border-white/80 dark:border-white/[0.08] bg-white/80 dark:bg-[#0d1a2e]/80 backdrop-blur-2xl p-8 text-center">
         <span className="ti ti-alert-circle mb-4 block text-4xl text-[#E8A020]" />
         <h1 className="font-jakarta text-xl font-bold text-[#0D1B2A]">
           Access unavailable
@@ -67,15 +60,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
     setRefreshToken((t) => t + 1)
   }, [])
 
-  useEffect(() => {
-    const root = document.documentElement
-    root.classList.remove('dark')
-    root.classList.add('light')
-    root.style.colorScheme = 'light'
-    return () => {
-      root.style.colorScheme = ''
-    }
-  }, [])
+  // Dark mode is managed by useDarkMode hook via localStorage
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -166,23 +151,23 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
         refresh,
       }}
     >
-      <div className="light flex h-screen overflow-hidden bg-[#F5F7FB] text-[#0D1B2A]">
+      <div className="flex h-screen overflow-hidden bg-[#eef2f7] dark:bg-[#080d18] text-[#0D1B2A] dark:text-white/90 transition-colors duration-300 font-['DM_Sans']">
         <ParentSidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
-          <header className="flex items-center gap-3 border-b border-[#DDE3EC] bg-white px-4 py-3 md:hidden">
+          <header className="flex h-[52px] items-center gap-3 border-b border-white/80 dark:border-white/[0.05] bg-white/70 dark:bg-[#080d18]/75 backdrop-blur-xl px-4 sticky top-0 z-50 transition-all duration-300 md:hidden">
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
-              className="rounded-lg p-2 text-[#0B3D6B] hover:bg-[#F5F7FB]"
+              className="rounded-lg p-2 text-[#0B3D6B] dark:text-white/70 hover:bg-[#0B3D6B]/[0.06] dark:hover:bg-white/[0.06]"
               aria-label="Open menu"
             >
               <span className="ti ti-menu-2 text-xl" />
             </button>
-            <span className="font-jakarta text-sm font-bold text-[#0B3D6B]">
+            <span className="font-jakarta text-sm font-bold text-[#0B3D6B] dark:text-white/90">
               Parent Portal
             </span>
           </header>
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+          <main className="flex-1 overflow-y-auto bg-[#eef2f7] dark:bg-[#080d18] p-4 sm:p-6 transition-colors duration-300">{children}</main>
         </div>
       </div>
     </ParentContext.Provider>

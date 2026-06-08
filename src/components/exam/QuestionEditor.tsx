@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useEffect, useState } from 'react'
 import {
@@ -713,8 +713,8 @@ export default function QuestionEditor({ paper, open, onClose }: Props) {
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} aria-hidden="true" />
-      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-3xl flex-col bg-white shadow-xl">
+      <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-3xl flex-col bg-white/90 dark:bg-[#0d1a2e]/90 backdrop-blur-2xl border-l border-white/80 dark:border-white/[0.08] shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#DDE3EC] px-6 py-4">
           <div>

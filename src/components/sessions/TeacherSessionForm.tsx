@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { collection, getDocs } from 'firebase/firestore'
@@ -159,7 +159,7 @@ export default function TeacherSessionForm({
     <>
       <div className="fixed inset-0 z-40 bg-[#0D1B2A]/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <aside
-        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-white shadow-2xl dark:bg-gray-800"
+        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-white/90 dark:bg-[#0d1a2e]/90 backdrop-blur-2xl border-l border-white/80 dark:border-white/[0.08] shadow-2xl"
         role="dialog"
         aria-modal="true"
       >

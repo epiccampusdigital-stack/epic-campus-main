@@ -7,6 +7,7 @@ import { signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase/client'
 import { logAuditEvent } from '@/lib/audit/helpers'
 import { useCompanyPortal } from '@/components/company/CompanyContext'
+import DarkModeToggle from '@/components/ui/DarkModeToggle'
 
 const NAV = [
   { label: 'Dashboard', href: '/company/dashboard', icon: 'ti-layout-dashboard' },
@@ -39,18 +40,19 @@ export default function CompanySidebar() {
   }
 
   const sidebarContent = (
-    <div className="flex h-full w-[240px] flex-col bg-[#0B3D6B]">
+    <div className="flex h-full w-[240px] flex-col bg-white/60 dark:bg-[#0B3D6B]/20 backdrop-blur-2xl border-r border-white/80 dark:border-white/[0.06] transition-all duration-300">
+      {/* Logo */}
       <div className="px-4 py-4">
-        <div className="flex items-center justify-center rounded-lg px-3 py-2">
-          <img
-            src="/images/logo-transparent.png"
-            alt="Epic Campus"
-            className="h-12 w-auto"
-          />
+        <div className="flex items-center gap-2 px-2 py-1">
+          <img src="/favicon.png" alt="EPIC Campus" className="h-7 w-7 rounded-md object-cover" />
+          <span className="text-[14px] font-semibold text-[#0B3D6B] dark:text-[#E8A020] transition-colors duration-300">
+            EPIC Campus
+          </span>
         </div>
       </div>
-      <div className="mx-4 border-t border-white/10" />
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <div className="mx-4 border-t border-[#0B3D6B]/10 dark:border-white/[0.06]" />
+
+      <nav className="flex-1 space-y-0.5 px-3 py-3">
         {NAV.map((item) => {
           const active = pathname === item.href
           return (
@@ -58,31 +60,36 @@ export default function CompanySidebar() {
               key={item.href}
               href={item.href}
               onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${
+              className={`flex items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] font-medium transition-all duration-200 ${
                 active
-                  ? 'border-l-[3px] border-[#E8A020] bg-white/12 pl-[9px] font-medium text-white'
-                  : 'border-l-[3px] border-transparent text-white/75 hover:bg-white/[0.08]'
+                  ? 'bg-[#0B3D6B]/[0.09] text-[#0B3D6B] dark:bg-[#E8A020]/[0.13] dark:text-[#E8A020]'
+                  : 'text-gray-500 dark:text-white/45 hover:bg-[#0B3D6B]/[0.06] dark:hover:bg-white/[0.05] hover:text-[#0B3D6B] dark:hover:text-white/70'
               }`}
             >
-              <span className={`ti ${item.icon} text-lg`} aria-hidden="true" />
+              <span className={`ti ${item.icon} text-[14px]`} aria-hidden="true" />
               {item.label}
             </Link>
           )
         })}
       </nav>
-      <div className="mx-4 border-t border-white/10" />
-      <div className="p-4">
+
+      <div className="mx-4 border-t border-[#0B3D6B]/10 dark:border-white/[0.06]" />
+
+      <div className="p-3">
         {company && (
-          <p className="mb-3 truncate text-sm font-medium text-white">{company.name}</p>
+          <p className="mb-2 truncate px-1 text-[12px] font-medium text-[#0B3D6B] dark:text-white/80">{company.name}</p>
         )}
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-white/75 hover:bg-white/[0.08]"
-        >
-          <span className="ti ti-logout text-lg" aria-hidden="true" />
-          Logout
-        </button>
+        <div className="flex items-center gap-2 px-1">
+          <DarkModeToggle />
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex flex-1 items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] font-medium text-gray-500 dark:text-white/45 transition-all duration-200 hover:bg-[#0B3D6B]/[0.06] dark:hover:bg-white/[0.05] hover:text-[#0B3D6B] dark:hover:text-white/70"
+          >
+            <span className="ti ti-logout text-[14px]" aria-hidden="true" />
+            Logout
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -94,13 +101,13 @@ export default function CompanySidebar() {
       <aside className="hidden shrink-0 md:block">{sidebarContent}</aside>
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 transform transition-transform md:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 md:hidden ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
