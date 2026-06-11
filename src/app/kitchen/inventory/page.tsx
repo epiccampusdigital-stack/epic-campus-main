@@ -266,10 +266,10 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-[#0D1B2A] dark:text-white">Inventory</h1>
-        <div className="flex items-center gap-2">
+        <h1 className="text-xl font-bold text-[#0D1B2A] md:text-2xl dark:text-white">Inventory</h1>
+        <div className="hidden items-center gap-2 md:flex">
           <button
             type="button"
             onClick={() => setViewMode(viewMode === 'grid' ? 'table' : 'grid')}
@@ -295,16 +295,16 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
         {CATEGORY_PILLS.map((pill) => (
           <button
             key={pill.id || 'all'}
             type="button"
             onClick={() => setCatFilter(pill.id as InventoryCategory | '')}
-            className={`min-h-[44px] rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+            className={`min-h-[40px] shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
               catFilter === pill.id
                 ? 'bg-[#E8A020] text-white'
-                : 'bg-white text-[#0B3D6B] border border-[#DDE3EC] dark:bg-gray-900 dark:text-white dark:border-gray-600'
+                : 'border border-[#DDE3EC] bg-white text-[#0B3D6B] dark:border-gray-600 dark:bg-gray-900 dark:text-white'
             }`}
           >
             {pill.label} {pill.emoji}
@@ -320,15 +320,24 @@ export default function InventoryPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search items…"
-          className="w-full rounded-xl border border-[#DDE3EC] bg-white py-3.5 pl-12 pr-4 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+          className="w-full min-h-[48px] rounded-xl border border-[#DDE3EC] bg-white py-3 pl-12 pr-4 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
         />
       </div>
 
-      {viewMode === 'grid' ? (
-        loading ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+      <button
+        type="button"
+        onClick={openAdd}
+        className="fixed bottom-20 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#E8A020] text-2xl font-bold text-white shadow-lg hover:bg-[#d4911c] md:hidden"
+        aria-label="Add item"
+      >
+        +
+      </button>
+
+      <div className={viewMode === 'table' ? 'md:hidden' : ''}>
+        {loading ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4 lg:grid-cols-5">
             {Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} className="h-56 animate-pulse rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />
+              <div key={i} className="h-48 animate-pulse rounded-2xl bg-[#DDE3EC] dark:bg-white/10 md:h-56" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
@@ -336,7 +345,7 @@ export default function InventoryPage() {
             <p className="text-sm text-[#5A6A7A] dark:text-white/40">No items found</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4 lg:grid-cols-5">
             {filtered.map((item) => (
               <InventoryGridCard
                 key={item.id}
@@ -346,11 +355,48 @@ export default function InventoryPage() {
               />
             ))}
           </div>
-        )
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-white/90 bg-white/65 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05]">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px] text-left text-sm">
+        )}
+      </div>
+
+      {viewMode === 'table' && (
+        <>
+        <div className="space-y-3 md:hidden">
+          {loading ? (
+            Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-24 animate-pulse rounded-xl bg-[#DDE3EC] dark:bg-white/10" />
+            ))
+          ) : filtered.length === 0 ? (
+            <p className="py-8 text-center text-sm text-[#5A6A7A] dark:text-white/40">No items found</p>
+          ) : (
+            filtered.map((item) => {
+              const status = getStockStatus(item)
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-3 rounded-xl border border-white/90 bg-white/65 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]"
+                  onClick={() => openEdit(item)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && openEdit(item)}
+                >
+                  <FoodEmoji itemName={item.itemName} size="md" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-bold text-[#0B3D6B] dark:text-white">{item.itemName}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {item.currentStock} {item.unit} · {formatLKR(item.unitCost)}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${status.cls}`}>
+                    {status.label}
+                  </span>
+                </div>
+              )
+            })
+          )}
+        </div>
+        <div className="hidden overflow-hidden rounded-xl border border-white/90 bg-white/65 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05] md:block">
+          <div>
+            <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] text-xs font-medium uppercase text-[#5A6A7A] dark:border-white/[0.06] dark:bg-white/[0.03] dark:text-white/40">
                   <th className="px-4 py-3">Item</th>
@@ -463,6 +509,7 @@ export default function InventoryPage() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {history.length > 0 && (

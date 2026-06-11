@@ -27,9 +27,7 @@ export default function IngredientPicker({
 
   const sorted = useMemo(() => {
     const q = search.toLowerCase().trim()
-    const filtered = items.filter(
-      (i) => !q || i.itemName.toLowerCase().includes(q),
-    )
+    const filtered = items.filter((i) => !q || i.itemName.toLowerCase().includes(q))
     return [...filtered].sort((a, b) => {
       const aOut = a.currentStock <= 0 ? 1 : 0
       const bOut = b.currentStock <= 0 ? 1 : 0
@@ -48,7 +46,7 @@ export default function IngredientPicker({
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  const displayValue = open ? search : selected?.itemName ?? ''
+  const displayValue = open ? search : (selected?.itemName ?? '')
 
   return (
     <div ref={containerRef} className="relative">
@@ -74,14 +72,14 @@ export default function IngredientPicker({
             setOpen(true)
             setSearch(selected?.itemName ?? '')
           }}
-          className={`w-full rounded-xl border border-[#DDE3EC] bg-white py-3 pr-4 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white ${
+          className={`w-full min-h-[52px] rounded-xl border border-[#DDE3EC] bg-white py-3 pr-4 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white ${
             selected && !open ? 'pl-16' : 'pl-10'
           }`}
         />
       </div>
 
       {open && (
-        <ul className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-[#DDE3EC] bg-white shadow-lg dark:border-gray-600 dark:bg-gray-900">
+        <ul className="absolute z-50 mt-1 max-h-[40vh] w-full overflow-y-auto rounded-xl border border-[#DDE3EC] bg-white shadow-lg dark:border-gray-600 dark:bg-gray-900">
           {sorted.length === 0 ? (
             <li className="px-4 py-3 text-sm text-gray-500">No items found</li>
           ) : (
@@ -96,21 +94,21 @@ export default function IngredientPicker({
                       setSearch('')
                       setOpen(false)
                     }}
-                    className={`flex min-h-[44px] w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06] ${
+                    className={`flex min-h-[52px] w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06] ${
                       value === item.id ? 'bg-[#E8A020]/10' : ''
                     }`}
                   >
                     <span className="text-[32px] leading-none">{getFoodEmoji(item.itemName)}</span>
-                    <span className="flex-1 font-medium text-[#0D1B2A] dark:text-white">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#0D1B2A] dark:text-white">
                       {item.itemName}
                     </span>
                     {out ? (
-                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
+                      <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
                         OUT
                       </span>
                     ) : (
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                        {item.currentStock} {item.unit} in stock
+                      <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                        {item.currentStock} {item.unit}
                       </span>
                     )}
                   </button>

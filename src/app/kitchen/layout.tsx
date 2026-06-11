@@ -1,14 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { onAuthStateChanged } from 'firebase/auth'
+import { usePathname, useRouter } from 'next/navigation'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
-import { signOut } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase/client'
 import DarkModeToggle from '@/components/ui/DarkModeToggle'
+import KitchenBottomNav from '@/components/kitchen/KitchenBottomNav'
 import { isNavActive, navLinkClasses } from '@/lib/utils/nav'
 import { KitchenContext } from '@/app/kitchen/context'
 import type { EpicUser } from '@/types'
@@ -89,7 +88,7 @@ function KitchenSidebar({
           <button
             type="button"
             onClick={handleLogout}
-            className="flex flex-1 items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] font-medium text-gray-500 transition-all duration-200 hover:bg-[#0B3D6B]/[0.06] hover:text-[#0B3D6B] dark:text-white/45 dark:hover:bg-white/[0.05] dark:hover:text-white/70"
+            className="flex min-h-[44px] flex-1 items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] font-medium text-gray-500 transition-all duration-200 hover:bg-[#0B3D6B]/[0.06] hover:text-[#0B3D6B] dark:text-white/45 dark:hover:bg-white/[0.05] dark:hover:text-white/70"
           >
             <span className="ti ti-logout text-[14px]" aria-hidden="true" />
             Logout
@@ -106,7 +105,7 @@ function KitchenSidebar({
       <aside className="hidden shrink-0 md:block">{content}</aside>
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-20 bg-black/40 md:hidden"
+          className="fixed inset-0 z-20 bg-black/50 md:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />
@@ -136,7 +135,10 @@ export default function KitchenLayout({ children }: { children: React.ReactNode 
       }
       try {
         const snap = await getDoc(doc(db, 'users', firebaseUser.uid))
-        if (!snap.exists()) { router.replace('/login'); return }
+        if (!snap.exists()) {
+          router.replace('/login')
+          return
+        }
         const data = snap.data()
         if (data.role !== 'kitchen' && data.role !== 'admin' && data.role !== 'owner') {
           router.replace('/login')
@@ -160,7 +162,7 @@ export default function KitchenLayout({ children }: { children: React.ReactNode 
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#eef2f7] dark:bg-[#080d18] transition-colors duration-300">
+      <div className="flex h-screen items-center justify-center bg-[#eef2f7] transition-colors duration-300 dark:bg-[#080d18]">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-[#0B3D6B] border-t-[#E8A020]" />
           <p className="text-sm text-[#5A6A7A] dark:text-white/50">Loading kitchen portal…</p>
@@ -175,19 +177,19 @@ export default function KitchenLayout({ children }: { children: React.ReactNode 
     <KitchenContext.Provider value={{ user, sidebarOpen, setSidebarOpen }}>
       <div className="flex h-screen overflow-hidden bg-[#eef2f7] font-['DM_Sans'] transition-colors duration-300 dark:bg-[#080d18]">
         <KitchenSidebar user={user} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <header className="sticky top-0 z-50 flex h-[52px] shrink-0 items-center justify-between border-b border-white/80 bg-white/70 px-4 backdrop-blur-xl transition-all duration-300 dark:border-white/[0.05] dark:bg-[#080d18]/75 sm:px-6">
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
                 onClick={() => setSidebarOpen(true)}
-                className="rounded-lg p-2 text-[#0B3D6B] hover:bg-[#0B3D6B]/[0.06] dark:text-white/70 dark:hover:bg-white/[0.06] md:hidden"
+                className="flex h-11 w-11 items-center justify-center rounded-lg text-[#0B3D6B] hover:bg-[#0B3D6B]/[0.06] dark:text-white/70 dark:hover:bg-white/[0.06] md:hidden"
                 aria-label="Open menu"
               >
                 <span className="ti ti-menu-2 text-xl" aria-hidden="true" />
               </button>
-              <div>
-                <p className="text-[15px] font-semibold text-[#0D1B2A] dark:text-white/90">
+              <div className="min-w-0">
+                <p className="truncate text-[15px] font-semibold text-[#0D1B2A] dark:text-white/90">
                   Kitchen Portal
                 </p>
                 <p className="hidden text-[11px] text-[#5A6A7A] dark:text-white/40 sm:block">
@@ -196,18 +198,21 @@ export default function KitchenLayout({ children }: { children: React.ReactNode 
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <DarkModeToggle />
+              <div className="hidden md:block">
+                <DarkModeToggle />
+              </div>
               {user && (
-                <div className="ml-1 flex h-8 w-8 items-center justify-center rounded-full bg-orange-500 text-[11px] font-bold text-white">
+                <div className="ml-1 flex h-9 w-9 items-center justify-center rounded-full bg-orange-500 text-[11px] font-bold text-white">
                   {user.displayName.slice(0, 2).toUpperCase()}
                 </div>
               )}
             </div>
           </header>
-          <main className="flex-1 overflow-y-auto bg-[#eef2f7] p-4 transition-colors duration-300 dark:bg-[#080d18] sm:p-6">
-            {children}
+          <main className="flex-1 overflow-y-auto overflow-x-hidden bg-[#eef2f7] p-4 pb-20 transition-colors duration-300 dark:bg-[#080d18] md:pb-6 sm:p-6">
+            <div className="mx-auto max-w-full">{children}</div>
           </main>
         </div>
+        <KitchenBottomNav />
       </div>
     </KitchenContext.Provider>
   )

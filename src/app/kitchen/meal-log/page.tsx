@@ -14,6 +14,8 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { useKitchen } from '@/app/kitchen/context'
+import CountStepper from '@/components/kitchen/CountStepper'
+import KitchenBottomSheet from '@/components/kitchen/KitchenBottomSheet'
 import MealIngredientList, {
   rowsToIngredients,
   type IngredientRow,
@@ -29,13 +31,6 @@ const MEAL_TYPES: { value: MealType; label: string }[] = [
   { value: 'tea', label: 'Tea' },
 ]
 
-const MEAL_TYPE_COLORS: Record<MealType, string> = {
-  breakfast: 'bg-amber-50 text-amber-700 border-amber-200',
-  lunch: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  dinner: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  tea: 'bg-orange-50 text-orange-700 border-orange-200',
-}
-
 function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
@@ -47,11 +42,11 @@ export default function MealLogPage() {
   const [dateFilter, setDateFilter] = useState(today())
   const [typeFilter, setTypeFilter] = useState<MealType | 'all'>('all')
   const [showSlide, setShowSlide] = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
 
-  // Form state
   const [fDate, setFDate] = useState(today())
   const [fType, setFType] = useState<MealType>('lunch')
   const [fStudents, setFStudents] = useState('')
@@ -62,7 +57,9 @@ export default function MealLogPage() {
   async function loadLogs() {
     setLoading(true)
     try {
-      const snap = await getDocs(query(collection(db, 'mealLogs'), orderBy('date', 'desc'), orderBy('createdAt', 'desc')))
+      const snap = await getDocs(
+        query(collection(db, 'mealLogs'), orderBy('date', 'desc'), orderBy('createdAt', 'desc')),
+      )
       setLogs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as MealLog)))
     } catch (err) {
       console.error('[MealLog]', err)
@@ -73,12 +70,19 @@ export default function MealLogPage() {
 
   async function loadInventory() {
     try {
-      const snap = await getDocs(query(collection(db, 'inventory'), where('isActive', '==', true), orderBy('itemName')))
+      const snap = await getDocs(
+        query(collection(db, 'inventory'), where('isActive', '==', true), orderBy('itemName')),
+      )
       setInventoryItems(snap.docs.map((d) => ({ id: d.id, ...d.data() } as InventoryItem)))
-    } catch {}
+    } catch {
+      // ignore
+    }
   }
 
-  useEffect(() => { loadLogs(); loadInventory() }, [])
+  useEffect(() => {
+    loadLogs()
+    loadInventory()
+  }, [])
 
   function showToast(msg: string) {
     setToast(msg)
@@ -116,7 +120,6 @@ export default function MealLogPage() {
         createdAt: serverTimestamp(),
       })
 
-      // Deduct from inventory
       for (const ing of usedIngredients) {
         const item = inventoryItems.find((i) => i.id === ing.itemId)
         if (!item) continue
@@ -139,7 +142,11 @@ export default function MealLogPage() {
       }
 
       setShowSlide(false)
-      setFDate(today()); setFType('lunch'); setFStudents(''); setFStaff(''); setFNotes('')
+      setFDate(today())
+      setFType('lunch')
+      setFStudents('')
+      setFStaff('')
+      setFNotes('')
       setIngredients([{ itemId: '', qty: '' }])
       showToast('Meal logged successfully')
       await loadLogs()
@@ -150,43 +157,62 @@ export default function MealLogPage() {
     }
   }
 
+  const slideFooter = (
+    <div className="flex gap-3">
+      <button
+        type="button"
+        onClick={() => setShowSlide(false)}
+        className="flex min-h-[48px] flex-1 items-center justify-center rounded-xl border border-[#DDE3EC] text-sm font-medium text-[#5A6A7A]"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={handleSave}
+        disabled={saving || (!fStudents && !fStaff)}
+        className="flex min-h-[48px] flex-1 items-center justify-center rounded-xl bg-[#E8A020] text-base font-bold text-white hover:bg-[#d4911c] disabled:opacity-50"
+      >
+        {saving ? 'Saving…' : 'Log Meal'}
+      </button>
+    </div>
+  )
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-lg">
+        <div className="fixed bottom-24 right-4 z-50 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-lg md:bottom-6">
           {toast}
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="space-y-3">
         <h1 className="text-xl font-bold text-[#0D1B2A] dark:text-white">Meal Log</h1>
         <button
           type="button"
           onClick={() => setShowSlide(true)}
-          className="flex items-center gap-2 rounded-lg bg-[#E8A020] px-4 py-2 text-sm font-semibold text-white hover:bg-[#d4911c]"
+          className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-[#E8A020] text-base font-bold text-white hover:bg-[#d4911c] md:w-auto md:px-6"
         >
           <span className="ti ti-plus" /> Log New Meal
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <input
           type="date"
           value={dateFilter}
           onChange={(e) => setDateFilter(e.target.value)}
-          className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+          className="min-h-[48px] w-full rounded-xl border border-[#DDE3EC] bg-white px-3 py-2 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white sm:w-auto"
         />
-        <div className="flex rounded-lg border border-[#DDE3EC] bg-white overflow-hidden dark:border-gray-600 dark:bg-gray-900">
+        <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 sm:overflow-visible">
           {(['all', ...MEAL_TYPES.map((m) => m.value)] as (MealType | 'all')[]).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTypeFilter(t)}
-              className={`px-3 py-2 text-xs font-medium transition-colors ${
+              className={`min-h-[44px] shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                 typeFilter === t
                   ? 'bg-[#0B3D6B] text-white'
-                  : 'text-[#5A6A7A] hover:bg-[#F5F7FB] dark:text-white/60 dark:hover:bg-white/[0.05]'
+                  : 'border border-[#DDE3EC] bg-white text-[#5A6A7A] dark:border-gray-600 dark:bg-gray-900 dark:text-white/60'
               }`}
             >
               {t === 'all' ? 'All' : t.charAt(0).toUpperCase() + t.slice(1)}
@@ -195,7 +221,6 @@ export default function MealLogPage() {
         </div>
       </div>
 
-      {/* Log cards */}
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -204,133 +229,151 @@ export default function MealLogPage() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-xl border border-white/90 bg-white/65 py-16 text-center dark:border-white/[0.08] dark:bg-white/[0.05]">
-          <span className="ti ti-soup text-4xl text-[#DDE3EC] dark:text-white/20" />
+          <span className="text-4xl">🍽️</span>
           <p className="mt-3 text-sm text-[#5A6A7A] dark:text-white/40">No meal logs for this filter</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((log) => (
-            <div
-              key={log.id}
-              className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/90 bg-white/65 px-5 py-4 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05]"
-            >
-              <div className="flex items-center gap-3">
-                <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${MEAL_TYPE_COLORS[log.mealType]}`}>
-                  {log.mealType}
-                </span>
-                <p className="text-sm font-medium text-[#0D1B2A] dark:text-white">{log.date}</p>
+          {filtered.map((log) => {
+            const visual = MEAL_SESSION_VISUAL[log.mealType]
+            const expanded = expandedId === log.id
+            return (
+              <div
+                key={log.id}
+                className="rounded-xl border border-white/90 bg-white/65 dark:border-white/[0.08] dark:bg-white/[0.05]"
+              >
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(expanded ? null : log.id)}
+                  className="flex w-full items-center gap-3 p-4 text-left"
+                >
+                  <span className="text-3xl">{visual?.emoji}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold capitalize text-[#0D1B2A] dark:text-white">
+                      {log.mealType}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{log.date}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-semibold text-[#0D1B2A] dark:text-white">
+                      {log.studentCount + log.staffCount} served
+                    </p>
+                    <p className="text-sm font-bold text-[#E8A020]">
+                      {formatLKR(log.estimatedCost)}
+                    </p>
+                  </div>
+                  <span className={`ti ti-chevron-${expanded ? 'up' : 'down'} text-gray-400`} />
+                </button>
+                {expanded && (
+                  <div className="border-t border-[#DDE3EC] px-4 py-3 text-sm dark:border-white/[0.06]">
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {log.studentCount} students · {log.staffCount} staff
+                    </p>
+                    <p className="mt-1 text-gray-600 dark:text-gray-400">
+                      {formatLKR(log.costPerPerson)} per person
+                    </p>
+                    {log.ingredientsUsed?.length > 0 && (
+                      <ul className="mt-2 space-y-1">
+                        {log.ingredientsUsed.map((ing, i) => (
+                          <li key={i} className="text-gray-600 dark:text-gray-400">
+                            {ing.itemName}: {ing.qtyUsed} {ing.unit}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {log.notes && (
+                      <p className="mt-2 text-gray-500 dark:text-gray-500">Notes: {log.notes}</p>
+                    )}
+                    <p className="mt-2 text-xs text-gray-400">By {log.loggedByName}</p>
+                  </div>
+                )}
               </div>
-              <div className="flex flex-wrap gap-4 text-sm text-[#5A6A7A] dark:text-white/60">
-                <span>{log.studentCount} students + {log.staffCount} staff</span>
-                <span className="font-medium text-[#0B3D6B] dark:text-[#E8A020]">
-                  {formatLKR(log.estimatedCost)}
-                </span>
-                <span>{formatLKR(log.costPerPerson)}/person</span>
-                <span className="text-xs">{log.loggedByName}</span>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
-      {/* Log Meal Slide-over */}
-      {showSlide && (
-        <>
-          <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setShowSlide(false)} />
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white/90 backdrop-blur-2xl dark:bg-[#0d1a2e]/90 sm:w-[500px]">
-            <div className="flex items-center justify-between border-b border-white/80 bg-white/70 px-5 py-4 dark:border-white/[0.06] dark:bg-white/[0.04]">
-              <h3 className="font-semibold text-[#0D1B2A] dark:text-white">Log Meal</h3>
-              <button type="button" onClick={() => setShowSlide(false)} className="ti ti-x text-xl text-gray-500" />
-            </div>
-            <div className="flex-1 overflow-y-auto space-y-4 p-5">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[#5A6A7A]">Date</label>
-                  <input
-                    type="date"
-                    value={fDate}
-                    onChange={(e) => setFDate(e.target.value)}
-                    className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-xs font-medium text-[#5A6A7A]">Meal Type</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {MEAL_TYPES.map((m) => {
-                      const visual = MEAL_SESSION_VISUAL[m.value]
-                      return (
-                        <button
-                          key={m.value}
-                          type="button"
-                          onClick={() => setFType(m.value)}
-                          className={`flex min-h-[56px] flex-col items-center justify-center rounded-xl border-2 py-2 ${
-                            fType === m.value
-                              ? 'border-[#E8A020] bg-[#E8A020]/10'
-                              : 'border-[#DDE3EC] bg-white dark:border-gray-600 dark:bg-gray-900'
-                          }`}
-                        >
-                          <span className="text-2xl">{visual?.emoji}</span>
-                          <span className="text-xs font-semibold">{m.label}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[#5A6A7A]">Student Count</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={fStudents}
-                    onChange={(e) => setFStudents(e.target.value)}
-                    className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[#5A6A7A]">Staff Count</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={fStaff}
-                    onChange={(e) => setFStaff(e.target.value)}
-                    className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                  />
-                </div>
-              </div>
+      <KitchenBottomSheet
+        open={showSlide}
+        onClose={() => setShowSlide(false)}
+        title="Log Meal"
+        footer={slideFooter}
+      >
+        <div className="space-y-5">
+          <div>
+            <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
+              Date
+            </label>
+            <input
+              type="date"
+              value={fDate}
+              onChange={(e) => setFDate(e.target.value)}
+              className="w-full min-h-[48px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-2 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            />
+          </div>
 
-              <MealIngredientList
-                inventory={inventoryItems}
-                rows={ingredients}
-                onChange={setIngredients}
-                totalServings={totalServings}
-              />
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[#5A6A7A]">Notes</label>
-                <textarea
-                  value={fNotes}
-                  onChange={(e) => setFNotes(e.target.value)}
-                  rows={3}
-                  className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 border-t border-white/80 p-5 dark:border-white/[0.06]">
-              <button type="button" onClick={() => setShowSlide(false)} className="flex-1 rounded-lg border border-[#DDE3EC] py-2 text-sm font-medium text-[#5A6A7A]">
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving || (!fStudents && !fStaff)}
-                className="flex-1 rounded-lg bg-[#E8A020] py-2 text-sm font-semibold text-white hover:bg-[#d4911c] disabled:opacity-50"
-              >
-                {saving ? 'Saving…' : 'Log Meal'}
-              </button>
+          <div>
+            <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
+              Meal Type
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {MEAL_TYPES.map((m) => {
+                const visual = MEAL_SESSION_VISUAL[m.value]
+                return (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setFType(m.value)}
+                    className={`flex min-h-[80px] flex-col items-center justify-center rounded-xl border-2 py-2 ${
+                      fType === m.value
+                        ? 'border-[#E8A020] bg-[#E8A020]/15'
+                        : 'border-[#DDE3EC] bg-white dark:border-gray-600 dark:bg-gray-900'
+                    }`}
+                  >
+                    <span className="text-[32px] leading-none">{visual?.emoji}</span>
+                    <span className="mt-1 text-sm font-semibold">{m.label}</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
-        </>
-      )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
+                Students
+              </label>
+              <CountStepper value={fStudents} onChange={setFStudents} step={1} />
+            </div>
+            <div>
+              <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
+                Staff
+              </label>
+              <CountStepper value={fStaff} onChange={setFStaff} step={1} />
+            </div>
+          </div>
+
+          <MealIngredientList
+            inventory={inventoryItems}
+            rows={ingredients}
+            onChange={setIngredients}
+            totalServings={totalServings}
+            stickyCost
+          />
+
+          <div>
+            <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
+              Notes
+            </label>
+            <textarea
+              value={fNotes}
+              onChange={(e) => setFNotes(e.target.value)}
+              rows={3}
+              className="w-full min-h-[80px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-3 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            />
+          </div>
+        </div>
+      </KitchenBottomSheet>
     </div>
   )
 }

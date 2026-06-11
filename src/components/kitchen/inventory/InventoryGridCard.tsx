@@ -1,7 +1,7 @@
 'use client'
 
 import FoodEmoji from '@/components/kitchen/FoodEmoji'
-import { findFoodItem } from '@/lib/kitchen/foodImages'
+import { findFoodItem, getFoodEmoji } from '@/lib/kitchen/foodImages'
 import { useKitchenSinhala } from '@/lib/kitchen/useKitchenSinhala'
 import type { InventoryItem } from '@/types/kitchen'
 
@@ -32,7 +32,7 @@ export default function InventoryGridCard({ item, onEdit, onRestock }: Inventory
       tabIndex={0}
       onClick={onEdit}
       onKeyDown={(e) => e.key === 'Enter' && onEdit()}
-      className={`relative flex cursor-pointer flex-col rounded-2xl border-2 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:bg-gray-900/50 ${
+      className={`relative flex min-h-[180px] cursor-pointer flex-col rounded-2xl border-2 bg-white p-3 shadow-sm transition-shadow hover:shadow-md dark:bg-gray-900/50 md:min-h-0 md:p-4 ${
         isOut
           ? 'border-red-400 bg-red-50/50 dark:border-red-600 dark:bg-red-900/10'
           : isLow
@@ -42,28 +42,33 @@ export default function InventoryGridCard({ item, onEdit, onRestock }: Inventory
     >
       {isOut && (
         <span className="absolute right-2 top-2 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white">
-          OUT OF STOCK
+          OUT
         </span>
       )}
       {isLow && !isOut && (
         <span className="absolute right-2 top-2 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
-          Low Stock
+          Low
         </span>
       )}
 
-      <div className="flex justify-center py-2">
-        <FoodEmoji itemName={item.itemName} size="lg" />
+      <div className="flex justify-center py-1 md:py-2">
+        <span className="text-[56px] leading-none md:hidden" role="img" aria-label={item.itemName}>
+          {food?.emoji ?? getFoodEmoji(item.itemName)}
+        </span>
+        <div className="hidden md:block">
+          <FoodEmoji itemName={item.itemName} size="lg" />
+        </div>
       </div>
 
-      <p className="text-center text-base font-bold text-[#0B3D6B] dark:text-white">
+      <p className="text-center text-sm font-bold text-[#0B3D6B] dark:text-white md:text-base">
         {item.itemName}
       </p>
       {sinhala && food?.sinhalaName && (
         <p className="text-center text-xs text-gray-500 dark:text-gray-400">{food.sinhalaName}</p>
       )}
 
-      <div className="mt-3">
-        <div className="h-2.5 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+      <div className="mt-2 md:mt-3">
+        <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700 md:h-2.5">
           <div
             className={`h-full rounded-full transition-all ${stockBarColor(item)}`}
             style={{ width: `${fillPct}%` }}
@@ -80,7 +85,7 @@ export default function InventoryGridCard({ item, onEdit, onRestock }: Inventory
           e.stopPropagation()
           onRestock()
         }}
-        className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-1 rounded-xl bg-[#0B3D6B] py-2.5 text-sm font-semibold text-white hover:bg-[#0a3460]"
+        className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-1 rounded-xl bg-[#0B3D6B] py-2.5 text-sm font-semibold text-white hover:bg-[#0a3460] md:mt-3"
       >
         <span className="text-lg">+</span> Restock
       </button>

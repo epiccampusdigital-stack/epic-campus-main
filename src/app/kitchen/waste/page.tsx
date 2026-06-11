@@ -20,11 +20,18 @@ import {
 } from 'recharts'
 import { db } from '@/lib/firebase/client'
 import { useKitchen } from '@/app/kitchen/context'
+import CountStepper from '@/components/kitchen/CountStepper'
 import IngredientPicker from '@/components/kitchen/IngredientPicker'
+import KitchenBottomSheet from '@/components/kitchen/KitchenBottomSheet'
 import { getFoodEmoji, WASTE_REASON_VISUAL } from '@/lib/kitchen/foodImages'
 import { formatLKR } from '@/lib/utils/formatCurrency'
-import type { WasteEntry, WasteReason, InventoryItem, MealLog } from '@/types/kitchen'
-import type { KitchenAISuggestion } from '@/types/kitchen'
+import type {
+  WasteEntry,
+  WasteReason,
+  InventoryItem,
+  MealLog,
+  KitchenAISuggestion,
+} from '@/types/kitchen'
 
 const WASTE_REASONS: WasteReason[] = [
   'overcooked', 'expired', 'leftover', 'spoiled', 'dropped', 'other',
@@ -204,34 +211,46 @@ export default function WastePage() {
   return (
     <div className="space-y-6">
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-lg">
+        <div className="fixed bottom-24 right-4 z-50 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-lg md:bottom-6">
           {toast}
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="space-y-3">
         <h1 className="text-xl font-bold text-[#0D1B2A] dark:text-white">Waste Tracker</h1>
         <button
           type="button"
           onClick={() => setShowSlide(true)}
-          className="flex items-center gap-2 rounded-lg bg-[#E8A020] px-4 py-2 text-sm font-semibold text-white hover:bg-[#d4911c]"
+          className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-[#E8A020] text-base font-bold text-white hover:bg-[#d4911c] md:w-auto md:px-6"
         >
           <span className="ti ti-plus" /> Log Waste
         </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 md:grid-cols-2 md:gap-4 lg:grid-cols-3">
         {[
-          { label: 'This Week Waste', value: formatLKR(weekWaste), color: 'text-red-600' },
-          { label: 'This Month Waste', value: formatLKR(monthWaste), color: 'text-amber-600' },
-          { label: 'Most Wasted Item', value: mostWasted ? `${mostWasted.name} (${formatLKR(mostWasted.loss)})` : 'None', color: 'text-[#0B3D6B] dark:text-[#E8A020]' },
+          { label: 'Week', value: formatLKR(weekWaste), color: 'text-red-600' },
+          { label: 'Month', value: formatLKR(monthWaste), color: 'text-amber-600' },
+          {
+            label: 'Top Item',
+            value: mostWasted ? mostWasted.name : 'None',
+            sub: mostWasted ? formatLKR(mostWasted.loss) : '',
+            color: 'text-[#0B3D6B] dark:text-[#E8A020]',
+          },
         ].map((s) => (
-          <div key={s.label} className="rounded-[12px] border border-white/90 bg-white/65 p-4 backdrop-blur-2xl dark:border-white/[0.08] dark:bg-white/[0.05]">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-gray-400 dark:text-white/40">
+          <div
+            key={s.label}
+            className="rounded-[12px] border border-white/90 bg-white/65 p-3 backdrop-blur-2xl dark:border-white/[0.08] dark:bg-white/[0.05] md:p-4"
+          >
+            <p className="text-[10px] font-semibold uppercase text-gray-400 dark:text-white/40 md:text-xs">
               {s.label}
             </p>
-            <p className={`mt-2 text-base font-semibold ${s.color}`}>{s.value}</p>
+            <p className={`mt-1 truncate text-sm font-bold md:mt-2 md:text-base ${s.color}`}>
+              {s.value}
+            </p>
+            {'sub' in s && s.sub && (
+              <p className="text-xs font-medium text-red-600">{s.sub}</p>
+            )}
           </div>
         ))}
       </div>
@@ -249,10 +268,45 @@ export default function WastePage() {
         </ResponsiveContainer>
       </div>
 
-      {/* Waste table */}
-      <div className="overflow-hidden rounded-xl border border-white/90 bg-white/65 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05]">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px] text-left text-sm">
+      <div className="space-y-3 md:hidden">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-20 animate-pulse rounded-xl bg-[#DDE3EC] dark:bg-white/10" />
+          ))
+        ) : entries.length === 0 ? (
+          <p className="py-8 text-center text-sm text-[#5A6A7A] dark:text-white/40">
+            No waste entries yet
+          </p>
+        ) : (
+          entries.slice(0, 50).map((e) => {
+            const reasonVisual = WASTE_REASON_VISUAL.find((r) => r.id === e.reason)
+            return (
+              <div
+                key={e.id}
+                className="flex items-center gap-3 rounded-xl border border-white/90 bg-white/65 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]"
+              >
+                <span className="text-3xl">{getFoodEmoji(e.itemName)}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold text-[#0D1B2A] dark:text-white">{e.itemName}</p>
+                  <p className="text-sm text-gray-500">
+                    {e.quantity} {e.unit} · {e.date}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium dark:bg-white/10">
+                    {reasonVisual?.emoji} {REASON_LABELS[e.reason]}
+                  </span>
+                  <p className="mt-1 text-sm font-bold text-red-600">{formatLKR(e.estimatedLoss)}</p>
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      <div className="hidden overflow-hidden rounded-xl border border-white/90 bg-white/65 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05] md:block">
+        <div>
+          <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] text-xs font-medium uppercase text-[#5A6A7A] dark:border-white/[0.06] dark:bg-white/[0.03] dark:text-white/40">
                 <th className="px-4 py-3">Date</th>
@@ -344,131 +398,121 @@ export default function WastePage() {
         )}
       </div>
 
-      {/* Log Waste Slide-over */}
-      {showSlide && (
-        <>
-          <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setShowSlide(false)} />
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white/90 backdrop-blur-2xl dark:bg-[#0d1a2e]/90 sm:w-[440px]">
-            <div className="flex items-center justify-between border-b border-white/80 bg-white/70 px-5 py-4 dark:border-white/[0.06] dark:bg-white/[0.04]">
-              <h3 className="font-semibold text-[#0D1B2A] dark:text-white">Log Waste</h3>
-              <button type="button" onClick={() => setShowSlide(false)} className="ti ti-x text-xl text-gray-500" />
-            </div>
-            <div className="flex-1 overflow-y-auto space-y-4 p-5">
+      <KitchenBottomSheet
+        open={showSlide}
+        onClose={() => setShowSlide(false)}
+        title="Log Waste"
+        footer={
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setShowSlide(false)}
+              className="flex min-h-[48px] flex-1 items-center justify-center rounded-xl border border-[#DDE3EC] text-sm font-medium text-[#5A6A7A]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || !fItemId || !fQty}
+              className="flex min-h-[48px] flex-1 items-center justify-center rounded-xl bg-[#E8A020] text-base font-bold text-white disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Log Waste'}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-5">
+          <div>
+            <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">Date</label>
+            <input
+              type="date"
+              value={fDate}
+              onChange={(e) => setFDate(e.target.value)}
+              className="w-full min-h-[48px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-2 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">Item *</label>
+            <IngredientPicker
+              items={inventoryItems}
+              value={fItemId}
+              onChange={setFItemId}
+              placeholder="Search item…"
+            />
+          </div>
+          {selectedItem && (
+            <div className="flex items-center gap-2 rounded-xl bg-[#F5F7FB] p-3 dark:bg-white/[0.04]">
+              <span className="text-3xl">{getFoodEmoji(selectedItem.itemName)}</span>
               <div>
-                <label className="mb-1 block text-xs font-medium text-[#5A6A7A]">Date</label>
-                <input type="date" value={fDate} onChange={(e) => setFDate(e.target.value)}
-                  className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white" />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[#0D1B2A] dark:text-white">
-                  Item *
-                </label>
-                <IngredientPicker
-                  items={inventoryItems}
-                  value={fItemId}
-                  onChange={setFItemId}
-                  placeholder="Search item…"
-                />
-              </div>
-              {selectedItem && (
-                <div className="flex items-center gap-2 rounded-xl bg-[#F5F7FB] p-3 dark:bg-white/[0.04]">
-                  <span className="text-3xl">{getFoodEmoji(selectedItem.itemName)}</span>
-                  <div>
-                    <p className="font-semibold text-[#0B3D6B] dark:text-white">{selectedItem.itemName}</p>
-                    <p className="text-xs text-gray-500">
-                      Available: {selectedItem.currentStock} {selectedItem.unit}
-                    </p>
-                  </div>
-                </div>
-              )}
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[#0D1B2A] dark:text-white">
-                  Quantity * {selectedItem && `(${selectedItem.unit})`}
-                </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const n = Math.max(0, (parseFloat(fQty) || 0) - 0.5)
-                      setFQty(n > 0 ? String(n) : '')
-                    }}
-                    className="flex h-12 w-12 items-center justify-center rounded-xl border border-[#DDE3EC] bg-[#F5F7FB] text-xl font-bold"
-                  >
-                    −
-                  </button>
-                  <input
-                    type="number"
-                    min="0"
-                    value={fQty}
-                    onChange={(e) => setFQty(e.target.value)}
-                    className="h-12 flex-1 rounded-xl border border-[#DDE3EC] bg-white text-center text-lg font-bold dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setFQty(String((parseFloat(fQty) || 0) + 0.5))}
-                    className="flex h-12 w-12 items-center justify-center rounded-xl border border-[#DDE3EC] bg-[#F5F7FB] text-xl font-bold"
-                  >
-                    +
-                  </button>
-                </div>
-                {estimatedLoss > 0 && (
-                  <p className="mt-2 text-center text-base font-bold text-[#E8A020]">
-                    Estimated Loss: {formatLKR(estimatedLoss)}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[#0D1B2A] dark:text-white">
-                  Reason
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {WASTE_REASON_VISUAL.map((r) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => setFReason(r.id)}
-                      className={`min-h-[44px] min-w-[80px] rounded-xl border-2 px-3 py-2 text-center text-xs font-semibold transition-colors ${
-                        fReason === r.id
-                          ? 'border-[#E8A020] bg-[#E8A020] text-white'
-                          : 'border-[#DDE3EC] bg-white text-[#0D1B2A] dark:border-gray-600 dark:bg-gray-900 dark:text-white'
-                      }`}
-                    >
-                      <span className="block text-lg">{r.emoji}</span>
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {todayLogs.length > 0 && (
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-[#5A6A7A]">Link to Meal Session (optional)</label>
-                  <select value={fMealLogId} onChange={(e) => setFMealLogId(e.target.value)}
-                    className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white">
-                    <option value="">None</option>
-                    {todayLogs.map((l) => (
-                      <option key={l.id} value={l.id}>{l.mealType} — {l.totalServings} servings</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[#5A6A7A]">Notes</label>
-                <textarea value={fNotes} onChange={(e) => setFNotes(e.target.value)} rows={3}
-                  className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white" />
+                <p className="font-semibold text-[#0B3D6B] dark:text-white">{selectedItem.itemName}</p>
+                <p className="text-sm text-gray-500">
+                  Available: {selectedItem.currentStock} {selectedItem.unit}
+                </p>
               </div>
             </div>
-            <div className="flex gap-3 border-t border-white/80 p-5 dark:border-white/[0.06]">
-              <button type="button" onClick={() => setShowSlide(false)} className="flex-1 rounded-lg border border-[#DDE3EC] py-2 text-sm font-medium text-[#5A6A7A]">
-                Cancel
-              </button>
-              <button type="button" onClick={handleSave} disabled={saving || !fItemId || !fQty}
-                className="flex-1 rounded-lg bg-[#E8A020] py-2 text-sm font-semibold text-white hover:bg-[#d4911c] disabled:opacity-50">
-                {saving ? 'Saving…' : 'Log Waste'}
-              </button>
+          )}
+          <div>
+            <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
+              Quantity * {selectedItem && `(${selectedItem.unit})`}
+            </label>
+            <CountStepper value={fQty} onChange={setFQty} step={0.5} />
+            {estimatedLoss > 0 && (
+              <p className="mt-2 text-center text-lg font-bold text-[#E8A020]">
+                Estimated Loss: {formatLKR(estimatedLoss)}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">Reason</label>
+            <div className="grid grid-cols-3 gap-2">
+              {WASTE_REASON_VISUAL.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setFReason(r.id)}
+                  className={`flex min-h-[52px] min-w-[90px] flex-col items-center justify-center rounded-xl border-2 px-2 py-2 text-center text-xs font-semibold ${
+                    fReason === r.id
+                      ? 'border-[#E8A020] bg-[#E8A020] text-white'
+                      : 'border-[#DDE3EC] bg-white text-[#0D1B2A] dark:border-gray-600 dark:bg-gray-900 dark:text-white'
+                  }`}
+                >
+                  <span className="text-2xl leading-none">{r.emoji}</span>
+                  {r.label}
+                </button>
+              ))}
             </div>
           </div>
-        </>
-      )}
+          {todayLogs.length > 0 && (
+            <div>
+              <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
+                Link to Meal (optional)
+              </label>
+              <select
+                value={fMealLogId}
+                onChange={(e) => setFMealLogId(e.target.value)}
+                className="w-full min-h-[48px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-2 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+              >
+                <option value="">None</option>
+                {todayLogs.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.mealType} — {l.totalServings} servings
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div>
+            <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">Notes</label>
+            <textarea
+              value={fNotes}
+              onChange={(e) => setFNotes(e.target.value)}
+              rows={3}
+              className="w-full min-h-[80px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-3 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            />
+          </div>
+        </div>
+      </KitchenBottomSheet>
     </div>
   )
 }

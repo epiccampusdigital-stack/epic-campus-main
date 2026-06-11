@@ -144,23 +144,30 @@ export default function ReportsPage() {
         <button
           type="button"
           onClick={() => window.print()}
-          className="no-print flex items-center gap-2 rounded-lg border border-[#DDE3EC] bg-white px-4 py-2 text-sm font-medium text-[#0B3D6B] hover:bg-[#F5F7FB] dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-white"
+          className="no-print hidden items-center gap-2 rounded-lg border border-[#DDE3EC] bg-white px-4 py-2 text-sm font-medium text-[#0B3D6B] hover:bg-[#F5F7FB] dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-white md:flex"
         >
           <span className="ti ti-printer" /> Print Report
         </button>
       </div>
 
-      {/* Date range picker */}
-      <div className="no-print flex flex-wrap gap-3 items-center">
-        <div>
-          <label className="mr-2 text-xs text-[#5A6A7A]">From</label>
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-            className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white" />
+      <div className="no-print flex flex-col gap-3 md:flex-row md:items-center">
+        <div className="w-full">
+          <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">From</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="w-full min-h-[48px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-2 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+          />
         </div>
-        <div>
-          <label className="mr-2 text-xs text-[#5A6A7A]">To</label>
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-            className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white" />
+        <div className="w-full">
+          <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">To</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="w-full min-h-[48px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-2 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+          />
         </div>
       </div>
 
@@ -172,9 +179,9 @@ export default function ReportsPage() {
           { label: 'Total Meals Served', value: String(totalServings), color: 'text-[#0B3D6B] dark:text-[#E8A020]' },
           { label: 'Waste % of Food Cost', value: `${wastePercent.toFixed(1)}%`, color: wastePercent > 10 ? 'text-red-600' : 'text-emerald-600' },
         ].map((s) => (
-          <div key={s.label} className="rounded-[12px] border border-white/90 bg-white/65 p-4 backdrop-blur-2xl dark:border-white/[0.08] dark:bg-white/[0.05]">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-gray-400 dark:text-white/40">{s.label}</p>
-            <p className={`mt-2 text-lg font-bold ${s.color}`}>{s.value}</p>
+          <div key={s.label} className="min-h-[72px] rounded-[12px] border border-white/90 bg-white/65 p-3 backdrop-blur-2xl dark:border-white/[0.08] dark:bg-white/[0.05] md:p-4">
+            <p className="text-xs font-semibold uppercase text-gray-400 dark:text-white/40">{s.label}</p>
+            <p className={`mt-2 text-base font-bold md:text-lg ${s.color}`}>{s.value}</p>
           </div>
         ))}
       </div>
@@ -184,11 +191,11 @@ export default function ReportsPage() {
         {/* 1 - Daily cost trend */}
         <div className="rounded-xl border border-white/90 bg-white/65 p-5 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05]">
           <h2 className="mb-4 text-sm font-bold text-[#0D1B2A] dark:text-white">Daily Cost Trend (LKR)</h2>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={220} minHeight={220}>
             <LineChart data={dailyCostData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#DDE3EC" />
-              <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={4} />
-              <YAxis tick={{ fontSize: 10 }} />
+              <XAxis dataKey="date" tick={{ fontSize: 9 }} interval={6} />
+              <YAxis tick={{ fontSize: 9 }} width={40} />
               <Tooltip formatter={(v) => formatLKR(Number(v) || 0)} />
               <Line type="monotone" dataKey="cost" stroke="#0B3D6B" strokeWidth={2} dot={false} />
             </LineChart>
@@ -201,10 +208,10 @@ export default function ReportsPage() {
           {topWasted.length === 0 ? (
             <p className="text-sm text-[#5A6A7A] dark:text-white/40">No waste data yet</p>
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={220} minHeight={220}>
               <BarChart data={topWasted} layout="vertical">
-                <XAxis type="number" tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={80} />
+                <XAxis type="number" tick={{ fontSize: 9 }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 9 }} width={64} />
                 <Tooltip formatter={(v) => formatLKR(Number(v) || 0)} />
                 <Bar dataKey="value" fill="#E8A020" radius={[0, 4, 4, 0]} />
               </BarChart>
@@ -215,11 +222,11 @@ export default function ReportsPage() {
         {/* 3 - Meals served */}
         <div className="rounded-xl border border-white/90 bg-white/65 p-5 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05]">
           <h2 className="mb-4 text-sm font-bold text-[#0D1B2A] dark:text-white">Meals Served — Last 14 Days</h2>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={220} minHeight={220}>
             <BarChart data={mealsServedData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#DDE3EC" />
-              <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} />
+              <XAxis dataKey="date" tick={{ fontSize: 9 }} interval={2} />
+              <YAxis tick={{ fontSize: 9 }} width={32} />
               <Tooltip />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="students" stackId="a" fill="#1A6BAD" name="Students" />
@@ -234,11 +241,11 @@ export default function ReportsPage() {
           {wasteTrendData.length === 0 ? (
             <p className="text-sm text-[#5A6A7A] dark:text-white/40">Insufficient data</p>
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={220} minHeight={220}>
               <LineChart data={wasteTrendData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#DDE3EC" />
-                <XAxis dataKey="day" tick={{ fontSize: 10 }} interval={4} />
-                <YAxis tick={{ fontSize: 10 }} />
+                <XAxis dataKey="day" tick={{ fontSize: 9 }} interval={5} />
+                <YAxis tick={{ fontSize: 9 }} width={40} />
             <Tooltip formatter={(v) => formatLKR(Number(v) || 0)} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Line type="monotone" dataKey="thisMonth" stroke="#E8A020" strokeWidth={2} dot={false} name="This Month" />
