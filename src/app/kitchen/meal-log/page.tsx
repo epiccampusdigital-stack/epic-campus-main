@@ -14,13 +14,13 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { useKitchen } from '@/app/kitchen/context'
+import MealIngredientList, {
+  rowsToIngredients,
+  type IngredientRow,
+} from '@/components/kitchen/MealIngredientList'
+import { MEAL_SESSION_VISUAL } from '@/lib/kitchen/foodImages'
 import { formatLKR } from '@/lib/utils/formatCurrency'
-import type {
-  MealLog,
-  MealType,
-  IngredientUsed,
-  InventoryItem,
-} from '@/types/kitchen'
+import type { MealLog, MealType, InventoryItem } from '@/types/kitchen'
 
 const MEAL_TYPES: { value: MealType; label: string }[] = [
   { value: 'breakfast', label: 'Breakfast' },
@@ -40,14 +40,6 @@ function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-interface IngredientRow {
-  itemId: string
-  itemName: string
-  qtyUsed: string
-  unit: string
-  unitCost: number
-}
-
 export default function MealLogPage() {
   const { user } = useKitchen()
   const [logs, setLogs] = useState<MealLog[]>([])
@@ -65,9 +57,7 @@ export default function MealLogPage() {
   const [fStudents, setFStudents] = useState('')
   const [fStaff, setFStaff] = useState('')
   const [fNotes, setFNotes] = useState('')
-  const [ingredients, setIngredients] = useState<IngredientRow[]>([
-    { itemId: '', itemName: '', qtyUsed: '', unit: '', unitCost: 0 },
-  ])
+  const [ingredients, setIngredients] = useState<IngredientRow[]>([{ itemId: '', qty: '' }])
 
   async function loadLogs() {
     setLoading(true)
@@ -101,54 +91,15 @@ export default function MealLogPage() {
     return matchDate && matchType
   })
 
-  const totalCost = ingredients.reduce((s, i) => {
-    const qty = Number(i.qtyUsed) || 0
-    return s + qty * i.unitCost
-  }, 0)
   const totalServings = (Number(fStudents) || 0) + (Number(fStaff) || 0)
-  const costPerPerson = totalServings > 0 ? totalCost / totalServings : 0
-
-  function addIngredientRow() {
-    setIngredients((prev) => [...prev, { itemId: '', itemName: '', qtyUsed: '', unit: '', unitCost: 0 }])
-  }
-
-  function updateIngredient(idx: number, field: keyof IngredientRow, val: string) {
-    setIngredients((prev) => {
-      const next = [...prev]
-      if (field === 'itemId') {
-        const found = inventoryItems.find((i) => i.id === val)
-        next[idx] = {
-          ...next[idx],
-          itemId: val,
-          itemName: found?.itemName ?? '',
-          unit: found?.unit ?? '',
-          unitCost: found?.unitCost ?? 0,
-        }
-      } else {
-        next[idx] = { ...next[idx], [field]: val }
-      }
-      return next
-    })
-  }
-
-  function removeIngredient(idx: number) {
-    setIngredients((prev) => prev.filter((_, i) => i !== idx))
-  }
 
   async function handleSave() {
     if (!fStudents && !fStaff) return
     setSaving(true)
     try {
-      const usedIngredients: IngredientUsed[] = ingredients
-        .filter((i) => i.itemId && Number(i.qtyUsed) > 0)
-        .map((i) => ({
-          itemId: i.itemId,
-          itemName: i.itemName,
-          qtyUsed: Number(i.qtyUsed),
-          unit: i.unit as IngredientUsed['unit'],
-          unitCost: i.unitCost,
-          totalCost: Number(i.qtyUsed) * i.unitCost,
-        }))
+      const usedIngredients = rowsToIngredients(ingredients, inventoryItems)
+      const totalCost = usedIngredients.reduce((s, i) => s + i.totalCost, 0)
+      const costPerPerson = totalServings > 0 ? totalCost / totalServings : 0
 
       await addDoc(collection(db, 'mealLogs'), {
         date: fDate,
@@ -189,7 +140,7 @@ export default function MealLogPage() {
 
       setShowSlide(false)
       setFDate(today()); setFType('lunch'); setFStudents(''); setFStaff(''); setFNotes('')
-      setIngredients([{ itemId: '', itemName: '', qtyUsed: '', unit: '', unitCost: 0 }])
+      setIngredients([{ itemId: '', qty: '' }])
       showToast('Meal logged successfully')
       await loadLogs()
     } catch (err) {
@@ -303,14 +254,27 @@ export default function MealLogPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-[#5A6A7A]">Meal Type</label>
-                  <select
-                    value={fType}
-                    onChange={(e) => setFType(e.target.value as MealType)}
-                    className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                  >
-                    {MEAL_TYPES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-                  </select>
+                  <label className="mb-2 block text-xs font-medium text-[#5A6A7A]">Meal Type</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {MEAL_TYPES.map((m) => {
+                      const visual = MEAL_SESSION_VISUAL[m.value]
+                      return (
+                        <button
+                          key={m.value}
+                          type="button"
+                          onClick={() => setFType(m.value)}
+                          className={`flex min-h-[56px] flex-col items-center justify-center rounded-xl border-2 py-2 ${
+                            fType === m.value
+                              ? 'border-[#E8A020] bg-[#E8A020]/10'
+                              : 'border-[#DDE3EC] bg-white dark:border-gray-600 dark:bg-gray-900'
+                          }`}
+                        >
+                          <span className="text-2xl">{visual?.emoji}</span>
+                          <span className="text-xs font-semibold">{m.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[#5A6A7A]">Student Count</label>
@@ -334,61 +298,12 @@ export default function MealLogPage() {
                 </div>
               </div>
 
-              {/* Ingredients */}
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Ingredients Used</p>
-                  <button type="button" onClick={addIngredientRow} className="text-xs font-medium text-[#0B3D6B] hover:underline dark:text-[#E8A020]">
-                    + Add Row
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {ingredients.map((ing, idx) => (
-                    <div key={idx} className="flex flex-wrap gap-2 items-end">
-                      <div className="flex-1 min-w-[160px]">
-                        <select
-                          value={ing.itemId}
-                          onChange={(e) => updateIngredient(idx, 'itemId', e.target.value)}
-                          className="w-full rounded-lg border border-[#DDE3EC] bg-white px-2 py-1.5 text-xs dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                        >
-                          <option value="">Select item…</option>
-                          {inventoryItems.map((i) => (
-                            <option key={i.id} value={i.id}>{i.itemName} ({i.currentStock} {i.unit})</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="w-24">
-                        <input
-                          type="number"
-                          min="0"
-                          placeholder={`Qty (${ing.unit || 'unit'})`}
-                          value={ing.qtyUsed}
-                          onChange={(e) => updateIngredient(idx, 'qtyUsed', e.target.value)}
-                          className="w-full rounded-lg border border-[#DDE3EC] bg-white px-2 py-1.5 text-xs dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                        />
-                      </div>
-                      {ing.itemId && Number(ing.qtyUsed) > 0 && (
-                        <p className="text-xs text-[#0B3D6B] dark:text-[#E8A020] whitespace-nowrap">
-                          {formatLKR(Number(ing.qtyUsed) * ing.unitCost)}
-                        </p>
-                      )}
-                      <button type="button" onClick={() => removeIngredient(idx)} className="ti ti-x text-red-400 text-sm" />
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 rounded-lg bg-[#F5F7FB] p-3 dark:bg-white/[0.04]">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[#5A6A7A] dark:text-white/60">Estimated Cost:</span>
-                    <span className="font-bold text-[#E8A020]">{formatLKR(totalCost)}</span>
-                  </div>
-                  {totalServings > 0 && (
-                    <div className="flex justify-between text-xs mt-1">
-                      <span className="text-[#5A6A7A] dark:text-white/50">Cost per person:</span>
-                      <span className="text-[#0B3D6B] dark:text-white/70">{formatLKR(costPerPerson)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <MealIngredientList
+                inventory={inventoryItems}
+                rows={ingredients}
+                onChange={setIngredients}
+                totalServings={totalServings}
+              />
 
               <div>
                 <label className="mb-1 block text-xs font-medium text-[#5A6A7A]">Notes</label>

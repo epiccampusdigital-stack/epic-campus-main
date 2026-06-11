@@ -20,6 +20,8 @@ import {
 } from 'recharts'
 import { db } from '@/lib/firebase/client'
 import { useKitchen } from '@/app/kitchen/context'
+import IngredientPicker from '@/components/kitchen/IngredientPicker'
+import { getFoodEmoji, WASTE_REASON_VISUAL } from '@/lib/kitchen/foodImages'
 import { formatLKR } from '@/lib/utils/formatCurrency'
 import type { WasteEntry, WasteReason, InventoryItem, MealLog } from '@/types/kitchen'
 import type { KitchenAISuggestion } from '@/types/kitchen'
@@ -358,33 +360,84 @@ export default function WastePage() {
                   className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white" />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-[#5A6A7A]">Item *</label>
-                <select value={fItemId} onChange={(e) => setFItemId(e.target.value)}
-                  className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white">
-                  <option value="">Select item…</option>
-                  {inventoryItems.map((i) => (
-                    <option key={i.id} value={i.id}>{i.itemName} (Stock: {i.currentStock} {i.unit})</option>
-                  ))}
-                </select>
+                <label className="mb-2 block text-sm font-semibold text-[#0D1B2A] dark:text-white">
+                  Item *
+                </label>
+                <IngredientPicker
+                  items={inventoryItems}
+                  value={fItemId}
+                  onChange={setFItemId}
+                  placeholder="Search item…"
+                />
               </div>
+              {selectedItem && (
+                <div className="flex items-center gap-2 rounded-xl bg-[#F5F7FB] p-3 dark:bg-white/[0.04]">
+                  <span className="text-3xl">{getFoodEmoji(selectedItem.itemName)}</span>
+                  <div>
+                    <p className="font-semibold text-[#0B3D6B] dark:text-white">{selectedItem.itemName}</p>
+                    <p className="text-xs text-gray-500">
+                      Available: {selectedItem.currentStock} {selectedItem.unit}
+                    </p>
+                  </div>
+                </div>
+              )}
               <div>
-                <label className="mb-1 block text-xs font-medium text-[#5A6A7A]">
+                <label className="mb-2 block text-sm font-semibold text-[#0D1B2A] dark:text-white">
                   Quantity * {selectedItem && `(${selectedItem.unit})`}
                 </label>
-                <input type="number" min="0" value={fQty} onChange={(e) => setFQty(e.target.value)}
-                  className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white" />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const n = Math.max(0, (parseFloat(fQty) || 0) - 0.5)
+                      setFQty(n > 0 ? String(n) : '')
+                    }}
+                    className="flex h-12 w-12 items-center justify-center rounded-xl border border-[#DDE3EC] bg-[#F5F7FB] text-xl font-bold"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    min="0"
+                    value={fQty}
+                    onChange={(e) => setFQty(e.target.value)}
+                    className="h-12 flex-1 rounded-xl border border-[#DDE3EC] bg-white text-center text-lg font-bold dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setFQty(String((parseFloat(fQty) || 0) + 0.5))}
+                    className="flex h-12 w-12 items-center justify-center rounded-xl border border-[#DDE3EC] bg-[#F5F7FB] text-xl font-bold"
+                  >
+                    +
+                  </button>
+                </div>
                 {estimatedLoss > 0 && (
-                  <p className="mt-1 text-xs font-bold text-[#E8A020]">
+                  <p className="mt-2 text-center text-base font-bold text-[#E8A020]">
                     Estimated Loss: {formatLKR(estimatedLoss)}
                   </p>
                 )}
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-[#5A6A7A]">Reason</label>
-                <select value={fReason} onChange={(e) => setFReason(e.target.value as WasteReason)}
-                  className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white">
-                  {WASTE_REASONS.map((r) => <option key={r} value={r}>{REASON_LABELS[r]}</option>)}
-                </select>
+                <label className="mb-2 block text-sm font-semibold text-[#0D1B2A] dark:text-white">
+                  Reason
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {WASTE_REASON_VISUAL.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => setFReason(r.id)}
+                      className={`min-h-[44px] min-w-[80px] rounded-xl border-2 px-3 py-2 text-center text-xs font-semibold transition-colors ${
+                        fReason === r.id
+                          ? 'border-[#E8A020] bg-[#E8A020] text-white'
+                          : 'border-[#DDE3EC] bg-white text-[#0D1B2A] dark:border-gray-600 dark:bg-gray-900 dark:text-white'
+                      }`}
+                    >
+                      <span className="block text-lg">{r.emoji}</span>
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
               </div>
               {todayLogs.length > 0 && (
                 <div>

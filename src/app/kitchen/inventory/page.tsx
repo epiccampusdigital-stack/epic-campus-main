@@ -11,18 +11,17 @@ import {
   orderBy,
   serverTimestamp,
   Timestamp,
-  where,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { useKitchen } from '@/app/kitchen/context'
+import InventoryGridCard from '@/components/kitchen/inventory/InventoryGridCard'
+import InventoryItemSlideOver, {
+  type InventoryFormValues,
+} from '@/components/kitchen/inventory/InventoryItemSlideOver'
+import FoodEmoji from '@/components/kitchen/FoodEmoji'
+import { CATEGORY_PILLS } from '@/lib/kitchen/foodImages'
 import { formatLKR } from '@/lib/utils/formatCurrency'
-import type { InventoryCategory, InventoryItem, StockUnit } from '@/types/kitchen'
-
-const CATEGORIES: InventoryCategory[] = [
-  'grains', 'protein', 'vegetables', 'dairy', 'condiments', 'beverages', 'other',
-]
-
-const UNITS: StockUnit[] = ['kg', 'litres', 'units', 'grams']
+import type { InventoryCategory, InventoryItem } from '@/types/kitchen'
 
 const CATEGORY_LABELS: Record<InventoryCategory, string> = {
   grains: 'Grains & Rice',
@@ -75,24 +74,13 @@ function getStockStatus(item: InventoryItem): { label: string; cls: string } {
 
 type SlideMode = 'add' | 'edit' | null
 
-interface FormValues {
-  itemName: string
-  category: InventoryCategory
-  unit: StockUnit
-  currentStock: string
-  minStockLevel: string
-  unitCost: string
-  notes: string
-}
-
-const EMPTY_FORM: FormValues = {
+const EMPTY_FORM: InventoryFormValues = {
   itemName: '',
   category: 'grains',
   unit: 'kg',
   currentStock: '',
   minStockLevel: '',
   unitCost: '',
-  notes: '',
 }
 
 export default function InventoryPage() {
@@ -101,9 +89,10 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState<InventoryCategory | ''>('')
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
   const [slideMode, setSlideMode] = useState<SlideMode>(null)
   const [editItem, setEditItem] = useState<InventoryItem | null>(null)
-  const [form, setForm] = useState<FormValues>(EMPTY_FORM)
+  const [form, setForm] = useState<InventoryFormValues>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [restockItem, setRestockItem] = useState<InventoryItem | null>(null)
   const [restockQty, setRestockQty] = useState('')
@@ -147,19 +136,22 @@ export default function InventoryPage() {
       const allHistory: StockHistoryEntry[] = []
       for (const item of items.slice(0, 5)) {
         const snap = await getDocs(
-          query(
-            collection(db, 'inventory', item.id, 'history'),
-            orderBy('createdAt', 'desc'),
-          ),
+          query(collection(db, 'inventory', item.id, 'history'), orderBy('createdAt', 'desc')),
         )
         snap.docs.forEach((d) => allHistory.push({ id: d.id, ...d.data() } as StockHistoryEntry))
       }
       setHistory(allHistory.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds).slice(0, 20))
-    } catch {}
+    } catch {
+      // ignore
+    }
   }
 
-  useEffect(() => { loadItems() }, [])
-  useEffect(() => { if (!loading && items.length > 0) loadHistory() }, [loading])
+  useEffect(() => {
+    loadItems()
+  }, [])
+  useEffect(() => {
+    if (!loading && items.length > 0) loadHistory()
+  }, [loading])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -193,23 +185,22 @@ export default function InventoryPage() {
       currentStock: String(item.currentStock),
       minStockLevel: String(item.minStockLevel),
       unitCost: String(item.unitCost),
-      notes: '',
     })
     setSlideMode('edit')
     setMenuOpen(null)
   }
 
-  async function handleSave() {
-    if (!form.itemName || !form.currentStock || !form.minStockLevel || !form.unitCost) return
+  async function handleSave(values: InventoryFormValues) {
+    if (!values.itemName || !values.currentStock || !values.minStockLevel || !values.unitCost) return
     setSaving(true)
     try {
       const payload = {
-        itemName: form.itemName,
-        category: form.category,
-        unit: form.unit,
-        currentStock: Number(form.currentStock),
-        minStockLevel: Number(form.minStockLevel),
-        unitCost: Number(form.unitCost),
+        itemName: values.itemName,
+        category: values.category,
+        unit: values.unit,
+        currentStock: Number(values.currentStock),
+        minStockLevel: Number(values.minStockLevel),
+        unitCost: Number(values.unitCost),
         isActive: true,
         lastUpdated: serverTimestamp(),
         updatedBy: user?.uid ?? '',
@@ -221,7 +212,7 @@ export default function InventoryPage() {
         await updateDoc(doc(db, 'inventory', editItem.id), payload)
         await addDoc(collection(db, 'inventory', editItem.id, 'history'), {
           action: 'updated',
-          qty: Number(form.currentStock),
+          qty: Number(values.currentStock),
           reason: 'manual-edit',
           date: new Date().toISOString().slice(0, 10),
           by: user?.uid ?? '',
@@ -276,149 +267,204 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-[#0D1B2A] dark:text-white">Inventory</h1>
-        <button
-          type="button"
-          onClick={openAdd}
-          className="flex items-center gap-2 rounded-lg bg-[#E8A020] px-4 py-2 text-sm font-semibold text-white hover:bg-[#d4911c]"
-        >
-          <span className="ti ti-plus" /> Add Item
-        </button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <span className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search items…"
-            className="w-full rounded-lg border border-[#DDE3EC] bg-white py-2 pl-9 pr-3 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-          />
+        <h1 className="text-2xl font-bold text-[#0D1B2A] dark:text-white">Inventory</h1>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setViewMode(viewMode === 'grid' ? 'table' : 'grid')}
+            className="flex min-h-[44px] items-center gap-2 rounded-xl border border-[#DDE3EC] bg-white px-4 py-2 text-sm font-medium text-[#5A6A7A] dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+          >
+            {viewMode === 'grid' ? (
+              <>
+                <span className="ti ti-table" /> Table
+              </>
+            ) : (
+              <>
+                <span className="text-lg">🖼️</span> Grid
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={openAdd}
+            className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[#E8A020] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#d4911c]"
+          >
+            <span className="ti ti-plus" /> Add Item
+          </button>
         </div>
-        <select
-          value={catFilter}
-          onChange={(e) => setCatFilter(e.target.value as InventoryCategory | '')}
-          className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-        >
-          <option value="">All Categories</option>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
-          ))}
-        </select>
       </div>
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-white/90 bg-white/65 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05]">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] text-xs font-medium uppercase text-[#5A6A7A] dark:border-white/[0.06] dark:bg-white/[0.03] dark:text-white/40">
-                <th className="px-4 py-3">Item</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Unit</th>
-                <th className="px-4 py-3">In Stock</th>
-                <th className="px-4 py-3">Min Level</th>
-                <th className="px-4 py-3">Unit Cost</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <tr key={i} className="border-b border-[#DDE3EC] dark:border-white/[0.06]">
-                    {Array.from({ length: 8 }).map((__, j) => (
-                      <td key={j} className="px-4 py-3">
-                        <div className="h-4 animate-pulse rounded bg-[#DDE3EC] dark:bg-white/10" />
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-sm text-[#5A6A7A] dark:text-white/40">
-                    No items found
-                  </td>
+      <div className="flex flex-wrap gap-2">
+        {CATEGORY_PILLS.map((pill) => (
+          <button
+            key={pill.id || 'all'}
+            type="button"
+            onClick={() => setCatFilter(pill.id as InventoryCategory | '')}
+            className={`min-h-[44px] rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+              catFilter === pill.id
+                ? 'bg-[#E8A020] text-white'
+                : 'bg-white text-[#0B3D6B] border border-[#DDE3EC] dark:bg-gray-900 dark:text-white dark:border-gray-600'
+            }`}
+          >
+            {pill.label} {pill.emoji}
+          </button>
+        ))}
+      </div>
+
+      <div className="relative">
+        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-xl">
+          🔍
+        </span>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search items…"
+          className="w-full rounded-xl border border-[#DDE3EC] bg-white py-3.5 pl-12 pr-4 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+        />
+      </div>
+
+      {viewMode === 'grid' ? (
+        loading ? (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <div key={i} className="h-56 animate-pulse rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="rounded-xl border border-white/90 bg-white/65 py-16 text-center dark:border-white/[0.08] dark:bg-white/[0.05]">
+            <p className="text-sm text-[#5A6A7A] dark:text-white/40">No items found</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {filtered.map((item) => (
+              <InventoryGridCard
+                key={item.id}
+                item={item}
+                onEdit={() => openEdit(item)}
+                onRestock={() => setRestockItem(item)}
+              />
+            ))}
+          </div>
+        )
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-white/90 bg-white/65 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05]">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[800px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] text-xs font-medium uppercase text-[#5A6A7A] dark:border-white/[0.06] dark:bg-white/[0.03] dark:text-white/40">
+                  <th className="px-4 py-3">Item</th>
+                  <th className="px-4 py-3">Category</th>
+                  <th className="px-4 py-3">Unit</th>
+                  <th className="px-4 py-3">In Stock</th>
+                  <th className="px-4 py-3">Min Level</th>
+                  <th className="px-4 py-3">Unit Cost</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Actions</th>
                 </tr>
-              ) : (
-                filtered.map((item) => {
-                  const status = getStockStatus(item)
-                  return (
-                    <tr
-                      key={item.id}
-                      className="border-b border-[#DDE3EC] last:border-0 dark:border-white/[0.06]"
-                    >
-                      <td className="px-4 py-3 font-medium text-[#0D1B2A] dark:text-white">
-                        {item.itemName}
-                      </td>
-                      <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">
-                        {CATEGORY_LABELS[item.category]}
-                      </td>
-                      <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">{item.unit}</td>
-                      <td className="px-4 py-3 font-medium text-[#0D1B2A] dark:text-white">
-                        {item.currentStock} {item.unit}
-                      </td>
-                      <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">
-                        {item.minStockLevel} {item.unit}
-                      </td>
-                      <td className="px-4 py-3 text-[#0B3D6B] dark:text-[#E8A020]">
-                        {formatLKR(item.unitCost)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium ${status.cls}`}>
-                          {status.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="relative" ref={menuOpen === item.id ? menuRef : null}>
-                          <button
-                            type="button"
-                            onClick={() => setMenuOpen(menuOpen === item.id ? null : item.id)}
-                            className="rounded-lg p-1.5 text-[#5A6A7A] hover:bg-[#0B3D6B]/[0.06] dark:text-white/50 dark:hover:bg-white/[0.05]"
-                          >
-                            <span className="ti ti-dots-vertical" />
-                          </button>
-                          {menuOpen === item.id && (
-                            <div className="absolute right-0 top-8 z-10 min-w-[140px] rounded-xl border border-[#DDE3EC] bg-white py-1 shadow-lg dark:border-white/[0.08] dark:bg-[#0d1a2e]">
-                              <button
-                                type="button"
-                                onClick={() => openEdit(item)}
-                                className="block w-full px-4 py-2 text-left text-sm text-[#0D1B2A] hover:bg-[#F5F7FB] dark:text-white dark:hover:bg-white/[0.05]"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => { setRestockItem(item); setMenuOpen(null) }}
-                                className="block w-full px-4 py-2 text-left text-sm text-[#0D1B2A] hover:bg-[#F5F7FB] dark:text-white dark:hover:bg-white/[0.05]"
-                              >
-                                Restock
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeactivate(item)}
-                                className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-                              >
-                                Deactivate
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </td>
+              </thead>
+              <tbody>
+                {loading ? (
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <tr key={i} className="border-b border-[#DDE3EC] dark:border-white/[0.06]">
+                      {Array.from({ length: 8 }).map((__, j) => (
+                        <td key={j} className="px-4 py-3">
+                          <div className="h-4 animate-pulse rounded bg-[#DDE3EC] dark:bg-white/10" />
+                        </td>
+                      ))}
                     </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
+                  ))
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-12 text-center text-sm text-[#5A6A7A] dark:text-white/40">
+                      No items found
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((item) => {
+                    const status = getStockStatus(item)
+                    return (
+                      <tr
+                        key={item.id}
+                        className="border-b border-[#DDE3EC] last:border-0 dark:border-white/[0.06]"
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <FoodEmoji itemName={item.itemName} size="sm" />
+                            <span className="font-medium text-[#0D1B2A] dark:text-white">
+                              {item.itemName}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">
+                          {CATEGORY_LABELS[item.category]}
+                        </td>
+                        <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">{item.unit}</td>
+                        <td className="px-4 py-3 font-medium text-[#0D1B2A] dark:text-white">
+                          {item.currentStock} {item.unit}
+                        </td>
+                        <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">
+                          {item.minStockLevel} {item.unit}
+                        </td>
+                        <td className="px-4 py-3 text-[#0B3D6B] dark:text-[#E8A020]">
+                          {formatLKR(item.unitCost)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium ${status.cls}`}
+                          >
+                            {status.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="relative" ref={menuOpen === item.id ? menuRef : null}>
+                            <button
+                              type="button"
+                              onClick={() => setMenuOpen(menuOpen === item.id ? null : item.id)}
+                              className="rounded-lg p-1.5 text-[#5A6A7A] hover:bg-[#0B3D6B]/[0.06] dark:text-white/50 dark:hover:bg-white/[0.05]"
+                            >
+                              <span className="ti ti-dots-vertical" />
+                            </button>
+                            {menuOpen === item.id && (
+                              <div className="absolute right-0 top-8 z-10 min-w-[140px] rounded-xl border border-[#DDE3EC] bg-white py-1 shadow-lg dark:border-white/[0.08] dark:bg-[#0d1a2e]">
+                                <button
+                                  type="button"
+                                  onClick={() => openEdit(item)}
+                                  className="block w-full px-4 py-2 text-left text-sm text-[#0D1B2A] hover:bg-[#F5F7FB] dark:text-white dark:hover:bg-white/[0.05]"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRestockItem(item)
+                                    setMenuOpen(null)
+                                  }}
+                                  className="block w-full px-4 py-2 text-left text-sm text-[#0D1B2A] hover:bg-[#F5F7FB] dark:text-white dark:hover:bg-white/[0.05]"
+                                >
+                                  Restock
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeactivate(item)}
+                                  className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                                >
+                                  Deactivate
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Stock History */}
       {history.length > 0 && (
         <div className="rounded-xl border border-white/90 bg-white/65 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05]">
           <div className="border-b border-[#DDE3EC] px-5 py-4 dark:border-white/[0.06]">
@@ -428,8 +474,11 @@ export default function InventoryPage() {
             {history.map((h) => (
               <div key={h.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-sm">
                 <div>
-                  <span className={`font-medium ${h.action === 'restocked' ? 'text-emerald-600' : 'text-[#0D1B2A] dark:text-white'}`}>
-                    {h.action === 'restocked' ? '+' : '–'}{h.qty}
+                  <span
+                    className={`font-medium ${h.action === 'restocked' ? 'text-emerald-600' : 'text-[#0D1B2A] dark:text-white'}`}
+                  >
+                    {h.action === 'restocked' ? '+' : '–'}
+                    {h.qty}
                   </span>
                   <span className="ml-2 text-[#5A6A7A] dark:text-white/50">{h.reason}</span>
                 </div>
@@ -442,108 +491,65 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Add / Edit Slide-over */}
       {slideMode && (
-        <>
-          <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setSlideMode(null)} />
-          <div className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white/90 backdrop-blur-2xl dark:bg-[#0d1a2e]/90 sm:w-[440px]">
-            <div className="flex items-center justify-between border-b border-white/80 bg-white/70 px-5 py-4 dark:border-white/[0.06] dark:bg-white/[0.04]">
-              <h3 className="font-semibold text-[#0D1B2A] dark:text-white">
-                {slideMode === 'add' ? 'Add Inventory Item' : 'Edit Item'}
-              </h3>
-              <button type="button" onClick={() => setSlideMode(null)} className="ti ti-x text-xl text-gray-500" />
-            </div>
-            <div className="flex-1 overflow-y-auto space-y-4 p-5">
-              {([
-                ['itemName', 'Item Name', 'text'],
-                ['currentStock', 'Current Stock', 'number'],
-                ['minStockLevel', 'Min Stock Level', 'number'],
-                ['unitCost', 'Unit Cost (LKR)', 'number'],
-              ] as [keyof FormValues, string, string][]).map(([key, label, type]) => (
-                <div key={key}>
-                  <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/60">{label} *</label>
-                  <input
-                    type={type}
-                    value={form[key]}
-                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                    className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                  />
-                </div>
-              ))}
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/60">Category *</label>
-                <select
-                  value={form.category}
-                  onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as InventoryCategory }))}
-                  className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                >
-                  {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/60">Unit *</label>
-                <select
-                  value={form.unit}
-                  onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value as StockUnit }))}
-                  className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                >
-                  {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/60">Notes</label>
-                <textarea
-                  value={form.notes}
-                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                  rows={3}
-                  className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 border-t border-white/80 p-5 dark:border-white/[0.06]">
-              <button type="button" onClick={() => setSlideMode(null)} className="flex-1 rounded-lg border border-[#DDE3EC] py-2 text-sm font-medium text-[#5A6A7A]">
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="flex-1 rounded-lg bg-[#E8A020] py-2 text-sm font-semibold text-white hover:bg-[#d4911c] disabled:opacity-50"
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            </div>
-          </div>
-        </>
+        <InventoryItemSlideOver
+          mode={slideMode}
+          initial={form}
+          onClose={() => setSlideMode(null)}
+          onSave={handleSave}
+          saving={saving}
+        />
       )}
 
-      {/* Restock Modal */}
       {restockItem && (
         <>
           <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setRestockItem(null)} />
-          <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/80 bg-white/90 p-6 backdrop-blur-2xl shadow-2xl dark:border-white/[0.08] dark:bg-[#0d1a2e]/90">
-            <h3 className="font-bold text-[#0D1B2A] dark:text-white">Restock — {restockItem.itemName}</h3>
-            <p className="mt-1 text-sm text-[#5A6A7A] dark:text-white/50">
+          <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/80 bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:border-white/[0.08] dark:bg-[#0d1a2e]/90">
+            <div className="flex justify-center">
+              <FoodEmoji itemName={restockItem.itemName} size="lg" showName />
+            </div>
+            <p className="mt-3 text-center text-sm text-[#5A6A7A] dark:text-white/50">
               Current: {restockItem.currentStock} {restockItem.unit}
             </p>
-            <div className="mt-4">
-              <label className="mb-1 block text-xs font-medium text-[#5A6A7A]">Quantity to Add ({restockItem.unit})</label>
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const n = Math.max(0, (parseFloat(restockQty) || 0) - 1)
+                  setRestockQty(n > 0 ? String(n) : '')
+                }}
+                className="flex h-12 w-12 items-center justify-center rounded-xl border text-xl font-bold"
+              >
+                −
+              </button>
               <input
                 type="number"
                 value={restockQty}
                 onChange={(e) => setRestockQty(e.target.value)}
-                className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                placeholder="Quantity to add"
+                className="h-12 flex-1 rounded-xl border border-[#DDE3EC] bg-white text-center text-lg font-bold dark:border-gray-600 dark:bg-gray-900 dark:text-white"
               />
+              <button
+                type="button"
+                onClick={() => setRestockQty(String((parseFloat(restockQty) || 0) + 1))}
+                className="flex h-12 w-12 items-center justify-center rounded-xl border text-xl font-bold"
+              >
+                +
+              </button>
             </div>
             <div className="mt-4 flex gap-3">
-              <button type="button" onClick={() => setRestockItem(null)} className="flex-1 rounded-lg border border-[#DDE3EC] py-2 text-sm font-medium text-[#5A6A7A]">
+              <button
+                type="button"
+                onClick={() => setRestockItem(null)}
+                className="flex-1 rounded-xl border border-[#DDE3EC] py-3 text-sm font-medium text-[#5A6A7A]"
+              >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleRestock}
                 disabled={saving}
-                className="flex-1 rounded-lg bg-[#0B3D6B] py-2 text-sm font-semibold text-white hover:bg-[#0a3460] disabled:opacity-50"
+                className="flex-1 rounded-xl bg-[#0B3D6B] py-3 text-sm font-bold text-white hover:bg-[#0a3460] disabled:opacity-50"
               >
                 {saving ? 'Adding…' : 'Add Stock'}
               </button>

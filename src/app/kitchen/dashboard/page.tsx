@@ -4,14 +4,17 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
+import SinhalaToggle from '@/components/kitchen/SinhalaToggle'
+import { MEAL_SESSION_VISUAL } from '@/lib/kitchen/foodImages'
+import { useKitchenSinhala } from '@/lib/kitchen/useKitchenSinhala'
 import { formatLKR } from '@/lib/utils/formatCurrency'
 import type { MealLog, InventoryItem, MealType } from '@/types/kitchen'
 
-const MEAL_SESSIONS: { type: MealType; label: string; icon: string; time: string }[] = [
-  { type: 'breakfast', label: 'Breakfast', icon: 'ti-coffee', time: '7:00 – 9:00 AM' },
-  { type: 'lunch', label: 'Lunch', icon: 'ti-soup', time: '12:00 – 1:30 PM' },
-  { type: 'dinner', label: 'Dinner', icon: 'ti-moon', time: '6:30 – 8:00 PM' },
-  { type: 'tea', label: 'Afternoon Tea', icon: 'ti-cup', time: '3:30 – 4:30 PM' },
+const MEAL_SESSIONS: { type: MealType; label: string }[] = [
+  { type: 'breakfast', label: 'Breakfast' },
+  { type: 'lunch', label: 'Lunch' },
+  { type: 'dinner', label: 'Dinner' },
+  { type: 'tea', label: 'Tea' },
 ]
 
 function today(): string {
@@ -29,6 +32,7 @@ function weekAgo(): string {
 }
 
 export default function KitchenDashboardPage() {
+  const { sinhala } = useKitchenSinhala()
   const [loading, setLoading] = useState(true)
   const [todayLogs, setTodayLogs] = useState<MealLog[]>([])
   const [monthCost, setMonthCost] = useState(0)
@@ -132,43 +136,56 @@ export default function KitchenDashboardPage() {
         ))}
       </div>
 
+      <SinhalaToggle />
+
       {/* Today's meal sessions */}
       <div>
         <h2 className="mb-3 text-[15px] font-bold text-[#0D1B2A] dark:text-white">
           Today&apos;s Meal Sessions
         </h2>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {MEAL_SESSIONS.map((session) => {
             const log = todayLogs.find((m) => m.mealType === session.type)
+            const visual = MEAL_SESSION_VISUAL[session.type]
+            const servings = log ? (log.studentCount || 0) + (log.staffCount || 0) : 0
             return (
               <div
                 key={session.type}
-                className="flex flex-col rounded-[12px] border border-white/90 bg-white/65 p-4 backdrop-blur-2xl transition-all duration-300 dark:border-white/[0.08] dark:bg-white/[0.05]"
+                className="flex flex-col rounded-2xl border border-white/90 bg-white/65 p-5 backdrop-blur-2xl transition-all duration-300 dark:border-white/[0.08] dark:bg-white/[0.05]"
               >
-                <div className="flex items-center gap-2">
-                  <span className={`ti ${session.icon} text-[#0B3D6B] dark:text-[#E8A020]`} />
-                  <p className="font-semibold text-[#0D1B2A] text-sm dark:text-white">{session.label}</p>
+                <div className="text-center">
+                  <span className="text-5xl leading-none" role="img" aria-hidden="true">
+                    {visual?.emoji}
+                  </span>
+                  <p className="mt-2 text-base font-bold text-[#0D1B2A] dark:text-white">
+                    {session.label}
+                  </p>
+                  {sinhala && visual?.sinhala && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{visual.sinhala}</p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-400 dark:text-white/40">{visual?.time}</p>
                 </div>
-                <p className="mt-1 text-[11px] text-gray-400 dark:text-white/40">{session.time}</p>
+
                 {log ? (
-                  <div className="mt-3 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="ti ti-circle-check text-emerald-500 text-sm" />
-                      <span className="text-[12px] font-medium text-emerald-700 dark:text-emerald-400">Logged</span>
+                  <div className="mt-4 flex flex-1 flex-col items-center">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+                      <span className="ti ti-circle-check text-3xl text-emerald-600" />
                     </div>
-                    <p className="mt-1 text-[12px] text-gray-600 dark:text-white/60">
-                      {(log.studentCount || 0) + (log.staffCount || 0)} servings
+                    <span className="mt-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                      Logged ✓
+                    </span>
+                    <p className="mt-3 text-sm font-semibold text-[#0D1B2A] dark:text-white">
+                      {servings} served
                     </p>
-                    <p className="text-[12px] text-[#0B3D6B] dark:text-[#E8A020]">
+                    <p className="text-sm font-bold text-[#E8A020]">
                       {formatLKR(log.estimatedCost || 0)}
                     </p>
                   </div>
                 ) : (
-                  <div className="mt-3 flex-1 flex flex-col justify-between">
-                    <p className="text-[12px] text-gray-400 dark:text-white/40">Not logged yet</p>
+                  <div className="mt-4 flex flex-1 flex-col justify-end">
                     <Link
                       href={`/kitchen/meal-log?type=${session.type}`}
-                      className="mt-3 inline-block rounded-lg bg-[#E8A020] px-3 py-1.5 text-center text-[11px] font-semibold text-white hover:bg-[#d4911c]"
+                      className="flex min-h-[48px] w-full items-center justify-center rounded-xl bg-[#E8A020] text-base font-bold text-white hover:bg-[#d4911c]"
                     >
                       Log Now
                     </Link>
