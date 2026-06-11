@@ -11,6 +11,7 @@ import { getCourseBadge } from '@/lib/student/portal'
 import { logAuditEvent } from '@/lib/audit/helpers'
 import { useStudentPortal } from '@/components/student/StudentContext'
 import DarkModeToggle from '@/components/ui/DarkModeToggle'
+import { isNavActive, navLinkClasses } from '@/lib/utils/nav'
 
 const BASE_NAV_ITEMS = [
   { label: 'My Dashboard', href: '/my-dashboard', icon: 'ti-layout-dashboard' },
@@ -68,10 +69,6 @@ export default function StudentSidebar() {
     router.replace('/login')
   }
 
-  function isActive(href: string) {
-    return pathname === href
-  }
-
   const courseLabel = student ? getCourseBadge(student.courseId) : ''
   const courseName = student ? (COURSE_MAP[student.courseId]?.label ?? courseLabel) : ''
 
@@ -99,17 +96,13 @@ export default function StudentSidebar() {
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
         {navItems.map((item) => {
-          const active = isActive(item.href)
+          const active = isNavActive(pathname, item.href)
           return (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] font-medium transition-all duration-200 ${
-                active
-                  ? 'bg-[#0B3D6B]/[0.09] text-[#0B3D6B] dark:bg-[#E8A020]/[0.13] dark:text-[#E8A020]'
-                  : 'text-gray-500 dark:text-white/45 hover:bg-[#0B3D6B]/[0.06] dark:hover:bg-white/[0.05] hover:text-[#0B3D6B] dark:hover:text-white/70'
-              }`}
+              className={navLinkClasses(active)}
             >
               <span className={`ti ${item.icon} text-[14px] leading-none`} aria-hidden="true" />
               {item.label}
@@ -157,7 +150,7 @@ export default function StudentSidebar() {
 
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-20 bg-black/40 backdrop-blur-sm md:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />

@@ -15,6 +15,7 @@ import {
   filterStudentsForBroadcast,
 } from '@/lib/broadcast/helpers'
 import AudienceFilter from '@/components/broadcast/AudienceFilter'
+import toast from 'react-hot-toast'
 import { useManagement } from '@/components/layout/ManagementContext'
 import type {
   BroadcastAudience,
@@ -143,9 +144,18 @@ export default function BroadcastComposer({ students, onSent }: BroadcastCompose
       setStep(1)
       setScheduleMode(false)
       setScheduledAt('')
+      toast.success(sendNow ? 'Broadcast sent' : 'Broadcast saved')
       onSent()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save broadcast')
+      const msg = err instanceof Error ? err.message : 'Failed to save broadcast'
+      if (msg.toLowerCase().includes('index')) {
+        console.error('Firestore index needed:', err)
+        console.error('Create index at: https://console.firebase.google.com/project/YOUR_PROJECT/firestore/indexes')
+        setError('Filter unavailable — please use fewer filters or contact support')
+      } else {
+        setError(msg)
+      }
+      toast.error('Something went wrong. Please try again.')
     } finally {
       setSaving(false)
     }

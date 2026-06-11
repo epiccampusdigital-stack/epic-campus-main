@@ -42,7 +42,9 @@ export default function ParentPaymentsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A]">Payments</h2>
+        <h2 className="font-jakarta text-xl font-bold text-[#0D1B2A] sm:text-2xl dark:text-white">
+          Payments
+        </h2>
         <p className="text-sm text-[#5A6A7A]">
           Fee schedule and payment history for {student.name}
         </p>

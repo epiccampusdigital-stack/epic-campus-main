@@ -90,7 +90,7 @@ export default function ParentRegisterPage() {
       router.replace('/parent/dashboard')
     } catch (err) {
       console.error('[ParentRegister]', err)
-      setError(err instanceof Error ? err.message : 'Registration failed')
+      setError('Invalid code. Please check with your student\'s campus.')
     } finally {
       setLoading(false)
     }

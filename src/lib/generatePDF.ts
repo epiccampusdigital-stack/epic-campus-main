@@ -1,4 +1,5 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import { safePdfText } from '@/lib/utils/pdfText'
 
 const NAVY = rgb(0.043, 0.239, 0.42)
 const GOLD = rgb(0.91, 0.627, 0.125)
@@ -10,6 +11,11 @@ export async function generateEnrollmentCertificate(data: {
   enrollmentDate: string
   studentId: string
 }): Promise<Uint8Array> {
+  const studentName = safePdfText(data.studentName)
+  const program = safePdfText(data.program)
+  const enrollmentDate = safePdfText(data.enrollmentDate)
+  const studentId = safePdfText(data.studentId)
+
   const doc = await PDFDocument.create()
   const page = doc.addPage([595, 842])
   const { width, height } = page.getSize()
@@ -27,15 +33,15 @@ export async function generateEnrollmentCertificate(data: {
   page.drawText('CERTIFICATE OF ENROLLMENT', { x: 130, y: height - 170, size: 22, font, color: NAVY })
 
   page.drawText('This is to certify that', { x: 200, y: height - 230, size: 14, font: fontReg, color: GRAY })
-  page.drawText(data.studentName, { x: 200 - data.studentName.length * 5, y: height - 270, size: 24, font, color: NAVY })
+  page.drawText(studentName, { x: 200 - studentName.length * 5, y: height - 270, size: 24, font, color: NAVY })
 
   page.drawLine({ start: { x: 100, y: height - 280 }, end: { x: width - 100, y: height - 280 }, thickness: 0.5, color: GRAY })
 
   page.drawText('is officially enrolled in', { x: 195, y: height - 310, size: 14, font: fontReg, color: GRAY })
-  page.drawText(data.program, { x: 200 - data.program.length * 4, y: height - 345, size: 20, font, color: GOLD })
+  page.drawText(program, { x: 200 - program.length * 4, y: height - 345, size: 20, font, color: GOLD })
 
-  page.drawText(`Enrollment Date: ${data.enrollmentDate}`, { x: 195, y: height - 395, size: 12, font: fontReg, color: GRAY })
-  page.drawText(`Student ID: ${data.studentId}`, { x: 220, y: height - 415, size: 12, font: fontReg, color: GRAY })
+  page.drawText(`Enrollment Date: ${enrollmentDate}`, { x: 195, y: height - 395, size: 12, font: fontReg, color: GRAY })
+  page.drawText(`Student ID: ${studentId}`, { x: 220, y: height - 415, size: 12, font: fontReg, color: GRAY })
 
   page.drawLine({ start: { x: 60, y: 120 }, end: { x: width - 60, y: 120 }, thickness: 1, color: GOLD })
   page.drawText('No. 59/2, Sri Dewamitta Road, China Garden, Galle, Sri Lanka', { x: 130, y: 95, size: 10, font: fontReg, color: GRAY })
@@ -58,6 +64,13 @@ export async function generateExamCertificate(data: {
   date: string
   remarks?: string
 }): Promise<Uint8Array> {
+  const studentName = safePdfText(data.studentName)
+  const paperName = safePdfText(data.paperName)
+  const score = safePdfText(data.score)
+  const grade = safePdfText(data.grade)
+  const date = safePdfText(data.date)
+  const remarks = data.remarks ? safePdfText(data.remarks) : undefined
+
   const doc = await PDFDocument.create()
   const page = doc.addPage([595, 842])
   const { width, height } = page.getSize()
@@ -75,22 +88,22 @@ export async function generateExamCertificate(data: {
   page.drawText('CERTIFICATE OF ACHIEVEMENT', { x: 135, y: height - 165, size: 22, font, color: NAVY })
 
   page.drawText('This is to certify that', { x: 200, y: height - 225, size: 14, font: fontReg, color: GRAY })
-  page.drawText(data.studentName, { x: 200 - data.studentName.length * 5, y: height - 265, size: 24, font, color: NAVY })
+  page.drawText(studentName, { x: 200 - studentName.length * 5, y: height - 265, size: 24, font, color: NAVY })
   page.drawLine({ start: { x: 100, y: height - 275 }, end: { x: width - 100, y: height - 275 }, thickness: 0.5, color: GRAY })
 
   page.drawText('has successfully completed', { x: 185, y: height - 305, size: 14, font: fontReg, color: GRAY })
-  page.drawText(data.paperName, { x: 200 - data.paperName.length * 4, y: height - 340, size: 20, font, color: GOLD })
+  page.drawText(paperName, { x: 200 - paperName.length * 4, y: height - 340, size: 20, font, color: GOLD })
 
   page.drawRectangle({ x: 200, y: height - 420, width: 180, height: 60, borderColor: NAVY, borderWidth: 1.5, color: rgb(0.95, 0.97, 1) })
   page.drawText('SCORE', { x: 265, y: height - 378, size: 10, font: fontReg, color: GRAY })
-  page.drawText(data.score, { x: 262, y: height - 405, size: 22, font, color: NAVY })
+  page.drawText(score, { x: 262, y: height - 405, size: 22, font, color: NAVY })
 
-  page.drawText(`Grade: ${data.grade}`, { x: 250, y: height - 445, size: 14, font, color: GOLD })
-  page.drawText(`Date: ${data.date}`, { x: 235, y: height - 470, size: 12, font: fontReg, color: GRAY })
+  page.drawText(`Grade: ${grade}`, { x: 250, y: height - 445, size: 14, font, color: GOLD })
+  page.drawText(`Date: ${date}`, { x: 235, y: height - 470, size: 12, font: fontReg, color: GRAY })
 
-  if (data.remarks) {
+  if (remarks) {
     page.drawText('AI Examiner Remarks:', { x: 80, y: height - 510, size: 11, font, color: NAVY })
-    const words = data.remarks.split(' ')
+    const words = remarks.split(' ')
     let line = ''
     let y = height - 530
     for (const word of words) {

@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { collection, getDocs, orderBy, query } from 'firebase/firestore'
+import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore'
+import { FIRESTORE_LIST_LIMIT } from '@/lib/constants/firestore'
 import { db } from '@/lib/firebase/client'
 import { COURSES } from '@/lib/constants/courses'
 import { parseStudent } from '@/lib/students/helpers'
@@ -71,8 +72,14 @@ export default function PaymentsPage() {
     setLoading(true)
     try {
       const [paymentsSnap, studentsSnap] = await Promise.all([
-        getDocs(query(collection(db, 'payments'), orderBy('createdAt', 'desc'))),
-        getDocs(collection(db, 'students')),
+        getDocs(
+          query(
+            collection(db, 'payments'),
+            orderBy('createdAt', 'desc'),
+            limit(FIRESTORE_LIST_LIMIT),
+          ),
+        ),
+        getDocs(query(collection(db, 'students'), limit(FIRESTORE_LIST_LIMIT))),
       ])
       setPayments(
         paymentsSnap.docs.map((d) =>

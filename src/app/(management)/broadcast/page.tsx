@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { collection, getDocs } from 'firebase/firestore'
+import { collection, getDocs, limit, query } from 'firebase/firestore'
+import { FIRESTORE_LIST_LIMIT } from '@/lib/constants/firestore'
 import { db } from '@/lib/firebase/client'
 import { parseStudentsFromDocs } from '@/lib/broadcast/helpers'
 import BroadcastComposer from '@/components/broadcast/BroadcastComposer'
@@ -14,13 +15,17 @@ export default function BroadcastPage() {
   const [tab, setTab] = useState<Tab>('new')
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
+  const [hitLimit, setHitLimit] = useState(false)
   const [historyRefresh, setHistoryRefresh] = useState(0)
 
   const loadStudents = useCallback(async () => {
     setLoading(true)
     try {
-      const snap = await getDocs(collection(db, 'students'))
+      const snap = await getDocs(
+        query(collection(db, 'students'), limit(FIRESTORE_LIST_LIMIT)),
+      )
       setStudents(parseStudentsFromDocs(snap.docs))
+      setHitLimit(snap.docs.length >= FIRESTORE_LIST_LIMIT)
     } catch (err) {
       console.error('[BroadcastPage]', err)
     } finally {
@@ -40,7 +45,7 @@ export default function BroadcastPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white">
+        <h2 className="font-jakarta text-xl font-bold text-[#0D1B2A] sm:text-2xl dark:text-white">
           WhatsApp Broadcast
         </h2>
         <p className="text-sm text-[#5A6A7A]">Send messages to students via WhatsApp</p>
@@ -70,8 +75,18 @@ export default function BroadcastPage() {
         </nav>
       </div>
 
+      {hitLimit && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+          Showing first {FIRESTORE_LIST_LIMIT} students — use filters to narrow down.
+        </p>
+      )}
+
       {loading && tab === 'new' ? (
-        <div className="animate-pulse h-64 rounded-xl bg-[#DDE3EC]" />
+        <div className="animate-pulse space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-12 rounded-lg bg-gray-200 dark:bg-gray-700" />
+          ))}
+        </div>
       ) : tab === 'new' ? (
         <BroadcastComposer students={students} onSent={handleSent} />
       ) : (

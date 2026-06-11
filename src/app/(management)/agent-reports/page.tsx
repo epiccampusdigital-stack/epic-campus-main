@@ -195,7 +195,7 @@ export default function AgentCommissionReportsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white">
+        <h2 className="font-jakarta text-xl font-bold text-[#0D1B2A] sm:text-2xl dark:text-white">
           Agent Commission Reports
         </h2>
         <p className="mt-1 font-inter text-sm text-[#5A6A7A]">
@@ -292,8 +292,8 @@ export default function AgentCommissionReportsPage() {
           subtitle="Commissions are created automatically when registration fees are paid for students with an assigned agent."
         />
       ) : (
-        <section className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:border-gray-600 dark:bg-gray-800">
-          <div className="overflow-x-auto">
+        <section className="rounded-xl border border-[#DDE3EC] bg-white dark:border-gray-600 dark:bg-gray-800">
+          <div className="overflow-x-auto overflow-y-visible -mx-4 sm:mx-0">
             <table className="w-full min-w-[960px] text-left text-sm">
               <thead>
                 <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:bg-gray-900">

@@ -19,6 +19,8 @@ import {
 import { useManagement } from '@/components/layout/ManagementContext'
 import { logAuditEvent } from '@/lib/audit/helpers'
 import { processPaymentCommissions } from '@/lib/commissions/helpers'
+import { stripeConfigured } from '@/lib/utils/stripe'
+import toast from 'react-hot-toast'
 import type { Payment, PaymentMethod, PaymentStatus, PaymentType, Student } from '@/types'
 
 export interface PaymentFormValues {
@@ -230,10 +232,13 @@ export default function PaymentForm({
         }
       }
 
+      toast.success(isEdit ? 'Payment updated' : 'Payment recorded')
       onSaved()
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save payment')
+      const msg = err instanceof Error ? err.message : 'Failed to save payment'
+      setError(msg)
+      toast.error('Something went wrong. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -310,7 +315,7 @@ export default function PaymentForm({
                 <select
                   value={form.type}
                   onChange={(e) => setField('type', e.target.value as PaymentType)}
-                  className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
+                  className="min-h-11 w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020] sm:min-h-0"
                 >
                   <option value="tuition">Tuition</option>
                   <option value="registration">Registration</option>
@@ -324,7 +329,7 @@ export default function PaymentForm({
                 <select
                   value={form.status}
                   onChange={(e) => setField('status', e.target.value as PaymentStatus)}
-                  className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
+                  className="min-h-11 w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020] sm:min-h-0"
                 >
                   <option value="paid">Paid</option>
                   <option value="partial">Partial</option>
@@ -351,12 +356,17 @@ export default function PaymentForm({
               <select
                 value={form.method}
                 onChange={(e) => setField('method', e.target.value as PaymentMethod)}
-                className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
+                className="min-h-11 w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020] sm:min-h-0"
               >
                 <option value="cash">Cash</option>
                 <option value="bank-transfer">Bank Transfer</option>
-                <option value="stripe">Online (Stripe)</option>
+                {stripeConfigured && <option value="stripe">Online (Stripe)</option>}
               </select>
+              {!stripeConfigured && (
+                <p className="mt-1.5 text-xs text-[#5A6A7A]">
+                  Online payments not configured
+                </p>
+              )}
             </div>
 
             {form.method === 'bank-transfer' && (
@@ -367,7 +377,7 @@ export default function PaymentForm({
                   value={form.bankReference}
                   onChange={(e) => setField('bankReference', e.target.value)}
                   placeholder="Transaction reference"
-                  className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
+                  className="min-h-11 w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020] sm:min-h-0"
                 />
               </div>
             )}
@@ -380,7 +390,7 @@ export default function PaymentForm({
                   value={form.stripeId}
                   onChange={(e) => setField('stripeId', e.target.value)}
                   placeholder="pi_xxxxxxxx"
-                  className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
+                  className="min-h-11 w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020] sm:min-h-0"
                 />
               </div>
             )}

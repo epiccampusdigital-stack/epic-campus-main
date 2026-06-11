@@ -26,6 +26,7 @@ import { defaultFeeSchedule } from '@/lib/students/helpers'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { logAuditEvent } from '@/lib/audit/helpers'
 import { processPaymentCommissions } from '@/lib/commissions/helpers'
+import { stripeConfigured } from '@/lib/utils/stripe'
 import type {
   Payment,
   PaymentMethod,
@@ -310,8 +311,11 @@ export default function StudentFeePanel({
               >
                 <option value="cash">Cash</option>
                 <option value="bank-transfer">Bank Transfer</option>
-                <option value="stripe">Online (Stripe)</option>
+                {stripeConfigured && <option value="stripe">Online (Stripe)</option>}
               </select>
+              {!stripeConfigured && line.method === 'stripe' && (
+                <p className="mt-1 text-xs text-[#5A6A7A]">Online payments not configured</p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium uppercase text-[#5A6A7A]">
@@ -336,7 +340,7 @@ export default function StudentFeePanel({
                 className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white"
               />
             </div>
-            {line.method === 'stripe' && (
+            {line.method === 'stripe' && stripeConfigured && (
               <div className="sm:col-span-2">
                 <button
                   type="button"
@@ -344,7 +348,7 @@ export default function StudentFeePanel({
                   onClick={() =>
                     void generateStripeLink(feeKey, amount, `${title} — ${student.name}`)
                   }
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#0B3D6B] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0a3560] disabled:opacity-60"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#0B3D6B] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0a3560] disabled:opacity-60 sm:w-auto sm:min-h-0"
                 >
                   {linkLoading === feeKey ? 'Generating…' : 'Generate Payment Link'}
                 </button>

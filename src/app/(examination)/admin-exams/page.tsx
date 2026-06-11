@@ -365,7 +365,7 @@ export default function AdminExamsPage() {
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-[#DDE3EC] bg-white">
+          <div className="overflow-x-auto overflow-y-visible rounded-xl border border-[#DDE3EC] bg-white -mx-4 sm:mx-0">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="border-b border-[#DDE3EC] bg-[#F5F7FB]">
                 <tr>
@@ -405,18 +405,18 @@ export default function AdminExamsPage() {
                           className="rounded-[6px] border border-gray-200 px-3 py-1.5 text-xs font-semibold text-[#0B3D6B] hover:bg-gray-50">
                           Listening Audio
                         </button>
-                        <div className="relative">
+                        <div className="relative z-50">
                           <button
                             type="button"
                             onClick={() => setOpenDropdown(openDropdown === p.id ? null : p.id)}
-                            className="rounded-[6px] border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-50"
+                            className="min-h-11 rounded-[6px] border border-gray-200 px-2.5 py-2.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 sm:min-h-0 sm:py-1.5"
                           >
                             ⋮
                           </button>
                           {openDropdown === p.id && (
                             <>
                               <div className="fixed inset-0 z-40" onClick={() => setOpenDropdown(null)} aria-hidden="true" />
-                              <div className="absolute right-0 z-50 mt-1 w-40 rounded-lg border border-gray-100 bg-white shadow-lg">
+                              <div className="absolute right-0 bottom-full z-50 mb-1 w-40 rounded-lg border border-gray-100 bg-white shadow-lg sm:bottom-auto sm:mt-1">
                                 <button
                                   type="button"
                                   onClick={() => { setEditPaper(p); setFormOpen(true); setOpenDropdown(null) }}

@@ -31,15 +31,24 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const studentsSnap = await adminDb
-      .collection('students')
-      .where('parentAccessCode', '==', code)
-      .limit(1)
-      .get()
+    let studentsSnap
+    try {
+      studentsSnap = await adminDb
+        .collection('students')
+        .where('parentAccessCode', '==', code)
+        .limit(1)
+        .get()
+    } catch (lookupErr) {
+      console.error('[parent/register] code lookup failed:', lookupErr)
+      return NextResponse.json(
+        { error: 'Invalid code. Please check with your student\'s campus.' },
+        { status: 400 },
+      )
+    }
 
     if (studentsSnap.empty) {
       return NextResponse.json(
-        { error: 'Invalid access code. Check the code from Epic Campus staff.' },
+        { error: 'Invalid code. Please check with your student\'s campus.' },
         { status: 400 },
       )
     }
@@ -125,7 +134,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ uid: userRecord.uid, studentId })
   } catch (err) {
     console.error('[parent/register]', err)
-    const message = err instanceof Error ? err.message : 'Registration failed'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Invalid code. Please check with your student\'s campus.' },
+      { status: 400 },
+    )
   }
 }

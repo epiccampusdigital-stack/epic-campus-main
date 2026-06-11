@@ -9,6 +9,7 @@ import { doc, getDoc } from 'firebase/firestore'
 import { signOut } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase/client'
 import DarkModeToggle from '@/components/ui/DarkModeToggle'
+import { isNavActive, navLinkClasses } from '@/lib/utils/nav'
 import { KitchenContext } from '@/app/kitchen/context'
 import type { EpicUser } from '@/types'
 
@@ -57,17 +58,13 @@ function KitchenSidebar({
       <div className="mx-4 border-t border-[#0B3D6B]/10 dark:border-white/[0.06]" />
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
         {NAV.map((item) => {
-          const active = mounted && (pathname === item.href || pathname.startsWith(item.href + '/'))
+          const active = mounted && isNavActive(pathname, item.href)
           return (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] font-medium transition-all duration-200 ${
-                active
-                  ? 'bg-[#0B3D6B]/[0.09] text-[#0B3D6B] dark:bg-[#E8A020]/[0.13] dark:text-[#E8A020]'
-                  : 'text-gray-500 hover:bg-[#0B3D6B]/[0.06] hover:text-[#0B3D6B] dark:text-white/45 dark:hover:bg-white/[0.05] dark:hover:text-white/70'
-              }`}
+              className={navLinkClasses(active)}
             >
               <span className={`ti ${item.icon} text-[14px] leading-none`} aria-hidden="true" />
               {item.label}
@@ -109,7 +106,7 @@ function KitchenSidebar({
       <aside className="hidden shrink-0 md:block">{content}</aside>
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          className="fixed inset-0 z-20 bg-black/40 md:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />

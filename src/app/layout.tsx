@@ -2,6 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 import { Plus_Jakarta_Sans, Inter } from 'next/font/google'
 import ChatBotRoot from '@/components/public/ChatBotRoot'
+import AppToaster from '@/components/ui/AppToaster'
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -22,9 +23,9 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'EPIC Campus — We Create Your Future',
   description:
-    "Sri Lanka's trusted gateway to Japan, Korea, China and global careers since 2011.",
+    "Epic Campus — Sri Lanka's leading overseas education institute for Japan SSW, Korea, China, IELTS and NVQ programs. Based in Galle.",
   keywords:
-    'EPIC Campus, Sri Lanka, Japan SSW visa, Korea study, China scholarship, IELTS, NVQ, overseas education, study abroad Sri Lanka, work in Japan',
+    'Japan SSW Sri Lanka, Korea study visa, overseas education Galle, IELTS residential, NVQ certification, EPIC Campus, study abroad Sri Lanka',
   authors: [{ name: 'EPIC Campus' }],
   creator: 'EPIC Campus',
   publisher: 'EPIC Campus',
@@ -85,9 +86,10 @@ export default function RootLayout({
           href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"
         />
       </head>
-      <body className="font-inter antialiased bg-[#F5F7FB]">
+      <body className="overflow-x-hidden font-inter antialiased bg-[#F5F7FB]">
         {children}
         <ChatBotRoot />
+        <AppToaster />
       </body>
     </html>
   )

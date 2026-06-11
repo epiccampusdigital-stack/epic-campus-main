@@ -7,6 +7,7 @@ import { signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase/client'
 import { useParentPortalOptional } from '@/components/parent/ParentContext'
 import DarkModeToggle from '@/components/ui/DarkModeToggle'
+import { isNavActive, navLinkClasses } from '@/lib/utils/nav'
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/parent/dashboard', icon: 'ti-layout-dashboard' },
@@ -57,17 +58,13 @@ export default function ParentSidebar() {
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
         {NAV_ITEMS.map((item) => {
-          const active = mounted && pathname === item.href
+          const active = mounted && isNavActive(pathname, item.href)
           return (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => ctx?.setSidebarOpen(false)}
-              className={`flex items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] font-medium transition-all duration-200 ${
-                active
-                  ? 'bg-[#0B3D6B]/[0.09] text-[#0B3D6B] dark:bg-[#E8A020]/[0.13] dark:text-[#E8A020]'
-                  : 'text-gray-500 dark:text-white/45 hover:bg-[#0B3D6B]/[0.06] dark:hover:bg-white/[0.05] hover:text-[#0B3D6B] dark:hover:text-white/70'
-              }`}
+              className={navLinkClasses(active)}
             >
               <span className={`ti ${item.icon} text-[14px]`} aria-hidden="true" />
               {item.label}
@@ -99,7 +96,7 @@ export default function ParentSidebar() {
       {ctx?.sidebarOpen && (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-20 bg-black/40 backdrop-blur-sm md:hidden"
           aria-label="Close menu"
           onClick={() => ctx.setSidebarOpen(false)}
         />

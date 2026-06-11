@@ -10,6 +10,7 @@ import { ROLE_LABELS } from '@/lib/constants/roles'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { logAuditEvent } from '@/lib/audit/helpers'
 import DarkModeToggle from '@/components/ui/DarkModeToggle'
+import { isNavActive, navLinkClasses } from '@/lib/utils/nav'
 import type { Role } from '@/types'
 
 interface NavItem {
@@ -97,10 +98,6 @@ export default function ManagementSidebar() {
     router.replace('/login')
   }
 
-  function isActive(href: string) {
-    return pathname === href || pathname.startsWith(`${href}/`)
-  }
-
   const sidebarContent = (
     <div className="flex h-full w-[240px] flex-col bg-white/60 dark:bg-[#0B3D6B]/20 backdrop-blur-2xl border-r border-white/80 dark:border-white/[0.06] transition-all duration-300">
       {/* Logo */}
@@ -117,17 +114,13 @@ export default function ManagementSidebar() {
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
         {visibleItems.map((item) => {
-          const active = isActive(item.href)
+          const active = isNavActive(pathname, item.href)
           return (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] font-medium transition-all duration-200 ${
-                active
-                  ? 'bg-[#0B3D6B]/[0.09] text-[#0B3D6B] dark:bg-[#E8A020]/[0.13] dark:text-[#E8A020]'
-                  : 'text-gray-500 dark:text-white/45 hover:bg-[#0B3D6B]/[0.06] dark:hover:bg-white/[0.05] hover:text-[#0B3D6B] dark:hover:text-white/70'
-              }`}
+              className={navLinkClasses(active)}
             >
               <span className={`ti ${item.icon} text-[14px] leading-none`} aria-hidden="true" />
               {item.label}
@@ -182,7 +175,7 @@ export default function ManagementSidebar() {
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="fixed inset-0 z-20 bg-black/40 md:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />

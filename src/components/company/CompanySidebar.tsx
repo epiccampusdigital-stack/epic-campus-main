@@ -8,6 +8,7 @@ import { auth } from '@/lib/firebase/client'
 import { logAuditEvent } from '@/lib/audit/helpers'
 import { useCompanyPortal } from '@/components/company/CompanyContext'
 import DarkModeToggle from '@/components/ui/DarkModeToggle'
+import { isNavActive, navLinkClasses } from '@/lib/utils/nav'
 
 const NAV = [
   { label: 'Dashboard', href: '/company/dashboard', icon: 'ti-layout-dashboard' },
@@ -54,17 +55,13 @@ export default function CompanySidebar() {
 
       <nav className="flex-1 space-y-0.5 px-3 py-3">
         {NAV.map((item) => {
-          const active = pathname === item.href
+          const active = isNavActive(pathname, item.href)
           return (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] font-medium transition-all duration-200 ${
-                active
-                  ? 'bg-[#0B3D6B]/[0.09] text-[#0B3D6B] dark:bg-[#E8A020]/[0.13] dark:text-[#E8A020]'
-                  : 'text-gray-500 dark:text-white/45 hover:bg-[#0B3D6B]/[0.06] dark:hover:bg-white/[0.05] hover:text-[#0B3D6B] dark:hover:text-white/70'
-              }`}
+              className={navLinkClasses(active)}
             >
               <span className={`ti ${item.icon} text-[14px]`} aria-hidden="true" />
               {item.label}
@@ -101,7 +98,7 @@ export default function CompanySidebar() {
       <aside className="hidden shrink-0 md:block">{sidebarContent}</aside>
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-20 bg-black/40 backdrop-blur-sm md:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />

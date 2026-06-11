@@ -7,6 +7,7 @@ import {
   REGISTRATION_FEE_LKR,
 } from '@/lib/payments/constants'
 import { formatLKR, formatPaymentDate, getMethodLabel, getTypeLabel } from '@/lib/payments/helpers'
+import { stripeConfigured } from '@/lib/utils/stripe'
 import { feeScheduleTotals } from '@/lib/parent/helpers'
 import { defaultFeeSchedule } from '@/lib/students/helpers'
 import { useParentPortal } from '@/components/parent/ParentContext'
@@ -102,7 +103,7 @@ export default function ParentFeePanel({ payments, loading }: ParentFeePanelProp
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
         <div className="rounded-xl border border-[#DDE3EC] bg-[#F5F7FB] p-4">
           <p className="text-xs font-medium uppercase text-[#5A6A7A]">Total due</p>
           <p className="mt-1 font-jakarta text-xl font-bold text-[#0B3D6B]">
@@ -157,40 +158,56 @@ export default function ParentFeePanel({ payments, loading }: ParentFeePanelProp
       </div>
 
       {(unpaidRegistration || unpaidCourse || balance > 0) && (
-        <div className="rounded-xl border border-[#DDE3EC] bg-white p-5">
-          <h4 className="font-jakarta text-sm font-bold text-[#0B3D6B]">Pay Online</h4>
-          <p className="mt-1 text-sm text-[#5A6A7A]">
-            Secure card payment in LKR via Stripe.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {unpaidRegistration && (
-              <button
-                type="button"
-                disabled={payLoading}
-                onClick={() =>
-                  void handlePayOnline(
-                    REGISTRATION_FEE_LKR,
-                    `Registration Fee — ${student.name}`,
-                  )
-                }
-                className="rounded-lg bg-[#E8A020] px-4 py-2 font-jakarta text-sm font-bold text-[#0B3D6B] hover:bg-[#F5B942] disabled:opacity-60"
-              >
-                Pay Registration ({formatLKR(REGISTRATION_FEE_LKR)})
-              </button>
-            )}
-            {unpaidCourse && (
-              <button
-                type="button"
-                disabled={payLoading}
-                onClick={() =>
-                  void handlePayOnline(COURSE_FEE_LKR, `Course Fee — ${student.name}`)
-                }
-                className="rounded-lg bg-[#0B3D6B] px-4 py-2 font-jakarta text-sm font-bold text-white hover:bg-[#0a3560] disabled:opacity-60"
-              >
-                Pay Course Fee ({formatLKR(COURSE_FEE_LKR)})
-              </button>
-            )}
-          </div>
+        <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:border-gray-600 dark:bg-gray-800">
+          <h4 className="font-jakarta text-base font-bold text-[#0B3D6B] dark:text-white">
+            Pay Online
+          </h4>
+          {stripeConfigured ? (
+            <>
+              <p className="mt-1 text-sm text-[#5A6A7A]">
+                Secure card payment in LKR via Stripe.
+              </p>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                {unpaidRegistration && (
+                  <button
+                    type="button"
+                    disabled={payLoading}
+                    onClick={() =>
+                      void handlePayOnline(
+                        REGISTRATION_FEE_LKR,
+                        `Registration Fee — ${student.name}`,
+                      )
+                    }
+                    className="min-h-11 w-full rounded-lg bg-[#E8A020] px-4 py-2.5 font-jakarta text-sm font-bold text-[#0B3D6B] hover:bg-[#F5B942] disabled:opacity-60 sm:w-auto"
+                  >
+                    {payLoading ? (
+                      <span className="ti ti-loader-2 inline-block animate-spin" aria-hidden="true" />
+                    ) : (
+                      `Pay Registration (${formatLKR(REGISTRATION_FEE_LKR)})`
+                    )}
+                  </button>
+                )}
+                {unpaidCourse && (
+                  <button
+                    type="button"
+                    disabled={payLoading}
+                    onClick={() =>
+                      void handlePayOnline(COURSE_FEE_LKR, `Course Fee — ${student.name}`)
+                    }
+                    className="min-h-11 w-full rounded-lg bg-[#0B3D6B] px-4 py-2.5 font-jakarta text-sm font-bold text-white hover:bg-[#0a3560] disabled:opacity-60 sm:w-auto"
+                  >
+                    {payLoading ? (
+                      <span className="ti ti-loader-2 inline-block animate-spin" aria-hidden="true" />
+                    ) : (
+                      `Pay Course Fee (${formatLKR(COURSE_FEE_LKR)})`
+                    )}
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-gray-500">Online payments not configured</p>
+          )}
         </div>
       )}
 
@@ -199,13 +216,48 @@ export default function ParentFeePanel({ payments, loading }: ParentFeePanelProp
           Payment history
         </h4>
         {loading ? (
-          <p className="px-4 py-8 text-center text-sm text-[#5A6A7A]">Loading…</p>
+          <div className="animate-pulse space-y-3 p-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-16 rounded-lg bg-gray-200 dark:bg-gray-700" />
+            ))}
+          </div>
         ) : payments.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-[#5A6A7A]">
-            No payments recorded yet.
-          </p>
+          <div className="py-12 text-center">
+            <span className="ti ti-receipt text-4xl text-gray-300" aria-hidden="true" />
+            <p className="mt-3 font-semibold text-[#0B3D6B]">No payments yet</p>
+            <p className="mt-1 text-sm text-gray-500">Payment history will appear here.</p>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="space-y-3 p-4 md:hidden">
+            {payments.map((p) => (
+              <div
+                key={p.id}
+                className="rounded-lg border border-[#DDE3EC] bg-[#F5F7FB] p-4"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-base font-semibold text-[#0B3D6B]">{p.receiptNumber}</p>
+                    <p className="mt-1 text-sm text-[#5A6A7A]">
+                      {formatPaymentDate(p.paymentDate)} · {getTypeLabel(p.type)}
+                    </p>
+                  </div>
+                  <span className="text-lg font-bold text-[#0D1B2A]">{formatLKR(p.amount)}</span>
+                </div>
+                <div className="mt-3 flex items-center justify-between border-t border-[#DDE3EC] pt-3">
+                  <span className="text-sm capitalize text-[#5A6A7A]">{p.status}</span>
+                  <button
+                    type="button"
+                    onClick={() => setReceiptPayment(p)}
+                    className="min-h-11 rounded-lg bg-[#0B3D6B] px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    View receipt
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead>
                 <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB]">
@@ -249,6 +301,7 @@ export default function ParentFeePanel({ payments, loading }: ParentFeePanelProp
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

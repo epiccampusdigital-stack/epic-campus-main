@@ -19,6 +19,7 @@ import {
 import { generateTempPassword, sendCredentialsEmail } from '@/lib/students/helpers'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { logAuditEvent } from '@/lib/audit/helpers'
+import toast from 'react-hot-toast'
 import { LOCATION_LABELS } from '@/lib/students/helpers'
 import type { SalaryType, StaffMember, StaffRole, StaffStatus, StudentLocation } from '@/types'
 
@@ -259,10 +260,12 @@ export default function StaffForm({
         details: `${isEdit ? 'Updated' : 'Added'} staff member ${form.displayName.trim()}`,
       })
 
+      toast.success(isEdit ? 'Staff updated' : 'Staff saved')
       onSaved()
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save staff member')
+      toast.error('Something went wrong. Please try again.')
     } finally {
       setSaving(false)
     }
