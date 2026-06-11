@@ -17,6 +17,7 @@ import {
   getMonthPickerOptions,
 } from '@/lib/dashboard/helpers'
 import TeacherDashboard from '@/components/dashboard/TeacherDashboard'
+import StudentRiskAlertsWidget from '@/components/risk/StudentRiskAlertsWidget'
 import LocationFilterSelect from '@/components/ui/LocationFilterSelect'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { fetchUnreadPartnerNotifications } from '@/lib/partners/helpers'
@@ -398,6 +399,10 @@ export default function DashboardPage() {
               </div>
             ))}
       </section>
+
+      {(user?.role === 'admin' || user?.role === 'owner') && (
+        <StudentRiskAlertsWidget />
+      )}
 
       <section className="overflow-hidden rounded-[12px] border border-white/90 dark:border-white/[0.08] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl transition-all duration-300">
           <div className="flex flex-col gap-3 border-b border-white/80 dark:border-white/[0.06] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
