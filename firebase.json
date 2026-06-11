@@ -7,7 +7,15 @@
       "**/node_modules/**"
     ],
     "frameworksBackend": {
-      "region": "us-central1"
+      "region": "us-central1",
+      "timeoutSeconds": 120,
+      "minInstances": 0,
+      "maxInstances": 10,
+      "memory": "1GiB"
     }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   }
 }
