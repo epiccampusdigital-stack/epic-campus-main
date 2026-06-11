@@ -1,8 +1,22 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+const PUBLIC_PREFIXES = ['/verify']
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  )
+}
+
 export function middleware(request: NextRequest) {
   const host = request.headers.get('host') || ''
+  const { pathname } = request.nextUrl
+
+  // Public routes — no auth gate (e.g. QR verify scan)
+  if (isPublicPath(pathname)) {
+    return NextResponse.next()
+  }
 
   // Redirect non-www to www
   if (host === 'epiccampus.live') {

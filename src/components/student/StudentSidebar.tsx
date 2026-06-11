@@ -15,6 +15,7 @@ import { isNavActive, navLinkClasses } from '@/lib/utils/nav'
 
 const BASE_NAV_ITEMS = [
   { label: 'My Dashboard', href: '/my-dashboard', icon: 'ti-layout-dashboard' },
+  { label: 'My ID Card', href: '/my-id', icon: 'ti-id-badge-2' },
   { label: 'My Payments', href: '/my-payments', icon: 'ti-credit-card' },
   { label: 'Pay Online', href: '/student/payments', icon: 'ti-wallet' },
   { label: 'My Results', href: '/my-results', icon: 'ti-certificate' },

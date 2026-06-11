@@ -21,6 +21,9 @@ import { parseAttendance } from '@/lib/attendance/helpers'
 import StudentAgentSection from '@/components/students/StudentAgentSection'
 import ParentAccessSection from '@/components/students/ParentAccessSection'
 import StudentForm from '@/components/students/StudentForm'
+import StudentIDCard from '@/components/students/StudentIDCard'
+import { studentToIdCardProps } from '@/lib/students/idCard'
+import { downloadIDCard } from '@/lib/utils/downloadIDCard'
 import {
   parseStudent,
   STATUS_STYLES,
@@ -238,6 +241,8 @@ export default function StudentProfilePage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<TabId>('overview')
   const [formOpen, setFormOpen] = useState(false)
+  const [idCardOpen, setIdCardOpen] = useState(false)
+  const [idDownloading, setIdDownloading] = useState(false)
 
   // Fee schedule state
   const [feeSchedule, setFeeSchedule] = useState<{
@@ -404,7 +409,15 @@ export default function StudentProfilePage() {
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setIdCardOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-[#DDE3EC] px-4 py-2 font-jakarta text-sm font-semibold text-[#0B3D6B] hover:bg-[#F5F7FB]"
+            >
+              <span className="ti ti-id-badge-2" aria-hidden="true" />
+              ID Card
+            </button>
             <button
               type="button"
               onClick={() => setFormOpen(true)}
@@ -745,6 +758,62 @@ export default function StudentProfilePage() {
           </div>
         )}
       </div>
+
+      {idCardOpen && student && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-[#0D1B2A]/40 backdrop-blur-sm"
+            onClick={() => setIdCardOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="student-id-modal-title"
+              className="w-full max-w-md rounded-xl border border-[#DDE3EC] bg-white p-6 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2
+                id="student-id-modal-title"
+                className="mb-4 text-center font-jakarta text-lg font-bold text-[#0D1B2A]"
+              >
+                Student ID Card
+              </h2>
+              <div className="flex justify-center overflow-x-auto rounded-xl bg-[#F5F7FB] p-4">
+                <div id="admin-student-id-card">
+                  <StudentIDCard {...studentToIdCardProps(student)} />
+                </div>
+              </div>
+              <div className="mt-5 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIdCardOpen(false)}
+                  className="flex min-h-[44px] flex-1 items-center justify-center rounded-lg border border-[#DDE3EC] text-sm font-semibold text-[#5A6A7A]"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  disabled={idDownloading}
+                  onClick={async () => {
+                    setIdDownloading(true)
+                    try {
+                      await downloadIDCard('admin-student-id-card', student.name)
+                    } finally {
+                      setIdDownloading(false)
+                    }
+                  }}
+                  className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg bg-[#E8A020] text-sm font-bold text-[#0B3D6B] hover:bg-[#F5B942] disabled:opacity-60"
+                >
+                  <span className="ti ti-download" aria-hidden="true" />
+                  {idDownloading ? 'Preparing…' : 'Download PNG'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       <StudentForm
         open={formOpen}

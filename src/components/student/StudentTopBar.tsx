@@ -7,6 +7,7 @@ import DarkModeToggle from '@/components/ui/DarkModeToggle'
 
 const PAGE_TITLES: Record<string, string> = {
   '/my-dashboard': 'My Dashboard',
+  '/my-id': 'My ID Card',
   '/my-payments': 'My Payments',
   '/my-results': 'My Results',
   '/my-materials': 'Study Materials',
