@@ -8,6 +8,7 @@ export type Role =
   | 'student'
   | 'company'
   | 'parent'
+  | 'kitchen'
 
 export type CourseId = 'japan-ssw' | 'korea-d2d4' | 'china' | 'ielts' | 'nvq-it' | 'nvq-hospitality' | 'nvq-caregiving' | 'nvq-construction' | 'nvq-logistics'
 

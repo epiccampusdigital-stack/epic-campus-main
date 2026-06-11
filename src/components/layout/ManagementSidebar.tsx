@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
+import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore'
 import { signOut } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase/client'
 import { ROLE_LABELS } from '@/lib/constants/roles'
@@ -36,6 +36,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Agent Reports', href: '/agent-reports', icon: 'ti-chart-dots-2', roles: ['admin', 'owner', 'accountant'] },
   { label: 'Partners', href: '/partner-companies', icon: 'ti-building', roles: ['admin', 'owner'] },
   { label: 'Analytics', href: '/admin/analytics', icon: 'ti-chart-dots', roles: ['admin', 'owner'] },
+  { label: 'Kitchen Orders', href: '/admin/kitchen-orders', icon: 'ti-soup', roles: ['admin', 'owner'] },
+  { label: 'Kitchen Finance', href: '/accountant/dashboard', icon: 'ti-coin', roles: ['accountant', 'admin', 'owner'] },
   { label: 'Visa Tracker', href: '/admin/visa', icon: 'ti-plane', roles: ['admin', 'owner', 'reception'] },
   { label: 'Messages', href: '/messages', icon: 'ti-message', roles: ['admin', 'owner', 'reception'] },
   { label: 'Broadcast', href: '/broadcast', icon: 'ti-speakerphone', roles: ['admin', 'owner', 'reception'] },
@@ -51,6 +53,7 @@ export default function ManagementSidebar() {
   const { user, sidebarOpen, setSidebarOpen } = useManagement()
   const [mounted, setMounted] = useState(false)
   const [unreadMessages, setUnreadMessages] = useState(0)
+  const [pendingKitchenOrders, setPendingKitchenOrders] = useState(0)
 
   useEffect(() => setMounted(true), [])
 
@@ -65,6 +68,13 @@ export default function ManagementSidebar() {
     })
     return () => unsub()
   }, [])
+
+  useEffect(() => {
+    if (!user || (user.role !== 'admin' && user.role !== 'owner')) return
+    const q = query(collection(db, 'kitchenOrders'), where('status', '==', 'submitted'))
+    const unsub = onSnapshot(q, (snap) => setPendingKitchenOrders(snap.size))
+    return () => unsub()
+  }, [user])
 
   const visibleItems = NAV_ITEMS.filter(
     (item) => user && item.roles.includes(user.role)
@@ -124,6 +134,11 @@ export default function ManagementSidebar() {
               {item.href === '/messages' && unreadMessages > 0 && (
                 <span className="ml-auto rounded-full bg-[#E8A020] px-2 py-0.5 text-[10px] font-bold text-[#0B3D6B]">
                   {unreadMessages}
+                </span>
+              )}
+              {item.href === '/admin/kitchen-orders' && pendingKitchenOrders > 0 && (
+                <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                  {pendingKitchenOrders}
                 </span>
               )}
             </Link>

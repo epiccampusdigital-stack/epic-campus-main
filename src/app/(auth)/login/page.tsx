@@ -37,6 +37,8 @@ function getRedirectPath(role: string): string {
       return '/company/dashboard'
     case 'parent':
       return '/parent/dashboard'
+    case 'kitchen':
+      return '/kitchen/dashboard'
     default:
       return '/dashboard'
   }

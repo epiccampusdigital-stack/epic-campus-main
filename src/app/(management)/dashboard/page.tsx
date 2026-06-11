@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { collection, getDocs } from 'firebase/firestore'
+import { collection, getDocs, query, where, orderBy } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { formatLKR } from '@/lib/utils/formatCurrency'
 import { parsePayment, getStatusColor } from '@/lib/payments/helpers'
@@ -70,9 +70,18 @@ function isTodayInMonth(monthKey: string): boolean {
   return monthKey === currentMonthKey()
 }
 
+interface KitchenOverview {
+  monthCost: number
+  lowStock: number
+  pendingOrders: number
+  weekWaste: number
+  lastWeekWaste: number
+}
+
 export default function DashboardPage() {
   const { user } = useManagement()
   const [loading, setLoading] = useState(true)
+  const [kitchenOverview, setKitchenOverview] = useState<KitchenOverview | null>(null)
   const [courseFilter, setCourseFilter] = useState<CourseId | ''>('')
   const [locationFilter, setLocationFilter] = useState<StudentLocation | ''>('')
   const [monthFilter, setMonthFilter] = useState(currentMonthKey())
@@ -123,6 +132,53 @@ export default function DashboardPage() {
     }
     loadData()
   }, [loadData, user?.role])
+
+  useEffect(() => {
+    if (!user || (user.role !== 'admin' && user.role !== 'owner')) return
+    async function loadKitchen() {
+      try {
+        const today = new Date()
+        const monthStr = today.toISOString().slice(0, 7)
+        const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7)
+        const lastWeekAgo = new Date(today); lastWeekAgo.setDate(today.getDate() - 14)
+        const weekAgoStr = weekAgo.toISOString().slice(0, 10)
+        const lastWeekAgoStr = lastWeekAgo.toISOString().slice(0, 10)
+
+        const [mealSnap, wasteSnap, invSnap, orderSnap] = await Promise.all([
+          getDocs(collection(db, 'mealLogs')),
+          getDocs(collection(db, 'wasteLog')),
+          getDocs(query(collection(db, 'inventory'), where('isActive', '==', true))),
+          getDocs(query(collection(db, 'kitchenOrders'), where('status', '==', 'submitted'))),
+        ])
+
+        const monthCost = mealSnap.docs
+          .filter((d) => d.data().date?.startsWith(monthStr))
+          .reduce((s, d) => s + (Number(d.data().estimatedCost) || 0), 0)
+
+        const weekWaste = wasteSnap.docs
+          .filter((d) => d.data().date >= weekAgoStr)
+          .reduce((s, d) => s + (Number(d.data().estimatedLoss) || 0), 0)
+
+        const lastWeekWaste = wasteSnap.docs
+          .filter((d) => d.data().date >= lastWeekAgoStr && d.data().date < weekAgoStr)
+          .reduce((s, d) => s + (Number(d.data().estimatedLoss) || 0), 0)
+
+        const lowStock = invSnap.docs.filter((d) => {
+          const data = d.data()
+          return Number(data.currentStock) <= Number(data.minStockLevel)
+        }).length
+
+        setKitchenOverview({
+          monthCost,
+          lowStock,
+          pendingOrders: orderSnap.size,
+          weekWaste,
+          lastWeekWaste,
+        })
+      } catch {}
+    }
+    loadKitchen()
+  }, [user?.role])
 
   useEffect(() => {
     if (
@@ -548,6 +604,48 @@ export default function DashboardPage() {
           </div>
         </div>
       </section>
+
+      {/* Kitchen Overview Widget — admin/owner only */}
+      {(user?.role === 'admin' || user?.role === 'owner') && kitchenOverview && (
+        <section>
+          <div className="rounded-xl border border-white/90 bg-white/65 p-5 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05]">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="ti ti-soup text-[#0B3D6B] dark:text-[#E8A020]" />
+                <h2 className="font-bold text-[#0D1B2A] dark:text-white">Kitchen Overview</h2>
+                <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-medium text-orange-700">Ahangama</span>
+              </div>
+              <div className="flex gap-2">
+                <Link href="/admin/kitchen-orders" className="rounded-lg bg-[#0B3D6B] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0a3460]">
+                  Review Orders {kitchenOverview.pendingOrders > 0 && `(${kitchenOverview.pendingOrders})`}
+                </Link>
+                <Link href="/kitchen/reports" className="rounded-lg border border-[#DDE3EC] px-3 py-1.5 text-xs font-medium text-[#0B3D6B] hover:bg-[#F5F7FB] dark:border-white/[0.08] dark:text-white/70">
+                  Kitchen Reports
+                </Link>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {[
+                { label: 'Month Cost', value: formatLKR(kitchenOverview.monthCost), color: 'text-[#0B3D6B] dark:text-[#E8A020]' },
+                { label: 'Low Stock Items', value: String(kitchenOverview.lowStock), color: kitchenOverview.lowStock > 0 ? 'text-amber-600' : 'text-emerald-600' },
+                { label: 'Pending Orders', value: String(kitchenOverview.pendingOrders), color: kitchenOverview.pendingOrders > 0 ? 'text-blue-600' : 'text-[#0B3D6B] dark:text-[#E8A020]' },
+                {
+                  label: 'Waste Change',
+                  value: kitchenOverview.lastWeekWaste > 0
+                    ? `${((kitchenOverview.weekWaste - kitchenOverview.lastWeekWaste) / kitchenOverview.lastWeekWaste * 100).toFixed(0)}%`
+                    : '—',
+                  color: kitchenOverview.weekWaste > kitchenOverview.lastWeekWaste ? 'text-red-600' : 'text-emerald-600',
+                },
+              ].map((s) => (
+                <div key={s.label} className="rounded-[10px] border border-[#DDE3EC] bg-white p-3 dark:border-white/[0.07] dark:bg-white/[0.04]">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-gray-400 dark:text-white/40">{s.label}</p>
+                  <p className={`mt-1.5 text-base font-bold ${s.color}`}>{s.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       <section>
         <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:bg-gray-800">

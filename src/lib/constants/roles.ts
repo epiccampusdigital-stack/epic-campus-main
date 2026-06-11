@@ -8,11 +8,13 @@ export const ROLE_LABELS: Record<string, string> = {
   student: 'Student',
   company: 'Partner Company',
   parent: 'Parent / Guardian',
+  kitchen: 'Kitchen Staff',
 }
 
 export const COMPANY_ROLES = ['company']
 
 export const MANAGEMENT_ROLES = ['admin', 'owner', 'reception', 'accountant', 'teacher']
+export const KITCHEN_ROLES = ['kitchen']
 export const EXAM_ROLES = ['admin', 'teacher', 'examCoordinator']
 export const EXAM_PORTAL_ROLES = ['student', 'examCoordinator', 'admin', 'teacher', 'owner']
 export const EXAM_MANAGEMENT_ROLES = ['admin', 'owner', 'examCoordinator', 'teacher']
