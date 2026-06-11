@@ -7,6 +7,7 @@ import {
   getCourseLabel,
   getDaysInStage,
   getPipelineStages,
+  getRecommendedPathLabel,
   getSourceLabel,
 } from '@/lib/crm/helpers'
 import type { Lead, LeadStatus } from '@/types'
@@ -112,9 +113,20 @@ export default function LeadKanban({
                   >
                     <p className="font-jakarta text-sm font-semibold text-[#0D1B2A]">
                       {lead.name}
+                      {lead.source === 'destination-picker' && (
+                        <span className="ml-1.5 rounded-full bg-[#E8A020]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#0B3D6B]">
+                          Quiz
+                        </span>
+                      )}
                     </p>
                     <p className="mt-1 truncate font-inter text-xs text-[#5A6A7A]">
                       {getCourseLabel(lead.courseId)}
+                      {lead.recommendedPath && (
+                        <span className="text-[#E8A020]">
+                          {' '}
+                          · {getRecommendedPathLabel(lead.recommendedPath)}
+                        </span>
+                      )}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1">
                       <span className="rounded bg-[#F5F7FB] px-1.5 py-0.5 text-[10px] text-[#5A6A7A]">

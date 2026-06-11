@@ -72,6 +72,11 @@ export function parseLead(id: string, data: Record<string, unknown>): Lead {
     branchId: String(data.branchId ?? 'galle-main'),
     createdAt: created?.toISOString() ?? new Date().toISOString(),
     createdBy: String(data.createdBy ?? ''),
+    recommendedPath: data.recommendedPath ? String(data.recommendedPath) : undefined,
+    quizAnswers:
+      data.quizAnswers && typeof data.quizAnswers === 'object'
+        ? (data.quizAnswers as Record<string, string>)
+        : undefined,
   }
 }
 
@@ -123,9 +128,26 @@ export function getSourceLabel(source: LeadSource): string {
     referral: 'Referral',
     agent: 'Agent',
     website: 'Website',
+    'destination-picker': 'Destination Quiz',
     other: 'Other',
   }
-  return labels[source] ?? source
+  return labels[source as LeadSource] ?? source
+}
+
+export function getRecommendedPathLabel(path?: string): string {
+  if (!path) return '—'
+  switch (path) {
+    case 'japan-ssw':
+      return 'Japan SSW'
+    case 'korea':
+      return 'Korea'
+    case 'china':
+      return 'China'
+    case 'ielts':
+      return 'IELTS'
+    default:
+      return path
+  }
 }
 
 export const LEAD_SOURCES: LeadSource[] = [
@@ -137,6 +159,7 @@ export const LEAD_SOURCES: LeadSource[] = [
   'referral',
   'agent',
   'website',
+  'destination-picker',
   'other',
 ]
 

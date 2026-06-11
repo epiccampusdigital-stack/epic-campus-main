@@ -310,6 +310,8 @@ export interface Lead {
   branchId: string
   createdAt: string
   createdBy: string
+  recommendedPath?: string
+  quizAnswers?: Record<string, string>
 }
 
 export type LeadSource =
@@ -321,6 +323,7 @@ export type LeadSource =
   | 'referral'
   | 'agent'
   | 'website'
+  | 'destination-picker'
   | 'other'
 
 export type LeadStatus =

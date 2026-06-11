@@ -3,6 +3,7 @@
 import {
   formatContactDate,
   getCourseLabel,
+  getRecommendedPathLabel,
   getSourceLabel,
   getStatusColor,
   getStatusLabel,
@@ -98,14 +99,28 @@ export default function LeadTable({
                   className="transition-colors hover:bg-[#F5F7FB]/60"
                 >
                   <td className="px-4 py-3 font-medium text-[#0D1B2A]">
-                    {lead.name}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {lead.name}
+                      {lead.source === 'destination-picker' && (
+                        <span className="rounded-full border border-[#E8A020]/40 bg-[#E8A020]/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0B3D6B]">
+                          Quiz Lead
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-[#5A6A7A]">{lead.phone}</td>
                   <td className="max-w-[160px] truncate px-4 py-3 text-[#5A6A7A]">
                     {lead.email || '—'}
                   </td>
                   <td className="max-w-[140px] truncate px-4 py-3 text-[#5A6A7A]">
-                    {getCourseLabel(lead.courseId)}
+                    <div>
+                      {getCourseLabel(lead.courseId)}
+                      {lead.source === 'destination-picker' && lead.recommendedPath && (
+                        <p className="mt-0.5 text-[10px] font-semibold text-[#E8A020]">
+                          → {getRecommendedPathLabel(lead.recommendedPath)}
+                        </p>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-[#5A6A7A]">
                     {getSourceLabel(lead.source)}

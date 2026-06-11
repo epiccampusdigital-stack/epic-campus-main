@@ -2,6 +2,7 @@ import Link from 'next/link'
 import PublicNav from '@/components/public/PublicNav'
 import PublicFooter from '@/components/public/PublicFooter'
 import OnlineTradingCard from '@/components/public/OnlineTradingCard'
+import DestinationPicker from '@/components/public/DestinationPicker'
 
 function SectionTitle({
   title,
@@ -278,6 +279,19 @@ export default function HomePage() {
             <OnlineTradingCard />
           </div>
         </div>
+      </section>
+
+      {/* Destination Picker Quiz */}
+      <section className="bg-[#EEF3F8] py-16 px-4">
+        <div className="mx-auto mb-10 max-w-2xl text-center">
+          <h2 className="mb-3 font-jakarta text-3xl font-bold text-[#0B3D6B]">
+            Not sure which path is right for you?
+          </h2>
+          <p className="text-gray-600">
+            Answer 4 quick questions and we&apos;ll recommend the perfect program.
+          </p>
+        </div>
+        <DestinationPicker />
       </section>
 
       {/* Process */}
