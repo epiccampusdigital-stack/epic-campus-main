@@ -75,20 +75,23 @@ async function completeSignIn(user: User): Promise<string> {
     throw new Error('Could not reach session API. Check your connection.')
   }
 
-  if (!res.ok) {
-    let message = `Session creation failed (${res.status})`
-    try {
-      const data = (await res.json()) as { error?: string }
-      if (data.error) message = data.error
-    } catch {
-      // response body may not be JSON
+    if (!res.ok) {
+      let message = `Session creation failed (${res.status})`
+      try {
+        const data = (await res.json()) as { error?: string }
+        if (data.error) message = data.error
+      } catch {
+        // response body may not be JSON
+      }
+      console.error('[login] Session API error:', message)
+      throw new Error(message)
     }
-    console.error('[login] Session API error:', message)
-    throw new Error(message)
-  }
 
-  try {
-    const userDoc = await getDoc(doc(db, 'users', user.uid))
+    // Refresh ID token so Firestore security rules receive updated custom claims
+    await user.getIdToken(true)
+
+    try {
+      const userDoc = await getDoc(doc(db, 'users', user.uid))
     const role: Role | string = userDoc.exists()
       ? (userDoc.data().role as Role)
       : 'student'

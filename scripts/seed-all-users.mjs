@@ -40,6 +40,12 @@ const USERS = [
     displayName: 'Senal Yathnake',
     role: 'student',
   },
+  {
+    email: 'kitchen@epiccampus.lk',
+    password: 'Kitchen@2026',
+    displayName: 'Kitchen Staff',
+    role: 'kitchen',
+  },
 ]
 
 for (const user of USERS) {
@@ -76,4 +82,5 @@ console.log('Reception:  reception@epiccampus.lk / EpicRecept2026!')
 console.log('Teacher:    teacher@epiccampus.lk / EpicTeach2026!')
 console.log('Accountant: accounts@epiccampus.lk / EpicAcct2026!')
 console.log('Student:    student@epiccampus.lk / EpicStudent2026!')
+console.log('Kitchen:    kitchen@epiccampus.lk / Kitchen@2026')
 process.exit(0)

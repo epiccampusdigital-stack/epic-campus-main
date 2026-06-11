@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { adminAuth } from '@/lib/firebase/admin'
+import { adminAuth, adminDb } from '@/lib/firebase/admin'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,7 +10,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No token provided' }, { status: 400 })
     }
 
-    await adminAuth.verifyIdToken(token)
+    const decoded = await adminAuth.verifyIdToken(token)
+
+    const userSnap = await adminDb.collection('users').doc(decoded.uid).get()
+    const role = userSnap.data()?.role
+    if (role && typeof role === 'string') {
+      await adminAuth.setCustomUserClaims(decoded.uid, { role })
+    }
 
     const response = NextResponse.json({ success: true })
     response.cookies.set('epic-session', token, {

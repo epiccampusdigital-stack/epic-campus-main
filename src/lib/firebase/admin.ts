@@ -8,9 +8,19 @@ export const dynamic = 'force-dynamic'
 function buildAdminApp(): App {
   if (getApps().length > 0) return getApps()[0]
 
-  const projectId = process.env.FB_PROJECT_ID
-  const clientEmail = process.env.FB_CLIENT_EMAIL
-  const privateKey = process.env.FB_PRIVATE_KEY
+  const projectId =
+    process.env.FB_PROJECT_ID ??
+    process.env.FIREBASE_ADMIN_PROJECT_ID ??
+    process.env.FIREBASE_PROJECT_ID
+  const clientEmail =
+    process.env.FB_CLIENT_EMAIL ??
+    process.env.FIREBASE_ADMIN_CLIENT_EMAIL ??
+    process.env.FIREBASE_CLIENT_EMAIL
+  const privateKey = (
+    process.env.FB_PRIVATE_KEY ??
+    process.env.FIREBASE_ADMIN_PRIVATE_KEY ??
+    process.env.FIREBASE_PRIVATE_KEY
+  )
     ?.replace(/\\n/g, '\n')
     ?.replace(/^["']|["']$/g, '')
 

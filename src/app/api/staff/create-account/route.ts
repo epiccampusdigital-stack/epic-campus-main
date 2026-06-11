@@ -1,17 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminAuth, adminDb } from '@/lib/firebase/admin'
+import { STAFF_ROLES } from '@/lib/staff/helpers'
 import type { StaffRole } from '@/types'
 
 export const dynamic = 'force-dynamic'
-
-const STAFF_ROLES: StaffRole[] = [
-  'admin',
-  'owner',
-  'reception',
-  'accountant',
-  'teacher',
-  'examCoordinator',
-]
 
 export async function POST(req: NextRequest) {
   try {
@@ -76,6 +68,7 @@ export async function POST(req: NextRequest) {
     }
 
     await adminDb.collection('users').doc(userRecord.uid).set(userPayload)
+    await adminAuth.setCustomUserClaims(userRecord.uid, { role })
 
     if (pendingDocId && pendingDocId !== userRecord.uid) {
       await adminDb.collection('users').doc(pendingDocId).delete().catch(() => {})

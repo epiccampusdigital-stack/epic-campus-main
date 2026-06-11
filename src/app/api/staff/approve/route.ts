@@ -54,6 +54,9 @@ export async function POST(req: NextRequest) {
     }
 
     await adminDb.collection('users').doc(userRecord.uid).set(payload)
+    if (data.role && typeof data.role === 'string') {
+      await adminAuth.setCustomUserClaims(userRecord.uid, { role: data.role })
+    }
 
     if (staffId !== userRecord.uid) {
       await staffRef.delete()
