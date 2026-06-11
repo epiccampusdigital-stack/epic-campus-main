@@ -18,9 +18,10 @@ interface ChatWindowProps {
   conversation: Conversation | null
   messages: ChatMessage[]
   user: EpicUser
+  onAiFollowUp?: () => void
 }
 
-export default function ChatWindow({ conversation, messages, user }: ChatWindowProps) {
+export default function ChatWindow({ conversation, messages, user, onAiFollowUp }: ChatWindowProps) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [whatsappEnabled, setWhatsappEnabled] = useState(false)
@@ -173,6 +174,15 @@ export default function ChatWindow({ conversation, messages, user }: ChatWindowP
           />
           Send via WhatsApp
         </label>
+        {onAiFollowUp && (
+          <button
+            type="button"
+            onClick={onAiFollowUp}
+            className="rounded-lg border border-[#E8A020] px-2.5 py-1 text-[10px] font-bold text-[#0B3D6B] hover:bg-[#E8A020]/10"
+          >
+            AI Follow-up
+          </button>
+        )}
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto bg-[#F5F7FB] p-4 dark:bg-gray-900">

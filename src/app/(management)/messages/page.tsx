@@ -1,9 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { doc, getDoc } from 'firebase/firestore'
 import { useManagement } from '@/components/layout/ManagementContext'
 import ConversationList from '@/components/messages/ConversationList'
 import ChatWindow from '@/components/messages/ChatWindow'
+import WhatsAppFollowUpModal, {
+  type WhatsAppFollowUpStudent,
+} from '@/components/students/WhatsAppFollowUpModal'
+import { db } from '@/lib/firebase/client'
+import { COURSE_MAP } from '@/lib/constants/courses'
+import { parseStudent } from '@/lib/students/helpers'
 import {
   markConversationReadByStaff,
   subscribeConversations,
@@ -18,8 +25,30 @@ export default function MessagesPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(true)
+  const [followUpStudent, setFollowUpStudent] = useState<WhatsAppFollowUpStudent | null>(null)
 
   const selected = conversations.find((c) => c.id === selectedId) ?? null
+
+  const openAiFollowUp = useCallback(async (conv: Conversation) => {
+    let course = ''
+    try {
+      const snap = await getDoc(doc(db, 'students', conv.studentId))
+      if (snap.exists()) {
+        const s = parseStudent(snap.id, snap.data() as Record<string, unknown>)
+        course = COURSE_MAP[s.courseId]?.label ?? s.courseId
+      }
+    } catch {
+      // course optional for draft
+    }
+    setFollowUpStudent({
+      id: conv.studentId,
+      name: conv.studentName,
+      phone: conv.studentPhone,
+      course,
+      riskFlags: [],
+      recommendation: '',
+    })
+  }, [])
 
   useEffect(() => {
     const unsub = subscribeConversations(
@@ -63,11 +92,25 @@ export default function MessagesPage() {
           onSelect={setSelectedId}
           onCreated={setSelectedId}
           user={user}
+          onAiFollowUp={(conv) => void openAiFollowUp(conv)}
         />
         <div className="hidden flex-1 flex-col md:flex">
-          <ChatWindow conversation={selected} messages={messages} user={user} />
+          <ChatWindow
+            conversation={selected}
+            messages={messages}
+            user={user}
+            onAiFollowUp={selected ? () => void openAiFollowUp(selected) : undefined}
+          />
         </div>
       </div>
+
+      <WhatsAppFollowUpModal
+        student={followUpStudent}
+        staffName={user.displayName || user.email || 'Epic Campus'}
+        open={!!followUpStudent}
+        onClose={() => setFollowUpStudent(null)}
+        defaultMessageType="general"
+      />
     </div>
   )
 }

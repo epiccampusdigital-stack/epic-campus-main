@@ -15,6 +15,7 @@ interface ConversationListProps {
   onSelect: (id: string) => void
   onCreated: (id: string) => void
   user: EpicUser
+  onAiFollowUp?: (conversation: Conversation) => void
 }
 
 export default function ConversationList({
@@ -24,6 +25,7 @@ export default function ConversationList({
   onSelect,
   onCreated,
   user,
+  onAiFollowUp,
 }: ConversationListProps) {
   const [search, setSearch] = useState('')
   const [newOpen, setNewOpen] = useState(false)
@@ -144,29 +146,43 @@ export default function ConversationList({
         {filtered.map((c) => {
           const active = c.id === selectedId
           return (
-            <button
+            <div
               key={c.id}
-              type="button"
-              onClick={() => onSelect(c.id)}
-              className={`w-full border-b border-[#DDE3EC]/60 px-4 py-3 text-left hover:bg-[#F5F7FB] dark:hover:bg-gray-700/40 ${
+              className={`flex items-stretch border-b border-[#DDE3EC]/60 dark:border-gray-600 ${
                 active ? 'bg-[#F5F7FB] dark:bg-gray-700/60' : ''
               }`}
             >
-              <div className="flex items-start justify-between gap-2">
-                <p className="truncate font-medium text-[#0D1B2A] dark:text-white">
-                  {c.studentName}
+              <button
+                type="button"
+                onClick={() => onSelect(c.id)}
+                className="min-w-0 flex-1 px-4 py-3 text-left hover:bg-[#F5F7FB] dark:hover:bg-gray-700/40"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="truncate font-medium text-[#0D1B2A] dark:text-white">
+                    {c.studentName}
+                  </p>
+                  {c.unreadCount > 0 && (
+                    <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#E8A020] px-1.5 text-xs font-bold text-[#0B3D6B]">
+                      {c.unreadCount}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-0.5 truncate text-xs text-[#5A6A7A]">
+                  {c.lastMessage || 'No messages yet'}
                 </p>
-                {c.unreadCount > 0 && (
-                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#E8A020] px-1.5 text-xs font-bold text-[#0B3D6B]">
-                    {c.unreadCount}
-                  </span>
-                )}
-              </div>
-              <p className="mt-0.5 truncate text-xs text-[#5A6A7A]">
-                {c.lastMessage || 'No messages yet'}
-              </p>
-              <p className="mt-1 text-xs text-gray-400">{formatMessageTime(c.lastMessageAt)}</p>
-            </button>
+                <p className="mt-1 text-xs text-gray-400">{formatMessageTime(c.lastMessageAt)}</p>
+              </button>
+              {onAiFollowUp && (
+                <button
+                  type="button"
+                  title="AI Follow-up"
+                  onClick={() => onAiFollowUp(c)}
+                  className="shrink-0 self-center px-2 py-3 text-[10px] font-semibold text-[#0B3D6B] hover:text-[#E8A020]"
+                >
+                  AI Follow-up
+                </button>
+              )}
+            </div>
           )
         })}
       </div>

@@ -16,10 +16,12 @@ import {
 } from 'recharts'
 import { COURSES } from '@/lib/constants/courses'
 import { fetchRiskCache, riskCacheLastUpdated, runRiskAnalysis } from '@/lib/ai/riskCache'
+import WhatsAppFollowUpModal, {
+  type WhatsAppFollowUpStudent,
+} from '@/components/students/WhatsAppFollowUpModal'
 import {
   getRiskBadgeClasses,
   getRiskLabel,
-  whatsappContactUrl,
   type RiskLevel,
   type StudentRiskProfile,
 } from '@/lib/ai/studentRisk'
@@ -111,6 +113,7 @@ export default function StudentRiskPage() {
   const [riskFilter, setRiskFilter] = useState<RiskLevel | ''>('')
   const [courseFilter, setCourseFilter] = useState<CourseId | ''>('')
   const [locationFilter, setLocationFilter] = useState<StudentLocation | ''>('')
+  const [followUpStudent, setFollowUpStudent] = useState<WhatsAppFollowUpStudent | null>(null)
 
   useEffect(() => {
     if (authLoading) return
@@ -428,18 +431,22 @@ export default function StudentRiskPage() {
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
                           {p.studentMobile ? (
-                            <a
-                              href={whatsappContactUrl(
-                                p.studentMobile,
-                                p.studentName,
-                                p.flags[0],
-                              )}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFollowUpStudent({
+                                  id: p.studentId,
+                                  name: p.studentName,
+                                  phone: p.studentMobile!,
+                                  course: p.course,
+                                  riskFlags: p.flags,
+                                  recommendation: p.recommendation,
+                                })
+                              }
                               className="inline-flex min-h-11 items-center rounded-lg bg-[#25D366] px-3 py-2 text-xs font-bold text-white"
                             >
                               Contact
-                            </a>
+                            </button>
                           ) : null}
                           <Link
                             href={`/students/${p.studentId}`}
@@ -457,6 +464,13 @@ export default function StudentRiskPage() {
           </div>
         )}
       </div>
+
+      <WhatsAppFollowUpModal
+        student={followUpStudent}
+        staffName={user?.displayName || user?.email || 'Epic Campus'}
+        open={!!followUpStudent}
+        onClose={() => setFollowUpStudent(null)}
+      />
     </div>
   )
 }

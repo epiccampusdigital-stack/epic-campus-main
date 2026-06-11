@@ -22,6 +22,8 @@ import StudentAgentSection from '@/components/students/StudentAgentSection'
 import ParentAccessSection from '@/components/students/ParentAccessSection'
 import StudentForm from '@/components/students/StudentForm'
 import StudentIDCard from '@/components/students/StudentIDCard'
+import WhatsAppFollowUpModal from '@/components/students/WhatsAppFollowUpModal'
+import { useManagement } from '@/components/layout/ManagementContext'
 import { studentToIdCardProps } from '@/lib/students/idCard'
 import { downloadIDCard } from '@/lib/utils/downloadIDCard'
 import {
@@ -231,6 +233,7 @@ function GuardianCard({
 export default function StudentProfilePage() {
   const params = useParams()
   const router = useRouter()
+  const { user } = useManagement()
   const studentId = params.id as string
 
   const [student, setStudent] = useState<Student | null>(null)
@@ -243,6 +246,7 @@ export default function StudentProfilePage() {
   const [formOpen, setFormOpen] = useState(false)
   const [idCardOpen, setIdCardOpen] = useState(false)
   const [idDownloading, setIdDownloading] = useState(false)
+  const [followUpOpen, setFollowUpOpen] = useState(false)
 
   // Fee schedule state
   const [feeSchedule, setFeeSchedule] = useState<{
@@ -417,6 +421,15 @@ export default function StudentProfilePage() {
             >
               <span className="ti ti-id-badge-2" aria-hidden="true" />
               ID Card
+            </button>
+            <button
+              type="button"
+              onClick={() => setFollowUpOpen(true)}
+              disabled={!student.mobile}
+              className="inline-flex items-center gap-2 rounded-lg border border-[#25D366] px-4 py-2 font-jakarta text-sm font-semibold text-[#128C7E] hover:bg-[#25D366]/10 disabled:opacity-50"
+            >
+              <span className="ti ti-brand-whatsapp" aria-hidden="true" />
+              Send Follow-up
             </button>
             <button
               type="button"
@@ -820,6 +833,25 @@ export default function StudentProfilePage() {
         onClose={() => setFormOpen(false)}
         student={student}
         onSaved={loadData}
+      />
+
+      <WhatsAppFollowUpModal
+        student={
+          student
+            ? {
+                id: student.id,
+                name: student.name,
+                phone: student.mobile,
+                course: course?.label ?? student.courseId,
+                riskFlags: [],
+                recommendation: '',
+              }
+            : null
+        }
+        staffName={user?.displayName || user?.email || 'Epic Campus'}
+        open={followUpOpen}
+        onClose={() => setFollowUpOpen(false)}
+        defaultMessageType="general"
       />
     </div>
   )
