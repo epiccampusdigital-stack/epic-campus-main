@@ -196,6 +196,7 @@ export default function MealLogPage() {
       })
 
       let inventoryErrors = 0
+      const updatedItems: InventoryItem[] = []
       for (const ing of usedIngredients) {
         const item = inventoryItems.find((i) => i.id === ing.itemId)
         if (!item) continue
@@ -207,6 +208,7 @@ export default function MealLogPage() {
             updatedBy: user?.uid ?? '',
             updatedByName: user?.displayName ?? '',
           })
+          updatedItems.push({ ...item, currentStock: newStock })
           await addDoc(collection(db, 'inventory', ing.itemId, 'history'), {
             action: 'deducted',
             qty: ing.qtyUsed,
@@ -227,6 +229,23 @@ export default function MealLogPage() {
         }
       }
 
+      const lowItems = updatedItems.filter((i) => i.currentStock <= i.minStockLevel)
+      if (lowItems.length > 0) {
+        void fetch('/api/kitchen/low-stock-alert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lowStockItems: lowItems.map((i) => ({
+              itemName: i.itemName,
+              emoji: getFoodEmoji(i.itemName),
+              currentStock: i.currentStock,
+              minStockLevel: i.minStockLevel,
+              unit: i.unit,
+            })),
+          }),
+        }).catch(() => {})
+      }
+
       setShowSlide(false)
       setFDate(today())
       setFType('lunch')
@@ -239,6 +258,8 @@ export default function MealLogPage() {
           `Meal logged, but ${inventoryErrors} inventory update(s) failed — check stock manually`,
           'warning',
         )
+      } else if (lowItems.length > 0) {
+        showToast('Meal logged successfully. Low stock alert sent to admin', 'warning')
       } else {
         showToast('Meal logged successfully')
       }

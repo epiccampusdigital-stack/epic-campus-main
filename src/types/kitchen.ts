@@ -18,6 +18,15 @@ export interface InventoryItem {
   updatedBy: string
   updatedByName: string
   isActive: boolean
+  expiryDate?: string
+  expiryAlertDays?: number
+}
+
+export interface KitchenBudget {
+  id: string
+  monthlyBudget: number
+  updatedAt?: Timestamp
+  updatedBy?: string
 }
 
 export interface IngredientUsed {

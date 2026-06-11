@@ -2,6 +2,7 @@
 
 import FoodEmoji from '@/components/kitchen/FoodEmoji'
 import { findFoodItem, getFoodEmoji } from '@/lib/kitchen/foodImages'
+import { formatExpiryLabel } from '@/lib/kitchen/expiryHelpers'
 import { useKitchenSinhala } from '@/lib/kitchen/useKitchenSinhala'
 import type { InventoryItem } from '@/types/kitchen'
 
@@ -25,6 +26,7 @@ export default function InventoryGridCard({ item, onEdit, onRestock }: Inventory
   const fillPct = Math.min(100, (item.currentStock / maxBar) * 100)
   const isOut = item.currentStock <= 0
   const isLow = item.currentStock <= item.minStockLevel && !isOut
+  const expiryLabel = formatExpiryLabel(item)
 
   return (
     <div
@@ -77,6 +79,13 @@ export default function InventoryGridCard({ item, onEdit, onRestock }: Inventory
         <p className="mt-1 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
           {item.currentStock} {item.unit}
         </p>
+        {expiryLabel && (
+          <span
+            className={`mt-1 block text-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${expiryLabel.className}`}
+          >
+            {expiryLabel.text}
+          </span>
+        )}
       </div>
 
       <button

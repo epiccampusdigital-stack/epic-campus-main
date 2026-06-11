@@ -27,6 +27,8 @@ export interface InventoryFormValues {
   currentStock: string
   minStockLevel: string
   unitCost: string
+  expiryDate: string
+  expiryAlertDays: string
 }
 
 interface InventoryItemSlideOverProps {
@@ -275,6 +277,32 @@ export default function InventoryItemSlideOver({
                 min="0"
                 value={form.unitCost}
                 onChange={(e) => setForm((f) => ({ ...f, unitCost: e.target.value }))}
+                className="w-full min-h-[48px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-3 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
+                Expiry date
+              </label>
+              <input
+                type="date"
+                value={form.expiryDate}
+                onChange={(e) => setForm((f) => ({ ...f, expiryDate: e.target.value }))}
+                className="w-full min-h-[48px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-3 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
+                Alert me X days before
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="30"
+                value={form.expiryAlertDays}
+                onChange={(e) => setForm((f) => ({ ...f, expiryAlertDays: e.target.value }))}
                 className="w-full min-h-[48px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-3 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
               />
             </div>

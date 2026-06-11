@@ -13,6 +13,7 @@ import {
   limit,
   serverTimestamp,
   Timestamp,
+  deleteField,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { useKitchen } from '@/app/kitchen/context'
@@ -112,6 +113,8 @@ const EMPTY_FORM: InventoryFormValues = {
   currentStock: '',
   minStockLevel: '',
   unitCost: '',
+  expiryDate: '',
+  expiryAlertDays: '3',
 }
 
 export default function InventoryPage() {
@@ -268,6 +271,8 @@ export default function InventoryPage() {
       currentStock: String(item.currentStock),
       minStockLevel: String(item.minStockLevel),
       unitCost: String(item.unitCost),
+      expiryDate: item.expiryDate ?? '',
+      expiryAlertDays: String(item.expiryAlertDays ?? 3),
     })
     setSlideMode('edit')
     setMenuOpen(null)
@@ -277,7 +282,7 @@ export default function InventoryPage() {
     if (!values.itemName || !values.currentStock || !values.minStockLevel || !values.unitCost) return
     setSaving(true)
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         itemName: values.itemName,
         category: values.category,
         unit: values.unit,
@@ -288,6 +293,12 @@ export default function InventoryPage() {
         lastUpdated: serverTimestamp(),
         updatedBy: user?.uid ?? '',
         updatedByName: user?.displayName ?? '',
+      }
+      if (values.expiryDate) {
+        payload.expiryDate = values.expiryDate
+        payload.expiryAlertDays = Number(values.expiryAlertDays) || 3
+      } else if (slideMode === 'edit') {
+        payload.expiryDate = deleteField()
       }
       if (slideMode === 'add') {
         await addDoc(collection(db, 'inventory'), payload)

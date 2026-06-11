@@ -187,6 +187,13 @@ service cloud.firestore {
         request.auth.token.role == 'accountant';
     }
 
+    match /kitchenBudget/{doc} {
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['kitchen', 'admin', 'owner', 'accountant'];
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner'];
+    }
+
     match /expenses/{doc} {
       allow read: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'accountant'];
