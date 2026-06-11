@@ -1,5 +1,5 @@
 import './globals.css'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Plus_Jakarta_Sans, Inter } from 'next/font/google'
 import ChatBotRoot from '@/components/public/ChatBotRoot'
 import AppToaster from '@/components/ui/AppToaster'
@@ -30,7 +30,6 @@ export const metadata: Metadata = {
   creator: 'EPIC Campus',
   publisher: 'EPIC Campus',
   metadataBase: new URL('https://www.epiccampus.live'),
-  themeColor: '#0B3D6B',
   openGraph: {
     title: 'EPIC Campus — We Create Your Future',
     description:
@@ -68,6 +67,10 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#0B3D6B',
 }
 
 export default function RootLayout({
