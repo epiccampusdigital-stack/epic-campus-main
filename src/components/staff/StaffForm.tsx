@@ -165,7 +165,7 @@ export default function StaffForm({
         salaryType: form.salaryType,
         baseSalary: form.baseSalary ? Number(form.baseSalary) : 0,
         commissionRate:
-          form.salaryType === 'commission' && form.commissionRate
+          (form.role === 'agent' || form.salaryType === 'commission') && form.commissionRate
             ? Number(form.commissionRate)
             : null,
         status: 'active',
@@ -213,7 +213,7 @@ export default function StaffForm({
         salaryType: form.salaryType,
         baseSalary: form.baseSalary ? Number(form.baseSalary) : 0,
         commissionRate:
-          form.salaryType === 'commission' && form.commissionRate
+          (form.role === 'agent' || form.salaryType === 'commission') && form.commissionRate
             ? Number(form.commissionRate)
             : null,
         locationAssigned: form.locationAssigned || null,
@@ -498,14 +498,14 @@ export default function StaffForm({
                 </div>
               </div>
 
-              {form.salaryType === 'commission' && (
+              {(form.salaryType === 'commission' || form.role === 'agent') && (
                 <div>
                   <FieldLabel>Commission Rate (%)</FieldLabel>
                   <input
                     type="number"
                     min="0"
                     max="100"
-                    step="0.1"
+                    step="0.5"
                     value={form.commissionRate}
                     onChange={(e) => setField('commissionRate', e.target.value)}
                     disabled={isView}

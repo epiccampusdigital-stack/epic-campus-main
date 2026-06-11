@@ -5,6 +5,7 @@ import Stripe from 'stripe'
 import { adminAuth, adminDb } from '@/lib/firebase/admin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { sendWhatsApp } from '@/lib/twilio'
+import { processPaymentCommissionsAdmin } from '@/lib/commissions/admin'
 
 function generateTempPassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#'
@@ -206,7 +207,10 @@ export async function POST(req: NextRequest) {
           agentId = s.agentId ? String(s.agentId) : null
           agentName = s.agentName ? String(s.agentName) : null
         }
-        await adminDb.collection('payments').add({
+        const feeType = meta.feeType || ''
+        const paymentType =
+          feeType === 'registration' || amount === 25_000 ? 'registration' : 'tuition'
+        const paymentRef = await adminDb.collection('payments').add({
           studentId,
           studentName: studentName || '',
           agentId,
@@ -218,8 +222,19 @@ export async function POST(req: NextRequest) {
           paidAt: FieldValue.serverTimestamp(),
           createdAt: FieldValue.serverTimestamp(),
           method: 'stripe',
-          type: 'tuition',
+          type: paymentType,
           paymentDate,
+        })
+        await processPaymentCommissionsAdmin(paymentRef.id, {
+          type: paymentType,
+          amount,
+          status: 'paid',
+          agentId,
+          agentName,
+          paymentDate,
+          feeType,
+          studentId,
+          studentName: studentName || '',
         })
         console.log(`[Stripe webhook] Payment recorded for student ${studentId}: ${amount}`)
       } catch (err) {

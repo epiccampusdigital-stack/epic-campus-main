@@ -5,6 +5,7 @@ export type Role =
   | 'accountant'
   | 'teacher'
   | 'examCoordinator'
+  | 'agent'
   | 'student'
   | 'company'
   | 'parent'
@@ -110,6 +111,8 @@ export interface Student {
   location?: StudentLocation
   agentId?: string
   agentName?: string
+  referredByStaffId?: string
+  referredByStaffName?: string
   feeSchedule?: StudentFeeSchedule
   enrollmentDate?: string
   expectedCompletionDate?: string
@@ -390,6 +393,7 @@ export interface PayrollRecord {
   salesAmount?: number
   commissionRate?: number
   commission: number
+  referralCommission: number
   bonus: number
   tax: number
   advances: number
@@ -685,5 +689,27 @@ export interface EnrollmentApplication {
   stripePaymentStatus: EnrollmentPaymentStatus
   status: EnrollmentStatus
   studentId?: string
+  createdAt: string
+}
+
+export type CommissionStatus = 'pending' | 'paid' | 'cancelled'
+export type CommissionType = 'agent' | 'staff-referral'
+
+export interface CommissionRecord {
+  id: string
+  type: CommissionType
+  agentId: string
+  agentName: string
+  studentId: string
+  studentName: string
+  enrollmentDate: string
+  registrationFee: number
+  commissionRate: number
+  commissionAmount: number
+  status: CommissionStatus
+  paidAt?: string
+  paidBy?: string
+  notes?: string
+  location?: string
   createdAt: string
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { collection, getDocs, query, where } from 'firebase/firestore'
+import { Timestamp } from 'firebase/firestore'
 import {
   BarChart,
   Bar,
@@ -36,17 +37,24 @@ export default function AccountantKitchenDashboard() {
   const [lastMonthCost, setLastMonthCost] = useState(0)
   const [avgCostPerPersonPerDay, setAvgCostPerPersonPerDay] = useState(0)
   const [chartData, setChartData] = useState<{ month: string; kitchen: number; utility: number }[]>([])
+  const [agentCommPaidMonth, setAgentCommPaidMonth] = useState(0)
+  const [staffReferralMonth, setStaffReferralMonth] = useState(0)
+  const [registrationRevenueMonth, setRegistrationRevenueMonth] = useState(0)
 
   useEffect(() => {
     async function load() {
       setLoading(true)
       try {
-        const curMonth = thisMonthPrefix()
         const prevMonth = thisMonthPrefix(-1)
 
-        const [mealSnap, utilSnap] = await Promise.all([
+        const curMonth = thisMonthPrefix()
+
+        const [mealSnap, utilSnap, agentCommSnap, staffRefSnap, paymentsSnap] = await Promise.all([
           getDocs(collection(db, 'mealLogs')),
           getDocs(query(collection(db, 'expenses'), where('category', '==', 'Kitchen & Canteen'))),
+          getDocs(query(collection(db, 'agentCommissions'), where('status', '==', 'paid'))),
+          getDocs(query(collection(db, 'staffReferrals'), where('includedInPayroll', '==', true))),
+          getDocs(query(collection(db, 'payments'), where('type', '==', 'registration'))),
         ])
 
         const allMeals = mealSnap.docs.map((d) => d.data())
@@ -76,6 +84,38 @@ export default function AccountantKitchenDashboard() {
           utility: utilSnap.docs.filter((d) => String(d.data().date ?? '').startsWith(m)).reduce((s, d) => s + (Number(d.data().amount) || 0), 0),
         }))
         setChartData(kitchenCostByMonth)
+
+        const agentPaid = agentCommSnap.docs.reduce((sum, d) => {
+          const data = d.data()
+          const paidAt = data.paidAt
+          const dateStr =
+            paidAt instanceof Timestamp
+              ? paidAt.toDate().toISOString().slice(0, 7)
+              : String(data.paidAt ?? '').slice(0, 7)
+          if (dateStr !== curMonth) return sum
+          return sum + (Number(data.commissionAmount) || 0)
+        }, 0)
+        setAgentCommPaidMonth(agentPaid)
+
+        const staffRef = staffRefSnap.docs.reduce((sum, d) => {
+          const data = d.data()
+          const created = data.createdAt
+          const dateStr =
+            created instanceof Timestamp
+              ? created.toDate().toISOString().slice(0, 7)
+              : String(data.period ?? '').slice(0, 7)
+          if (dateStr !== curMonth) return sum
+          return sum + (Number(data.commissionAmount) || 0)
+        }, 0)
+        setStaffReferralMonth(staffRef)
+
+        const regRevenue = paymentsSnap.docs.reduce((sum, d) => {
+          const data = d.data()
+          const dateStr = String(data.paymentDate ?? '').slice(0, 7)
+          if (dateStr !== curMonth || data.status !== 'paid') return sum
+          return sum + (Number(data.amount) || 0)
+        }, 0)
+        setRegistrationRevenueMonth(regRevenue)
       } catch (err) {
         console.error('[AccountantKitchenDashboard]', err)
       } finally {
@@ -132,6 +172,45 @@ export default function AccountantKitchenDashboard() {
             {s.sub && <p className={`mt-0.5 text-xs ${s.subColor}`}>{s.sub}</p>}
           </div>
         ))}
+      </div>
+
+      {/* Commissions */}
+      <div className="rounded-xl border border-white/90 bg-white/65 p-5 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05]">
+        <h2 className="mb-4 text-sm font-bold text-[#0D1B2A] dark:text-white">Commissions</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            {
+              label: 'Agent commissions paid (month)',
+              value: loading ? '…' : formatLKR(agentCommPaidMonth),
+            },
+            {
+              label: 'Staff referral commissions (month)',
+              value: loading ? '…' : formatLKR(staffReferralMonth),
+            },
+            {
+              label: 'Total commission expense',
+              value: loading ? '…' : formatLKR(agentCommPaidMonth + staffReferralMonth),
+            },
+            {
+              label: '% of registration revenue',
+              value: loading
+                ? '…'
+                : registrationRevenueMonth > 0
+                  ? `${(((agentCommPaidMonth + staffReferralMonth) / registrationRevenueMonth) * 100).toFixed(1)}%`
+                  : '—',
+            },
+          ].map((s) => (
+            <div
+              key={s.label}
+              className="rounded-lg border border-[#DDE3EC] bg-[#F5F7FB] p-4 dark:border-gray-600 dark:bg-gray-800/50"
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                {s.label}
+              </p>
+              <p className="mt-2 text-lg font-bold text-[#0B3D6B] dark:text-[#E8A020]">{s.value}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Monthly breakdown chart */}

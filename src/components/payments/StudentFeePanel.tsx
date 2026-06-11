@@ -25,6 +25,7 @@ import {
 import { defaultFeeSchedule } from '@/lib/students/helpers'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { logAuditEvent } from '@/lib/audit/helpers'
+import { processPaymentCommissions } from '@/lib/commissions/helpers'
 import type {
   Payment,
   PaymentMethod,
@@ -155,6 +156,20 @@ export default function StudentFeePanel({
       createdAt: serverTimestamp(),
       createdBy: user.uid,
     })
+
+    await processPaymentCommissions(
+      paymentDocId,
+      {
+        type,
+        amount,
+        status: 'paid',
+        agentId: student.agentId,
+        agentName: student.agentName,
+        paymentDate,
+        location: student.location,
+      },
+      student,
+    )
   }
 
   async function saveSchedule() {

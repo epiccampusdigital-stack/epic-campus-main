@@ -47,6 +47,7 @@ export interface StudentFormValues {
   batchStartDate: string
   location: StudentLocation | ''
   agentId: string
+  referredByStaffId: string
   enrollmentDate: string
   expectedCompletionDate: string
   feeAmount: string
@@ -80,6 +81,7 @@ function makeEmptyForm(): StudentFormValues {
     batchStartDate: new Date().toISOString().slice(0, 10),
     location: 'ahangama',
     agentId: '',
+    referredByStaffId: '',
     enrollmentDate: new Date().toISOString().slice(0, 10),
     expectedCompletionDate: '',
     feeAmount: '',
@@ -120,6 +122,7 @@ function studentToForm(s: Student): StudentFormValues {
     batchStartDate: s.batchStartDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
     location: s.location ?? 'ahangama',
     agentId: s.agentId ?? '',
+    referredByStaffId: s.referredByStaffId ?? '',
     enrollmentDate: s.enrollmentDate?.slice(0, 10) ?? '',
     expectedCompletionDate: s.expectedCompletionDate?.slice(0, 10) ?? '',
     feeAmount: s.feeAmount != null ? String(s.feeAmount) : '',
@@ -218,7 +221,7 @@ export default function StudentForm({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [agents, setAgents] = useState<{ uid: string; displayName: string }[]>([])
+  const [agents, setAgents] = useState<{ uid: string; displayName: string; commissionRate?: number }[]>([])
   const [guardianSectionOpen, setGuardianSectionOpen] = useState(false)
 
   const isEdit = !!student
@@ -247,6 +250,7 @@ export default function StudentForm({
           .map((d) => ({
             uid: d.id,
             displayName: String(d.data().displayName ?? d.data().email ?? 'Staff'),
+            commissionRate: d.data().commissionRate != null ? Number(d.data().commissionRate) : undefined,
           }))
           .sort((a, b) => a.displayName.localeCompare(b.displayName))
         setAgents(list)
@@ -306,6 +310,7 @@ export default function StudentForm({
       const photoUrl = await uploadPhoto(studentDocId)
 
       const selectedAgent = agents.find((a) => a.uid === form.agentId)
+      const selectedReferralStaff = agents.find((a) => a.uid === form.referredByStaffId)
       const batchDuration = (form.batchDuration || '90days') as BatchDuration
       const batchEndIso = form.batchStartDate
         ? computeBatchEndDate(
@@ -352,6 +357,8 @@ export default function StudentForm({
         location: form.location || 'ahangama',
         agentId: form.agentId || null,
         agentName: selectedAgent?.displayName ?? null,
+        referredByStaffId: form.referredByStaffId || null,
+        referredByStaffName: selectedReferralStaff?.displayName ?? null,
         branchId: user.branchId ?? 'galle-main',
         enrollmentDate: form.enrollmentDate || null,
         expectedCompletionDate: form.expectedCompletionDate || null,
@@ -837,8 +844,34 @@ export default function StudentForm({
                     {agents.map((a) => (
                       <option key={a.uid} value={a.uid}>
                         {a.displayName}
+                        {a.commissionRate != null ? ` (${a.commissionRate}% commission)` : ''}
                       </option>
                     ))}
+                  </SelectInput>
+                  {form.agentId && (() => {
+                    const ag = agents.find((a) => a.uid === form.agentId)
+                    return ag?.commissionRate != null ? (
+                      <p className="mt-1 text-xs text-emerald-700">
+                        Commission rate: {ag.commissionRate}%
+                      </p>
+                    ) : null
+                  })()}
+                </div>
+                <div>
+                  <FieldLabel>Referred by (staff)</FieldLabel>
+                  <SelectInput
+                    value={form.referredByStaffId}
+                    onChange={(v) => setField('referredByStaffId', v)}
+                  >
+                    <option value="">None</option>
+                    {agents
+                      .filter((a) => a.uid !== form.agentId)
+                      .map((a) => (
+                        <option key={a.uid} value={a.uid}>
+                          {a.displayName}
+                          {a.commissionRate != null ? ` (${a.commissionRate}% referral)` : ''}
+                        </option>
+                      ))}
                   </SelectInput>
                 </div>
               </div>

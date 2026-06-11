@@ -9,6 +9,11 @@ import {
   updateDoc,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
+import {
+  fetchPendingStaffReferrals,
+  markStaffReferralsIncludedInPayroll,
+  type StaffReferralRecord,
+} from '@/lib/commissions/helpers'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { logAuditEvent } from '@/lib/audit/helpers'
 import {
@@ -37,6 +42,7 @@ export interface PayrollFormValues {
   hoursWorked: string
   salesAmount: string
   commissionRate: string
+  referralCommission: string
   tax: string
   advances: string
   otherDeductions: string
@@ -58,6 +64,7 @@ function defaultForm(): PayrollFormValues {
     hoursWorked: '',
     salesAmount: '',
     commissionRate: '',
+    referralCommission: '',
     tax: '',
     advances: '',
     otherDeductions: '',
@@ -100,8 +107,8 @@ function recordToForm(r: PayrollRecord): PayrollFormValues {
     baseSalary: String(r.baseSalary),
     hoursWorked: r.hoursWorked != null ? String(r.hoursWorked) : '',
     salesAmount: r.salesAmount != null ? String(r.salesAmount) : '',
-    commissionRate:
-      r.commissionRate != null ? String(r.commissionRate) : '',
+    commissionRate: r.commissionRate != null ? String(r.commissionRate) : '',
+    referralCommission: r.referralCommission > 0 ? String(r.referralCommission) : '',
     tax: String(r.tax),
     advances: String(r.advances),
     otherDeductions: String(r.otherDeductions),
@@ -126,6 +133,10 @@ export default function PayrollForm({
   const [form, setForm] = useState<PayrollFormValues>(defaultForm())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [pendingReferrals, setPendingReferrals] = useState<
+    (StaffReferralRecord & { id: string })[]
+  >([])
+  const [showReferralBreakdown, setShowReferralBreakdown] = useState(false)
 
   const isEdit = !!editRecord
 
@@ -160,11 +171,30 @@ export default function PayrollForm({
     }))
   }, [selectedStaff, isEdit])
 
+  const periodKey = formatPeriodKey(form.month, form.year)
+
+  useEffect(() => {
+    if (!form.staffId || isEdit) {
+      setPendingReferrals([])
+      return
+    }
+    void fetchPendingStaffReferrals(form.staffId, periodKey)
+      .then((refs) => {
+        setPendingReferrals(refs)
+        const total = refs.reduce((s, r) => s + r.commissionAmount, 0)
+        if (total > 0) {
+          setForm((prev) => ({ ...prev, referralCommission: String(total) }))
+        }
+      })
+      .catch(() => setPendingReferrals([]))
+  }, [form.staffId, periodKey, isEdit])
+
   const computed = useMemo(() => {
     const baseSalary = parseFloat(form.baseSalary) || 0
     const hoursWorked = parseFloat(form.hoursWorked) || 0
     const salesAmount = parseFloat(form.salesAmount) || 0
     const commissionRate = parseFloat(form.commissionRate) || 0
+    const referralCommission = parseFloat(form.referralCommission) || 0
     const bonus = parseFloat(form.bonus) || 0
     const tax = parseFloat(form.tax) || 0
     const advances = parseFloat(form.advances) || 0
@@ -181,9 +211,9 @@ export default function PayrollForm({
         ? computeCommission(salesAmount, commissionRate)
         : 0
     const deductions = totalDeductions(tax, advances, other)
-    const netPay = calculateNetPay(grossBase, bonus, deductions, commission)
+    const netPay = calculateNetPay(grossBase, bonus, deductions, commission, referralCommission)
 
-    return { grossBase, commission, deductions, netPay }
+    return { grossBase, commission, referralCommission, deductions, netPay }
   }, [form])
 
   function setField<K extends keyof PayrollFormValues>(
@@ -209,6 +239,7 @@ export default function PayrollForm({
       const hoursWorked = parseFloat(form.hoursWorked) || 0
       const salesAmount = parseFloat(form.salesAmount) || 0
       const commissionRate = parseFloat(form.commissionRate) || 0
+      const referralCommission = parseFloat(form.referralCommission) || 0
       const bonus = parseFloat(form.bonus) || 0
       const tax = parseFloat(form.tax) || 0
       const advances = parseFloat(form.advances) || 0
@@ -227,6 +258,7 @@ export default function PayrollForm({
         commissionRate:
           form.salaryType === 'commission' ? commissionRate : null,
         commission: computed.commission,
+        referralCommission,
         bonus,
         tax,
         advances,
@@ -264,6 +296,12 @@ export default function PayrollForm({
           payrollId,
           createdAt: serverTimestamp(),
         })
+        if (pendingReferrals.length > 0 && referralCommission > 0) {
+          await markStaffReferralsIncludedInPayroll(
+            pendingReferrals.map((r) => r.id),
+            payrollId,
+          )
+        }
         await logAuditEvent({
           userId: user.uid,
           userEmail: user.email,
@@ -451,6 +489,18 @@ export default function PayrollForm({
             )}
 
             <div className="mb-5">
+              <FieldLabel>Referral Commissions (LKR)</FieldLabel>
+              <input
+                type="number"
+                min="0"
+                value={form.referralCommission}
+                onChange={(e) => setField('referralCommission', e.target.value)}
+                placeholder="0"
+                className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
+              />
+            </div>
+
+            <div className="mb-5">
               <FieldLabel>Bonus (LKR)</FieldLabel>
               <input
                 type="number"
@@ -458,6 +508,47 @@ export default function PayrollForm({
                 value={form.bonus}
                 onChange={(e) => setField('bonus', e.target.value)}
                 className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
+              />
+            </div>
+
+            {pendingReferrals.length > 0 && (
+              <div className="mb-5 rounded-lg border border-teal-200 bg-teal-50 p-4">
+                <p className="font-jakarta text-sm font-semibold text-teal-900">
+                  Referral commissions this period: LKR{' '}
+                  {computed.referralCommission.toLocaleString('en-LK')} ({pendingReferrals.length}{' '}
+                  student{pendingReferrals.length !== 1 ? 's' : ''})
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowReferralBreakdown((v) => !v)}
+                  className="mt-2 text-xs font-semibold text-teal-800 underline"
+                >
+                  {showReferralBreakdown ? 'Hide breakdown' : 'Show breakdown'}
+                </button>
+                {showReferralBreakdown && (
+                  <ul className="mt-3 space-y-1 border-t border-teal-200 pt-3 text-sm text-teal-900">
+                    {pendingReferrals.map((r) => (
+                      <li key={r.id} className="flex justify-between gap-2">
+                        <span>{r.studentName}</span>
+                        <span className="font-medium">
+                          LKR {r.commissionAmount.toLocaleString('en-LK')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            <div className="mb-5">
+              <FieldLabel>Referral Commissions (LKR)</FieldLabel>
+              <input
+                type="number"
+                min="0"
+                readOnly={pendingReferrals.length > 0}
+                value={form.referralCommission}
+                onChange={(e) => setField('referralCommission', e.target.value)}
+                className="w-full rounded-lg border border-[#DDE3EC] bg-[#F5F7FB] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020] read-only:cursor-not-allowed"
               />
             </div>
 
@@ -563,8 +654,10 @@ export default function PayrollForm({
                 LKR {computed.netPay.toLocaleString('en-LK')}
               </p>
               <p className="mt-1 text-xs text-[#5A6A7A]">
-                Base {computed.grossBase.toLocaleString()} + Bonus + Commission −
-                Deductions ({computed.deductions.toLocaleString()})
+                Base {computed.grossBase.toLocaleString()}
+                {computed.commission > 0 && ` + Commission ${computed.commission.toLocaleString()}`}
+                {computed.referralCommission > 0 && ` + Referrals ${computed.referralCommission.toLocaleString()}`}
+                {' '}+ Bonus − Deductions ({computed.deductions.toLocaleString()})
               </p>
             </div>
           </div>

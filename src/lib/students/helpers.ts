@@ -22,7 +22,9 @@ export function toDate(value: unknown): Date | null {
   return null
 }
 
-export const AGENT_ROLES = ['reception', 'teacher', 'admin', 'owner', 'accountant'] as const
+export const AGENT_ROLES = ['agent', 'reception', 'teacher', 'admin', 'owner', 'accountant'] as const
+
+export const STAFF_REFERRAL_ROLES = ['reception', 'teacher', 'admin', 'owner', 'accountant'] as const
 
 export const LOCATION_LABELS: Record<StudentLocation, string> = {
   ahangama: 'Ahangama',
@@ -171,6 +173,8 @@ export function parseStudent(id: string, data: Record<string, unknown>): Student
     location: data.location ? (data.location as StudentLocation) : undefined,
     agentId: data.agentId ? String(data.agentId) : undefined,
     agentName: data.agentName ? String(data.agentName) : undefined,
+    referredByStaffId: data.referredByStaffId ? String(data.referredByStaffId) : undefined,
+    referredByStaffName: data.referredByStaffName ? String(data.referredByStaffName) : undefined,
     feeSchedule: parseFeeSchedule(data) ?? defaultFeeSchedule(),
     enrollmentDate: data.enrollmentDate ? String(data.enrollmentDate) : undefined,
     expectedCompletionDate: data.expectedCompletionDate

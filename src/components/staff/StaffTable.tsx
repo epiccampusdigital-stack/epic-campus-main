@@ -173,11 +173,18 @@ export default function StaffTable({
                   )}
                 </td>
                 <td className="hidden px-4 py-3 md:table-cell">
-                  <span
-                    className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${getRoleColor(member.role)}`}
-                  >
-                    {getRoleLabel(member.role)}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span
+                      className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${getRoleColor(member.role)}`}
+                    >
+                      {getRoleLabel(member.role)}
+                    </span>
+                    {member.role === 'agent' && member.commissionRate != null && member.commissionRate > 0 && (
+                      <span className="inline-flex rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-xs font-medium text-teal-700">
+                        {member.commissionRate}%
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="hidden px-4 py-3 lg:table-cell">
                   {member.locationAssigned ? (

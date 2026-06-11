@@ -37,6 +37,7 @@ export function parsePayroll(id: string, data: Record<string, unknown>): Payroll
     commissionRate:
       data.commissionRate != null ? Number(data.commissionRate) : undefined,
     commission: Number(data.commission ?? 0),
+    referralCommission: Number(data.referralCommission ?? 0),
     bonus: Number(data.bonus ?? 0),
     tax: Number(data.tax ?? 0),
     advances: Number(data.advances ?? 0),
@@ -59,8 +60,9 @@ export function calculateNetPay(
   bonus: number,
   deductions: number,
   commission: number,
+  referralCommission = 0,
 ): number {
-  return Math.max(0, base + bonus + commission - deductions)
+  return Math.max(0, base + bonus + commission + referralCommission - deductions)
 }
 
 export function totalDeductions(

@@ -18,6 +18,7 @@ import {
 } from '@/lib/payments/helpers'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { logAuditEvent } from '@/lib/audit/helpers'
+import { processPaymentCommissions } from '@/lib/commissions/helpers'
 import type { Payment, PaymentMethod, PaymentStatus, PaymentType, Student } from '@/types'
 
 export interface PaymentFormValues {
@@ -211,6 +212,22 @@ export default function PaymentForm({
           entityId: paymentDocId,
           details: `Recorded ${receiptNumber} — ${formatAmount(amount, 'LKR')} from ${selectedStudent.name}`,
         })
+
+        if (form.status === 'paid') {
+          await processPaymentCommissions(
+            paymentDocId,
+            {
+              type: form.type,
+              amount,
+              status: form.status,
+              agentId: selectedStudent.agentId,
+              agentName: selectedStudent.agentName,
+              paymentDate: form.paymentDate,
+              location: selectedStudent.location,
+            },
+            selectedStudent,
+          )
+        }
       }
 
       onSaved()

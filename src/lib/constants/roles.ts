@@ -5,6 +5,7 @@ export const ROLE_LABELS: Record<string, string> = {
   accountant: 'Accountant',
   teacher: 'Teacher',
   examCoordinator: 'Exam Coordinator',
+  agent: 'Enrollment Agent',
   student: 'Student',
   company: 'Partner Company',
   parent: 'Parent / Guardian',

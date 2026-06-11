@@ -8,6 +8,7 @@ export const STAFF_ROLES: StaffRole[] = [
   'accountant',
   'teacher',
   'examCoordinator',
+  'agent',
   'kitchen',
 ]
 
@@ -63,6 +64,7 @@ export function getRoleLabel(role: StaffRole): string {
     accountant: 'Accountant',
     teacher: 'Teacher',
     examCoordinator: 'Exam Coordinator',
+    agent: 'Enrollment Agent',
     kitchen: 'Kitchen Staff',
   }
   return labels[role] ?? role
@@ -75,6 +77,7 @@ const ROLE_STYLES: Record<StaffRole, string> = {
   accountant: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   teacher: 'bg-amber-50 text-amber-800 border-amber-200',
   examCoordinator: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  agent: 'bg-teal-50 text-teal-700 border-teal-200',
   kitchen: 'bg-orange-50 text-orange-700 border-orange-200',
 }
 

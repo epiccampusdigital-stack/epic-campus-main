@@ -193,5 +193,29 @@ service cloud.firestore {
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner'];
     }
+
+    match /agentCommissions/{doc} {
+      allow read: if request.auth != null &&
+        request.auth.token.role == 'agent' &&
+        resource.data.agentId == request.auth.uid;
+      allow read, write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner'];
+      allow read: if request.auth != null &&
+        request.auth.token.role == 'accountant';
+    }
+
+    match /staffReferrals/{doc} {
+      allow read: if request.auth != null && (
+        request.auth.token.role in ['admin', 'owner', 'accountant'] ||
+        resource.data.staffId == request.auth.uid
+      );
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'accountant'];
+    }
+
+    match /payroll/{doc} {
+      allow read, write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'accountant'];
+    }
   }
 }
