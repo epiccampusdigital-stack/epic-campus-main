@@ -7,6 +7,7 @@ import {
   getDocs,
   query,
   orderBy,
+  limit,
   doc,
   updateDoc,
   serverTimestamp,
@@ -20,7 +21,7 @@ import MealIngredientList, {
   type IngredientRow,
 } from '@/components/kitchen/MealIngredientList'
 import { fetchActiveInventory } from '@/lib/kitchen/fetchActiveInventory'
-import { MEAL_SESSION_VISUAL } from '@/lib/kitchen/foodImages'
+import { getFoodEmoji, MEAL_SESSION_VISUAL } from '@/lib/kitchen/foodImages'
 import { formatLKR } from '@/lib/utils/formatCurrency'
 import type { MealLog, MealType, InventoryItem } from '@/types/kitchen'
 
@@ -33,6 +34,41 @@ const MEAL_TYPES: { value: MealType; label: string }[] = [
 
 function today(): string {
   return new Date().toISOString().slice(0, 10)
+}
+
+function normalizeMealDate(date: unknown): string {
+  if (!date) return ''
+  if (typeof date === 'string') return date.slice(0, 10)
+  if (typeof date === 'object' && date !== null && 'toDate' in date) {
+    const toDate = (date as { toDate?: () => Date }).toDate
+    if (typeof toDate === 'function') {
+      return toDate.call(date).toISOString().slice(0, 10)
+    }
+  }
+  if (typeof date === 'object' && date !== null && 'seconds' in date) {
+    return new Date((date as { seconds: number }).seconds * 1000).toISOString().slice(0, 10)
+  }
+  return String(date).slice(0, 10)
+}
+
+function parseMealLog(id: string, data: Record<string, unknown>): MealLog {
+  return {
+    id,
+    date: normalizeMealDate(data.date),
+    mealType: data.mealType as MealType,
+    studentCount: Number(data.studentCount ?? 0),
+    staffCount: Number(data.staffCount ?? 0),
+    totalServings: Number(data.totalServings ?? 0),
+    ingredientsUsed: Array.isArray(data.ingredientsUsed)
+      ? (data.ingredientsUsed as MealLog['ingredientsUsed'])
+      : [],
+    estimatedCost: Number(data.estimatedCost ?? 0),
+    costPerPerson: Number(data.costPerPerson ?? 0),
+    notes: String(data.notes ?? ''),
+    loggedBy: String(data.loggedBy ?? ''),
+    loggedByName: String(data.loggedByName ?? ''),
+    createdAt: data.createdAt as MealLog['createdAt'],
+  }
 }
 
 export default function MealLogPage() {
@@ -58,10 +94,37 @@ export default function MealLogPage() {
   async function loadLogs() {
     setLoading(true)
     try {
-      const snap = await getDocs(
-        query(collection(db, 'mealLogs'), orderBy('date', 'desc'), orderBy('createdAt', 'desc')),
+      let snap
+      try {
+        snap = await getDocs(
+          query(collection(db, 'mealLogs'), orderBy('createdAt', 'desc'), limit(50)),
+        )
+      } catch (err) {
+        console.warn('[MealLog] indexed query failed, falling back', err)
+        const allSnap = await getDocs(collection(db, 'mealLogs'))
+        const docs = allSnap.docs
+          .map((d) => ({ doc: d, createdAt: d.data().createdAt }))
+          .sort((a, b) => {
+            const aSec =
+              a.createdAt && typeof a.createdAt === 'object' && 'seconds' in a.createdAt
+                ? (a.createdAt as { seconds: number }).seconds
+                : 0
+            const bSec =
+              b.createdAt && typeof b.createdAt === 'object' && 'seconds' in b.createdAt
+                ? (b.createdAt as { seconds: number }).seconds
+                : 0
+            return bSec - aSec
+          })
+          .slice(0, 50)
+          .map((x) => x.doc)
+        snap = { docs } as typeof allSnap
+      }
+
+      const parsed = snap.docs.map((d) =>
+        parseMealLog(d.id, d.data() as Record<string, unknown>),
       )
-      setLogs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as MealLog)))
+      console.log('[MealLog] fetched', parsed.length, 'meal logs')
+      setLogs(parsed)
     } catch (err) {
       console.error('[MealLog]', err)
     } finally {
@@ -101,7 +164,8 @@ export default function MealLogPage() {
   }
 
   const filtered = logs.filter((l) => {
-    const matchDate = !dateFilter || l.date === dateFilter
+    const docDate = l.date
+    const matchDate = !dateFilter || docDate === dateFilter
     const matchType = typeFilter === 'all' || l.mealType === typeFilter
     return matchDate && matchType
   })
@@ -146,6 +210,10 @@ export default function MealLogPage() {
           await addDoc(collection(db, 'inventory', ing.itemId, 'history'), {
             action: 'deducted',
             qty: ing.qtyUsed,
+            itemId: ing.itemId,
+            itemName: item.itemName,
+            emoji: getFoodEmoji(item.itemName),
+            unit: item.unit,
             reason: 'meal-log',
             mealType: fType,
             date: fDate,

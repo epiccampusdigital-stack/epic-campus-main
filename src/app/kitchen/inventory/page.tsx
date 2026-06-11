@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   collection,
+  collectionGroup,
   addDoc,
   updateDoc,
   doc,
   getDocs,
   query,
   orderBy,
+  limit,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore'
@@ -19,7 +21,7 @@ import InventoryItemSlideOver, {
   type InventoryFormValues,
 } from '@/components/kitchen/inventory/InventoryItemSlideOver'
 import FoodEmoji from '@/components/kitchen/FoodEmoji'
-import { CATEGORY_PILLS } from '@/lib/kitchen/foodImages'
+import { CATEGORY_PILLS, getFoodEmoji } from '@/lib/kitchen/foodImages'
 import { formatLKR } from '@/lib/utils/formatCurrency'
 import type { InventoryCategory, InventoryItem } from '@/types/kitchen'
 
@@ -53,6 +55,11 @@ const SEED_DATA = [
 
 interface StockHistoryEntry {
   id: string
+  itemId?: string
+  itemName?: string
+  emoji?: string
+  unit?: string
+  mealType?: string
   action: string
   qty: number
   reason: string
@@ -60,6 +67,30 @@ interface StockHistoryEntry {
   by: string
   byName: string
   createdAt: Timestamp
+}
+
+function formatHistoryDate(dateStr: string): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return dateStr
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function historyDescription(h: StockHistoryEntry): string {
+  const emoji = h.emoji ?? '📦'
+  const name = h.itemName ?? 'Item'
+  const unit = h.unit ?? ''
+
+  if (h.action === 'deducted' && h.reason === 'meal-log') {
+    const meal = h.mealType
+      ? h.mealType.charAt(0).toUpperCase() + h.mealType.slice(1)
+      : 'meal'
+    return `${emoji} ${name} — used ${h.qty} ${unit} for ${meal}`.trim()
+  }
+  if (h.action === 'restocked') {
+    return `${emoji} ${name} — restocked +${h.qty} ${unit}`.trim()
+  }
+  return `${emoji} ${name} — ${h.action} ${h.qty} ${unit}`.trim()
 }
 
 function getStockStatus(item: InventoryItem): { label: string; cls: string } {
@@ -132,17 +163,69 @@ export default function InventoryPage() {
   }
 
   async function loadHistory() {
+    if (items.length === 0) return
     try {
-      const allHistory: StockHistoryEntry[] = []
-      for (const item of items.slice(0, 5)) {
+      const itemMap = new Map(items.map((i) => [i.id, i]))
+      let entries: StockHistoryEntry[] = []
+
+      try {
         const snap = await getDocs(
-          query(collection(db, 'inventory', item.id, 'history'), orderBy('createdAt', 'desc')),
+          query(collectionGroup(db, 'history'), orderBy('createdAt', 'desc'), limit(20)),
         )
-        snap.docs.forEach((d) => allHistory.push({ id: d.id, ...d.data() } as StockHistoryEntry))
+        entries = snap.docs.map((d) => {
+          const itemId = d.ref.parent.parent?.id ?? ''
+          const item = itemMap.get(itemId)
+          const data = d.data()
+          return {
+            id: `${itemId}-${d.id}`,
+            itemId,
+            itemName: String(data.itemName ?? item?.itemName ?? 'Item'),
+            emoji: String(data.emoji ?? getFoodEmoji(item?.itemName ?? '')),
+            unit: String(data.unit ?? item?.unit ?? ''),
+            mealType: data.mealType ? String(data.mealType) : undefined,
+            action: String(data.action ?? ''),
+            qty: Number(data.qty ?? 0),
+            reason: String(data.reason ?? ''),
+            date: String(data.date ?? ''),
+            by: String(data.by ?? ''),
+            byName: String(data.byName ?? ''),
+            createdAt: data.createdAt as Timestamp,
+          }
+        })
+      } catch (err) {
+        console.warn('[Inventory history] collectionGroup failed, falling back', err)
+        const allHistory: StockHistoryEntry[] = []
+        for (const item of items) {
+          const snap = await getDocs(
+            query(collection(db, 'inventory', item.id, 'history'), orderBy('createdAt', 'desc')),
+          )
+          snap.docs.slice(0, 5).forEach((d) => {
+            const data = d.data()
+            allHistory.push({
+              id: `${item.id}-${d.id}`,
+              itemId: item.id,
+              itemName: String(data.itemName ?? item.itemName),
+              emoji: String(data.emoji ?? getFoodEmoji(item.itemName)),
+              unit: String(data.unit ?? item.unit),
+              mealType: data.mealType ? String(data.mealType) : undefined,
+              action: String(data.action ?? ''),
+              qty: Number(data.qty ?? 0),
+              reason: String(data.reason ?? ''),
+              date: String(data.date ?? ''),
+              by: String(data.by ?? ''),
+              byName: String(data.byName ?? ''),
+              createdAt: data.createdAt as Timestamp,
+            })
+          })
+        }
+        entries = allHistory
+          .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
+          .slice(0, 20)
       }
-      setHistory(allHistory.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds).slice(0, 20))
-    } catch {
-      // ignore
+
+      setHistory(entries)
+    } catch (err) {
+      console.error('[Inventory history]', err)
     }
   }
 
@@ -151,7 +234,7 @@ export default function InventoryPage() {
   }, [])
   useEffect(() => {
     if (!loading && items.length > 0) loadHistory()
-  }, [loading])
+  }, [loading, items])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -520,17 +603,9 @@ export default function InventoryPage() {
           <div className="divide-y divide-[#DDE3EC] dark:divide-white/[0.06]">
             {history.map((h) => (
               <div key={h.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-sm">
-                <div>
-                  <span
-                    className={`font-medium ${h.action === 'restocked' ? 'text-emerald-600' : 'text-[#0D1B2A] dark:text-white'}`}
-                  >
-                    {h.action === 'restocked' ? '+' : '–'}
-                    {h.qty}
-                  </span>
-                  <span className="ml-2 text-[#5A6A7A] dark:text-white/50">{h.reason}</span>
-                </div>
+                <p className="font-medium text-[#0D1B2A] dark:text-white">{historyDescription(h)}</p>
                 <div className="text-xs text-[#5A6A7A] dark:text-white/40">
-                  {h.byName} · {h.date}
+                  {h.byName || 'Staff'} · {formatHistoryDate(h.date)}
                 </div>
               </div>
             ))}
