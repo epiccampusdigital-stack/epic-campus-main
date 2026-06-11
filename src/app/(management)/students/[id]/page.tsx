@@ -32,6 +32,15 @@ import {
 } from '@/lib/students/helpers'
 import type { ExamResult, Payment, Student, StudentDocument, AttendanceRecord } from '@/types'
 
+const RELATIONSHIP_STYLES: Record<string, string> = {
+  Father: 'bg-blue-50 text-blue-700 border-blue-200',
+  Mother: 'bg-pink-50 text-pink-700 border-pink-200',
+  Spouse: 'bg-purple-50 text-purple-700 border-purple-200',
+  Sibling: 'bg-teal-50 text-teal-700 border-teal-200',
+  Guardian: 'bg-amber-50 text-amber-700 border-amber-200',
+  Other: 'bg-gray-50 text-gray-700 border-gray-200',
+}
+
 type TabId = 'overview' | 'payments' | 'attendance' | 'exams' | 'documents' | 'visa'
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
@@ -65,6 +74,153 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
       <dd className="font-inter text-sm font-medium text-[#0D1B2A] sm:text-right">
         {value || '—'}
       </dd>
+    </div>
+  )
+}
+
+function GuardianCard({
+  student,
+  guardian,
+  onEdit,
+}: {
+  student: Student
+  guardian: NonNullable<Student['guardian']>
+  onEdit: () => void
+}) {
+  const [copied, setCopied] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [sendResult, setSendResult] = useState<'sent' | 'error' | null>(null)
+
+  function copyCode() {
+    if (guardian.parentPortalCode) {
+      void navigator.clipboard.writeText(guardian.parentPortalCode)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  async function sendPortalCode() {
+    if (!guardian.phone || !guardian.parentPortalCode) return
+    setSending(true)
+    setSendResult(null)
+    try {
+      const res = await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'guardian-portal',
+          phone: guardian.phone,
+          name: guardian.name,
+          data: {
+            studentName: student.name,
+            code: guardian.parentPortalCode,
+            portalUrl: 'epiccampus.live/parent-register',
+          },
+        }),
+      })
+      setSendResult(res.ok ? 'sent' : 'error')
+    } catch {
+      setSendResult('error')
+    } finally {
+      setSending(false)
+      setTimeout(() => setSendResult(null), 4000)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-[#DDE3EC] bg-[#F5F7FB] p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="font-jakarta text-sm font-bold uppercase tracking-wide text-[#0B3D6B]">
+          Guardian / Parent
+        </h3>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[#DDE3EC] px-3 py-1.5 font-jakarta text-xs font-semibold text-[#5A6A7A] hover:bg-white"
+        >
+          <span className="ti ti-pencil" />
+          Edit
+        </button>
+      </div>
+
+      <div className="flex flex-wrap items-start gap-4">
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-jakarta text-base font-bold text-[#0D1B2A]">{guardian.name}</p>
+            <span
+              className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                RELATIONSHIP_STYLES[guardian.relationship] ?? 'bg-gray-50 text-gray-700 border-gray-200'
+              }`}
+            >
+              {guardian.relationship}
+            </span>
+          </div>
+
+          {guardian.phone && (
+            <p className="flex items-center gap-1.5 font-inter text-sm text-[#0D1B2A]">
+              <span className="ti ti-phone text-[#0B3D6B]" />
+              <a href={`tel:${guardian.phone}`} className="hover:text-[#0B3D6B] hover:underline">
+                {guardian.phone}
+              </a>
+            </p>
+          )}
+
+          {guardian.email && (
+            <p className="flex items-center gap-1.5 font-inter text-sm text-[#0D1B2A]">
+              <span className="ti ti-mail text-[#0B3D6B]" />
+              <a href={`mailto:${guardian.email}`} className="hover:text-[#0B3D6B] hover:underline">
+                {guardian.email}
+              </a>
+            </p>
+          )}
+
+          {guardian.address && (
+            <p className="flex items-start gap-1.5 font-inter text-sm text-[#5A6A7A]">
+              <span className="ti ti-map-pin mt-0.5 shrink-0 text-[#0B3D6B]" />
+              {guardian.address}
+            </p>
+          )}
+        </div>
+
+        {/* Portal code */}
+        {guardian.parentPortalEnabled && guardian.parentPortalCode && (
+          <div className="w-full rounded-lg border border-[#E8A020]/30 bg-white p-4 sm:w-auto sm:min-w-[200px]">
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+              Parent Portal Code
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-2xl font-bold tracking-[0.2em] text-[#0B3D6B]">
+                {guardian.parentPortalCode}
+              </span>
+              <button
+                type="button"
+                onClick={copyCode}
+                className="rounded p-1 text-[#5A6A7A] hover:text-[#0B3D6B]"
+                title="Copy code"
+              >
+                <span className={`ti ${copied ? 'ti-check text-green-600' : 'ti-copy'} text-sm`} />
+              </button>
+            </div>
+            <p className="mt-1 text-[10px] text-[#5A6A7A]">epiccampus.live/parent-register</p>
+
+            <button
+              type="button"
+              disabled={sending || !guardian.phone}
+              onClick={() => void sendPortalCode()}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[#25D366] px-3 py-1.5 font-jakarta text-xs font-semibold text-white hover:bg-[#20c05a] disabled:opacity-60"
+            >
+              <span className="ti ti-brand-whatsapp text-sm" />
+              {sending ? 'Sending…' : 'Send via WhatsApp'}
+            </button>
+            {sendResult === 'sent' && (
+              <p className="mt-1 text-[10px] font-medium text-green-600">Sent to {guardian.phone}</p>
+            )}
+            {sendResult === 'error' && (
+              <p className="mt-1 text-[10px] font-medium text-red-600">Failed to send — check Twilio config</p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -293,6 +449,29 @@ export default function StudentProfilePage() {
         {tab === 'overview' && (
           <div className="space-y-6">
             <StudentAgentSection student={student} onUpdated={loadData} />
+
+            {/* Guardian card */}
+            {student.guardian ? (
+              <GuardianCard
+                student={student}
+                guardian={student.guardian}
+                onEdit={() => setFormOpen(true)}
+              />
+            ) : (
+              <div className="rounded-xl border border-dashed border-[#DDE3EC] p-5 text-center">
+                <span className="ti ti-user-heart mb-2 block text-2xl text-[#DDE3EC]" />
+                <p className="font-inter text-sm text-[#5A6A7A]">No guardian details added</p>
+                <button
+                  type="button"
+                  onClick={() => setFormOpen(true)}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-[#0B3D6B] px-3 py-1.5 font-jakarta text-xs font-semibold text-[#0B3D6B] hover:bg-[#0B3D6B]/5"
+                >
+                  <span className="ti ti-plus" />
+                  Add Guardian Details
+                </button>
+              </div>
+            )}
+
             <ParentAccessSection student={student} onUpdated={loadData} />
 
             {/* Fee Schedule */}

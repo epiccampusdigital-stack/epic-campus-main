@@ -125,6 +125,16 @@ export interface Student {
   parentAccessEnabled?: boolean
   /** Firebase uid of linked parent account */
   parentId?: string
+  /** Guardian / parent contact details */
+  guardian?: {
+    name: string
+    relationship: 'Father' | 'Mother' | 'Spouse' | 'Sibling' | 'Guardian' | 'Other'
+    phone: string
+    email?: string
+    address?: string
+    parentPortalCode?: string
+    parentPortalEnabled: boolean
+  }
   createdAt: string
   createdBy: string
 }

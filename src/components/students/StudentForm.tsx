@@ -31,6 +31,8 @@ import {
 } from '@/lib/students/helpers'
 import type { BatchDuration, CourseId, Student, StudentLocation } from '@/types'
 
+export type GuardianRelationship = 'Father' | 'Mother' | 'Spouse' | 'Sibling' | 'Guardian' | 'Other'
+
 export interface StudentFormValues {
   name: string
   nic: string
@@ -53,30 +55,47 @@ export interface StudentFormValues {
   status: Student['status']
   visaStatus: NonNullable<Student['visaStatus']>
   notes: string
+  // Guardian / Parent
+  guardianName: string
+  guardianRelationship: GuardianRelationship
+  guardianPhone: string
+  guardianEmail: string
+  guardianAddress: string
+  guardianPortalEnabled: boolean
+  guardianPortalCode: string
 }
 
-const EMPTY: StudentFormValues = {
-  name: '',
-  nic: '',
-  dateOfBirth: '',
-  mobile: '',
-  email: '',
-  address: '',
-  courseId: '',
-  batchId: '',
-  batchDuration: '90days',
-  batchCustomDays: '',
-  batchStartDate: new Date().toISOString().slice(0, 10),
-  location: 'ahangama',
-  agentId: '',
-  enrollmentDate: new Date().toISOString().slice(0, 10),
-  expectedCompletionDate: '',
-  feeAmount: '',
-  feeCurrency: 'LKR',
-  paymentStatus: 'pending',
-  status: 'pending',
-  visaStatus: 'not-started',
-  notes: '',
+function makeEmptyForm(): StudentFormValues {
+  return {
+    name: '',
+    nic: '',
+    dateOfBirth: '',
+    mobile: '',
+    email: '',
+    address: '',
+    courseId: '',
+    batchId: '',
+    batchDuration: '90days',
+    batchCustomDays: '',
+    batchStartDate: new Date().toISOString().slice(0, 10),
+    location: 'ahangama',
+    agentId: '',
+    enrollmentDate: new Date().toISOString().slice(0, 10),
+    expectedCompletionDate: '',
+    feeAmount: '',
+    feeCurrency: 'LKR',
+    paymentStatus: 'pending',
+    status: 'pending',
+    visaStatus: 'not-started',
+    notes: '',
+    guardianName: '',
+    guardianRelationship: 'Father',
+    guardianPhone: '',
+    guardianEmail: '',
+    guardianAddress: '',
+    guardianPortalEnabled: true,
+    guardianPortalCode: String(Math.floor(100000 + Math.random() * 900000)),
+  }
 }
 
 interface StudentFormProps {
@@ -109,6 +128,13 @@ function studentToForm(s: Student): StudentFormValues {
     status: s.status,
     visaStatus: s.visaStatus ?? 'not-started',
     notes: s.notes ?? '',
+    guardianName: s.guardian?.name ?? '',
+    guardianRelationship: s.guardian?.relationship ?? 'Father',
+    guardianPhone: s.guardian?.phone ?? '',
+    guardianEmail: s.guardian?.email ?? '',
+    guardianAddress: s.guardian?.address ?? '',
+    guardianPortalEnabled: s.guardian?.parentPortalEnabled ?? true,
+    guardianPortalCode: s.guardian?.parentPortalCode ?? String(Math.floor(100000 + Math.random() * 900000)),
   }
 }
 
@@ -187,12 +213,13 @@ export default function StudentForm({
   onSaved,
 }: StudentFormProps) {
   const { user } = useManagement()
-  const [form, setForm] = useState<StudentFormValues>(EMPTY)
+  const [form, setForm] = useState<StudentFormValues>(makeEmptyForm())
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [agents, setAgents] = useState<{ uid: string; displayName: string }[]>([])
+  const [guardianSectionOpen, setGuardianSectionOpen] = useState(false)
 
   const isEdit = !!student
 
@@ -207,10 +234,11 @@ export default function StudentForm({
 
   useEffect(() => {
     if (open) {
-      setForm(student ? studentToForm(student) : EMPTY)
+      setForm(student ? studentToForm(student) : makeEmptyForm())
       setPhotoFile(null)
       setPhotoPreview(student?.photoUrl ?? null)
       setError('')
+      setGuardianSectionOpen(!!student?.guardian?.name)
       void getDocs(collection(db, 'users')).then((snap) => {
         const list = snap.docs
           .filter((d) =>
@@ -291,6 +319,19 @@ export default function StudentForm({
         : null
       const batchEndTs = batchEndIso ? Timestamp.fromDate(new Date(batchEndIso)) : null
 
+      const guardianPayload =
+        form.guardianName.trim()
+          ? {
+              name: form.guardianName.trim(),
+              relationship: form.guardianRelationship,
+              phone: form.guardianPhone.trim(),
+              email: form.guardianEmail.trim() || null,
+              address: form.guardianAddress.trim() || null,
+              parentPortalEnabled: form.guardianPortalEnabled,
+              parentPortalCode: form.guardianPortalEnabled ? form.guardianPortalCode : null,
+            }
+          : null
+
       const payload = {
         name: form.name.trim(),
         nic: form.nic.trim(),
@@ -321,6 +362,7 @@ export default function StudentForm({
         status: form.status,
         visaStatus: form.visaStatus,
         notes: form.notes.trim() || null,
+        guardian: guardianPayload,
         updatedAt: serverTimestamp(),
       }
 
@@ -340,6 +382,16 @@ export default function StudentForm({
               name: form.name.trim(),
               data: { status: form.visaStatus },
             }),
+          })
+        }
+        // Write guardian portal code if newly added or changed
+        if (guardianPayload?.parentPortalEnabled && guardianPayload.parentPortalCode) {
+          await setDoc(doc(db, 'parentPortalCodes', guardianPayload.parentPortalCode), {
+            code: guardianPayload.parentPortalCode,
+            studentId: studentDocId,
+            studentName: form.name.trim(),
+            createdAt: serverTimestamp(),
+            isActive: true,
           })
         }
         await logAuditEvent({
@@ -392,6 +444,17 @@ export default function StudentForm({
                   COURSES.find((c) => c.id === form.courseId)?.label ?? form.courseId,
               },
             }),
+          })
+        }
+
+        // Write guardian portal code
+        if (guardianPayload?.parentPortalEnabled && guardianPayload.parentPortalCode) {
+          await setDoc(doc(db, 'parentPortalCodes', guardianPayload.parentPortalCode), {
+            code: guardianPayload.parentPortalCode,
+            studentId: studentDocId,
+            studentName: form.name.trim(),
+            createdAt: serverTimestamp(),
+            isActive: true,
           })
         }
 
@@ -538,6 +601,140 @@ export default function StudentForm({
                   placeholder="Full address"
                 />
               </div>
+            </div>
+
+            {/* Guardian / Parent Details — collapsible */}
+            <div className="mb-6">
+              <button
+                type="button"
+                onClick={() => setGuardianSectionOpen((v) => !v)}
+                className="flex w-full items-center justify-between rounded-lg border border-[#DDE3EC] bg-[#F5F7FB] px-4 py-3 text-left"
+              >
+                <span className="flex items-center gap-2 font-jakarta text-sm font-bold text-[#0B3D6B]">
+                  <span className="ti ti-user-heart text-lg" aria-hidden="true" />
+                  Guardian / Parent Details
+                  {form.guardianName && (
+                    <span className="ml-1 rounded-full bg-[#0B3D6B] px-2 py-0.5 text-[10px] font-semibold text-white">
+                      {form.guardianName}
+                    </span>
+                  )}
+                </span>
+                <span
+                  className={`ti ${guardianSectionOpen ? 'ti-chevron-up' : 'ti-chevron-down'} text-[#5A6A7A]`}
+                  aria-hidden="true"
+                />
+              </button>
+
+              {guardianSectionOpen && (
+                <div className="mt-3 space-y-4 rounded-lg border border-[#DDE3EC] p-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <FieldLabel>Guardian Full Name *</FieldLabel>
+                      <TextInput
+                        value={form.guardianName}
+                        onChange={(v) => setField('guardianName', v)}
+                        placeholder="Full name"
+                      />
+                    </div>
+                    <div>
+                      <FieldLabel>Relationship *</FieldLabel>
+                      <SelectInput
+                        value={form.guardianRelationship}
+                        onChange={(v) => setField('guardianRelationship', v as typeof form.guardianRelationship)}
+                      >
+                        {(['Father', 'Mother', 'Spouse', 'Sibling', 'Guardian', 'Other'] as const).map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </SelectInput>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <FieldLabel>Phone Number *</FieldLabel>
+                      <TextInput
+                        type="tel"
+                        value={form.guardianPhone}
+                        onChange={(v) => setField('guardianPhone', v)}
+                        placeholder="07XXXXXXXX"
+                      />
+                    </div>
+                    <div>
+                      <FieldLabel>Email Address</FieldLabel>
+                      <TextInput
+                        type="email"
+                        value={form.guardianEmail}
+                        onChange={(v) => setField('guardianEmail', v)}
+                        placeholder="guardian@email.com"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <FieldLabel>Address</FieldLabel>
+                    <textarea
+                      value={form.guardianAddress}
+                      onChange={(e) => setField('guardianAddress', e.target.value)}
+                      rows={2}
+                      className="w-full resize-none rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-base text-[#0D1B2A] outline-none focus:border-[#E8A020] sm:text-sm"
+                      placeholder="Guardian address"
+                    />
+                  </div>
+
+                  {/* Parent portal toggle + code */}
+                  <div className="rounded-lg bg-[#F5F7FB] p-4">
+                    <label className="flex cursor-pointer items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setField('guardianPortalEnabled', !form.guardianPortalEnabled)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                          form.guardianPortalEnabled ? 'bg-[#0B3D6B]' : 'bg-gray-300'
+                        }`}
+                        aria-checked={form.guardianPortalEnabled}
+                        role="switch"
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                            form.guardianPortalEnabled ? 'translate-x-4' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                      <span className="font-inter text-sm font-medium text-[#0D1B2A]">
+                        Enable parent portal access
+                      </span>
+                    </label>
+
+                    {form.guardianPortalEnabled && (
+                      <div className="mt-3">
+                        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+                          Parent Portal Code
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 rounded-lg border border-[#E8A020]/40 bg-white px-4 py-2">
+                            <span className="font-mono text-xl font-bold tracking-[0.25em] text-[#0B3D6B]">
+                              {form.guardianPortalCode}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setField(
+                                'guardianPortalCode',
+                                String(Math.floor(100000 + Math.random() * 900000)),
+                              )
+                            }
+                            className="rounded-lg border border-[#DDE3EC] p-2 text-[#5A6A7A] hover:bg-[#F5F7FB]"
+                            title="Regenerate code"
+                          >
+                            <span className="ti ti-refresh text-base" aria-hidden="true" />
+                          </button>
+                        </div>
+                        <p className="mt-1.5 text-xs text-[#5A6A7A]">
+                          Share this code with the parent to access the parent portal
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <SectionTitle icon="ti-school" title="Program Info" />

@@ -24,6 +24,9 @@ export async function POST(req: NextRequest) {
       case 'enrollment':
         message = MESSAGES.enrollmentConfirmed(name, data?.program || 'your program')
         break
+      case 'guardian-portal':
+        message = `Hi ${name}, you have been registered as a guardian for ${data?.studentName ?? 'your child'} at EPIC Campus.\n\nYour parent portal access code is: *${data?.code ?? '------'}*\n\nRegister at: ${data?.portalUrl ?? 'epiccampus.live/parent-register'} using this code to track progress, payments, and exam results.\n\nInfo: info@epiccampus.lk`
+        break
       default:
         return NextResponse.json({ error: 'Unknown notification type' }, { status: 400 })
     }
