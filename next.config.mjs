@@ -15,6 +15,7 @@ const nextConfig = {
         ...(Array.isArray(config.externals) ? config.externals : []),
         '@grpc/grpc-js',
         '@grpc/proto-loader',
+        'protobufjs',
       ]
     }
     return config
