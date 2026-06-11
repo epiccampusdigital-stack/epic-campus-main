@@ -87,9 +87,9 @@ export default function MealIngredientList({
             className="rounded-xl border border-[#DDE3EC] bg-white p-4 dark:border-gray-600 dark:bg-gray-900/50"
           >
             <IngredientPicker
-              items={inventory}
-              value={row.itemId}
-              onChange={(id) => updateRow(index, { itemId: id })}
+              inventoryItems={inventory}
+              selectedItemId={row.itemId}
+              onSelect={(item) => updateRow(index, { itemId: item.id })}
             />
 
             {item && (

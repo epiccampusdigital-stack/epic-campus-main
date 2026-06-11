@@ -7,7 +7,6 @@ import {
   getDocs,
   query,
   orderBy,
-  where,
   doc,
   updateDoc,
   serverTimestamp,
@@ -20,6 +19,7 @@ import MealIngredientList, {
   rowsToIngredients,
   type IngredientRow,
 } from '@/components/kitchen/MealIngredientList'
+import { fetchActiveInventory } from '@/lib/kitchen/fetchActiveInventory'
 import { MEAL_SESSION_VISUAL } from '@/lib/kitchen/foodImages'
 import { formatLKR } from '@/lib/utils/formatCurrency'
 import type { MealLog, MealType, InventoryItem } from '@/types/kitchen'
@@ -46,6 +46,7 @@ export default function MealLogPage() {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
+  const [toastKind, setToastKind] = useState<'success' | 'warning'>('success')
 
   const [fDate, setFDate] = useState(today())
   const [fType, setFType] = useState<MealType>('lunch')
@@ -70,12 +71,10 @@ export default function MealLogPage() {
 
   async function loadInventory() {
     try {
-      const snap = await getDocs(
-        query(collection(db, 'inventory'), where('isActive', '==', true), orderBy('itemName')),
-      )
-      setInventoryItems(snap.docs.map((d) => ({ id: d.id, ...d.data() } as InventoryItem)))
-    } catch {
-      // ignore
+      const items = await fetchActiveInventory()
+      setInventoryItems(items)
+    } catch (err) {
+      console.error('[MealLog inventory]', err)
     }
   }
 
@@ -84,9 +83,21 @@ export default function MealLogPage() {
     loadInventory()
   }, [])
 
-  function showToast(msg: string) {
+  function showToast(msg: string, kind: 'success' | 'warning' = 'success') {
+    setToastKind(kind)
     setToast(msg)
-    setTimeout(() => setToast(''), 3000)
+    setTimeout(() => setToast(''), 4000)
+  }
+
+  function openLogSlide() {
+    setIngredients([{ itemId: '', qty: '' }])
+    setFDate(today())
+    setFType('lunch')
+    setFStudents('')
+    setFStaff('')
+    setFNotes('')
+    void loadInventory()
+    setShowSlide(true)
   }
 
   const filtered = logs.filter((l) => {
@@ -120,25 +131,32 @@ export default function MealLogPage() {
         createdAt: serverTimestamp(),
       })
 
+      let inventoryErrors = 0
       for (const ing of usedIngredients) {
         const item = inventoryItems.find((i) => i.id === ing.itemId)
         if (!item) continue
-        const newStock = Math.max(0, item.currentStock - ing.qtyUsed)
-        await updateDoc(doc(db, 'inventory', ing.itemId), {
-          currentStock: newStock,
-          lastUpdated: serverTimestamp(),
-          updatedBy: user?.uid ?? '',
-          updatedByName: user?.displayName ?? '',
-        })
-        await addDoc(collection(db, 'inventory', ing.itemId, 'history'), {
-          action: 'deducted',
-          qty: ing.qtyUsed,
-          reason: 'meal-log',
-          date: fDate,
-          by: user?.uid ?? '',
-          byName: user?.displayName ?? '',
-          createdAt: serverTimestamp(),
-        })
+        try {
+          const newStock = Math.max(0, item.currentStock - ing.qtyUsed)
+          await updateDoc(doc(db, 'inventory', ing.itemId), {
+            currentStock: newStock,
+            lastUpdated: serverTimestamp(),
+            updatedBy: user?.uid ?? '',
+            updatedByName: user?.displayName ?? '',
+          })
+          await addDoc(collection(db, 'inventory', ing.itemId, 'history'), {
+            action: 'deducted',
+            qty: ing.qtyUsed,
+            reason: 'meal-log',
+            mealType: fType,
+            date: fDate,
+            by: user?.uid ?? '',
+            byName: user?.displayName ?? '',
+            createdAt: serverTimestamp(),
+          })
+        } catch (err) {
+          inventoryErrors += 1
+          console.error('[MealLog inventory deduct]', ing.itemId, err)
+        }
       }
 
       setShowSlide(false)
@@ -148,8 +166,16 @@ export default function MealLogPage() {
       setFStaff('')
       setFNotes('')
       setIngredients([{ itemId: '', qty: '' }])
-      showToast('Meal logged successfully')
+      if (inventoryErrors > 0) {
+        showToast(
+          `Meal logged, but ${inventoryErrors} inventory update(s) failed — check stock manually`,
+          'warning',
+        )
+      } else {
+        showToast('Meal logged successfully')
+      }
       await loadLogs()
+      await loadInventory()
     } catch (err) {
       console.error('[MealLog save]', err)
     } finally {
@@ -180,7 +206,11 @@ export default function MealLogPage() {
   return (
     <div className="space-y-4 md:space-y-6">
       {toast && (
-        <div className="fixed bottom-24 right-4 z-50 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-lg md:bottom-6">
+        <div
+          className={`fixed bottom-24 right-4 z-50 rounded-xl px-5 py-3 text-sm font-medium text-white shadow-lg md:bottom-6 ${
+            toastKind === 'warning' ? 'bg-amber-600' : 'bg-emerald-600'
+          }`}
+        >
           {toast}
         </div>
       )}
@@ -189,7 +219,7 @@ export default function MealLogPage() {
         <h1 className="text-xl font-bold text-[#0D1B2A] dark:text-white">Meal Log</h1>
         <button
           type="button"
-          onClick={() => setShowSlide(true)}
+          onClick={openLogSlide}
           className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-[#E8A020] text-base font-bold text-white hover:bg-[#d4911c] md:w-auto md:px-6"
         >
           <span className="ti ti-plus" /> Log New Meal

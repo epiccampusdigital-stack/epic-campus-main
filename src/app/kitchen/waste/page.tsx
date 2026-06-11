@@ -23,6 +23,7 @@ import { useKitchen } from '@/app/kitchen/context'
 import CountStepper from '@/components/kitchen/CountStepper'
 import IngredientPicker from '@/components/kitchen/IngredientPicker'
 import KitchenBottomSheet from '@/components/kitchen/KitchenBottomSheet'
+import { fetchActiveInventory } from '@/lib/kitchen/fetchActiveInventory'
 import { getFoodEmoji, WASTE_REASON_VISUAL } from '@/lib/kitchen/foodImages'
 import { formatLKR } from '@/lib/utils/formatCurrency'
 import type {
@@ -89,13 +90,13 @@ export default function WastePage() {
   async function loadData() {
     setLoading(true)
     try {
-      const [wasteSnap, invSnap, mealSnap] = await Promise.all([
+      const [wasteSnap, invItems, mealSnap] = await Promise.all([
         getDocs(query(collection(db, 'wasteLog'), orderBy('date', 'desc'), orderBy('createdAt', 'desc'))),
-        getDocs(query(collection(db, 'inventory'), where('isActive', '==', true), orderBy('itemName'))),
+        fetchActiveInventory(),
         getDocs(query(collection(db, 'mealLogs'), where('date', '==', today()))),
       ])
       setEntries(wasteSnap.docs.map((d) => ({ id: d.id, ...d.data() } as WasteEntry)))
-      setInventoryItems(invSnap.docs.map((d) => ({ id: d.id, ...d.data() } as InventoryItem)))
+      setInventoryItems(invItems)
       setTodayLogs(mealSnap.docs.map((d) => ({ id: d.id, ...d.data() } as MealLog)))
     } catch (err) {
       console.error('[Waste]', err)
@@ -435,9 +436,9 @@ export default function WastePage() {
           <div>
             <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">Item *</label>
             <IngredientPicker
-              items={inventoryItems}
-              value={fItemId}
-              onChange={setFItemId}
+              inventoryItems={inventoryItems}
+              selectedItemId={fItemId}
+              onSelect={(item) => setFItemId(item.id)}
               placeholder="Search item…"
             />
           </div>
