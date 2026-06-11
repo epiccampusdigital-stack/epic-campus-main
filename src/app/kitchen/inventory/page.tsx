@@ -13,7 +13,6 @@ import {
   limit,
   serverTimestamp,
   Timestamp,
-  deleteField,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { useKitchen } from '@/app/kitchen/context'
@@ -297,8 +296,9 @@ export default function InventoryPage() {
       if (values.expiryDate) {
         payload.expiryDate = values.expiryDate
         payload.expiryAlertDays = Number(values.expiryAlertDays) || 3
-      } else if (slideMode === 'edit') {
-        payload.expiryDate = deleteField()
+      } else if (slideMode === 'edit' && editItem) {
+        payload.expiryDate = null
+        payload.expiryAlertDays = null
       }
       if (slideMode === 'add') {
         await addDoc(collection(db, 'inventory'), payload)

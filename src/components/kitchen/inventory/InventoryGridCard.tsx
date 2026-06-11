@@ -2,7 +2,11 @@
 
 import FoodEmoji from '@/components/kitchen/FoodEmoji'
 import { findFoodItem, getFoodEmoji } from '@/lib/kitchen/foodImages'
-import { formatExpiryLabel } from '@/lib/kitchen/expiryHelpers'
+import {
+  daysUntilExpiry,
+  formatExpiryBadgeDate,
+  getExpiryStatus,
+} from '@/lib/kitchen/expiryHelpers'
 import { useKitchenSinhala } from '@/lib/kitchen/useKitchenSinhala'
 import type { InventoryItem } from '@/types/kitchen'
 
@@ -19,6 +23,35 @@ function stockBarColor(item: InventoryItem): string {
   return 'bg-emerald-500'
 }
 
+function ExpiryBadge({ item }: { item: InventoryItem }) {
+  if (!item.expiryDate) return null
+  const status = getExpiryStatus(item)
+  const label = formatExpiryBadgeDate(item.expiryDate)
+
+  if (status === 'expired') {
+    return (
+      <span className="mt-1 inline-block rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-900/30 dark:text-red-400">
+        EXPIRED {label}
+      </span>
+    )
+  }
+  if (status === 'alert') {
+    return (
+      <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+        Expires {label}
+      </span>
+    )
+  }
+  if (status === 'week') {
+    return (
+      <span className="mt-1 inline-block rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-bold text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+        Exp: {label}
+      </span>
+    )
+  }
+  return <p className="mt-1 text-center text-[10px] text-gray-400">Exp: {label}</p>
+}
+
 export default function InventoryGridCard({ item, onEdit, onRestock }: InventoryGridCardProps) {
   const { sinhala } = useKitchenSinhala()
   const food = findFoodItem(item.itemName)
@@ -26,7 +59,7 @@ export default function InventoryGridCard({ item, onEdit, onRestock }: Inventory
   const fillPct = Math.min(100, (item.currentStock / maxBar) * 100)
   const isOut = item.currentStock <= 0
   const isLow = item.currentStock <= item.minStockLevel && !isOut
-  const expiryLabel = formatExpiryLabel(item)
+  const expiryStatus = getExpiryStatus(item)
 
   return (
     <div
@@ -35,11 +68,13 @@ export default function InventoryGridCard({ item, onEdit, onRestock }: Inventory
       onClick={onEdit}
       onKeyDown={(e) => e.key === 'Enter' && onEdit()}
       className={`relative flex min-h-[180px] cursor-pointer flex-col rounded-2xl border-2 bg-white p-3 shadow-sm transition-shadow hover:shadow-md dark:bg-gray-900/50 md:min-h-0 md:p-4 ${
-        isOut
-          ? 'border-red-400 bg-red-50/50 dark:border-red-600 dark:bg-red-900/10'
-          : isLow
-            ? 'border-[#E8A020]'
-            : 'border-gray-200 dark:border-gray-600'
+        expiryStatus === 'expired'
+          ? 'border-red-500 bg-red-50/30 dark:border-red-600'
+          : isOut
+            ? 'border-red-400 bg-red-50/50 dark:border-red-600 dark:bg-red-900/10'
+            : isLow
+              ? 'border-[#E8A020]'
+              : 'border-gray-200 dark:border-gray-600'
       }`}
     >
       {isOut && (
@@ -79,13 +114,9 @@ export default function InventoryGridCard({ item, onEdit, onRestock }: Inventory
         <p className="mt-1 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
           {item.currentStock} {item.unit}
         </p>
-        {expiryLabel && (
-          <span
-            className={`mt-1 block text-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${expiryLabel.className}`}
-          >
-            {expiryLabel.text}
-          </span>
-        )}
+        <div className="text-center">
+          <ExpiryBadge item={item} />
+        </div>
       </div>
 
       <button

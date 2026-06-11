@@ -196,19 +196,32 @@ export default function MealLogPage() {
       })
 
       let inventoryErrors = 0
-      const updatedItems: InventoryItem[] = []
+      const updatedItems: Array<{
+        itemName: string
+        emoji: string
+        currentStock: number
+        minStockLevel: number
+        unit: string
+      }> = []
+
       for (const ing of usedIngredients) {
         const item = inventoryItems.find((i) => i.id === ing.itemId)
         if (!item) continue
         try {
           const newStock = Math.max(0, item.currentStock - ing.qtyUsed)
+          updatedItems.push({
+            itemName: item.itemName,
+            emoji: getFoodEmoji(item.itemName),
+            currentStock: newStock,
+            minStockLevel: item.minStockLevel,
+            unit: item.unit,
+          })
           await updateDoc(doc(db, 'inventory', ing.itemId), {
             currentStock: newStock,
             lastUpdated: serverTimestamp(),
             updatedBy: user?.uid ?? '',
             updatedByName: user?.displayName ?? '',
           })
-          updatedItems.push({ ...item, currentStock: newStock })
           await addDoc(collection(db, 'inventory', ing.itemId, 'history'), {
             action: 'deducted',
             qty: ing.qtyUsed,
@@ -231,18 +244,10 @@ export default function MealLogPage() {
 
       const lowItems = updatedItems.filter((i) => i.currentStock <= i.minStockLevel)
       if (lowItems.length > 0) {
-        void fetch('/api/kitchen/low-stock-alert', {
+        fetch('/api/kitchen/low-stock-alert', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            lowStockItems: lowItems.map((i) => ({
-              itemName: i.itemName,
-              emoji: getFoodEmoji(i.itemName),
-              currentStock: i.currentStock,
-              minStockLevel: i.minStockLevel,
-              unit: i.unit,
-            })),
-          }),
+          body: JSON.stringify({ lowStockItems: lowItems }),
         }).catch(() => {})
       }
 
@@ -259,7 +264,7 @@ export default function MealLogPage() {
           'warning',
         )
       } else if (lowItems.length > 0) {
-        showToast('Meal logged successfully. Low stock alert sent to admin', 'warning')
+        showToast('Meal logged successfully. ⚠️ Low stock alert sent to admin', 'warning')
       } else {
         showToast('Meal logged successfully')
       }

@@ -283,7 +283,7 @@ export default function InventoryItemSlideOver({
 
             <div>
               <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
-                Expiry date
+                Expiry Date
               </label>
               <input
                 type="date"

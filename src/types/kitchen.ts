@@ -25,8 +25,8 @@ export interface InventoryItem {
 export interface KitchenBudget {
   id: string
   monthlyBudget: number
-  updatedAt?: Timestamp
-  updatedBy?: string
+  updatedAt: Timestamp
+  updatedBy: string
 }
 
 export interface IngredientUsed {

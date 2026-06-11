@@ -1,35 +1,70 @@
-import { PDFDocument, rgb, StandardFonts, type PDFPage, type PDFFont } from 'pdf-lib'
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import { collection, getDocs, query, orderBy } from 'firebase/firestore'
+import { db } from '@/lib/firebase/client'
+import { daysUntilExpiry } from '@/lib/kitchen/expiryHelpers'
+import type { ReportPeriod } from '@/lib/kitchen/reportPeriods'
 import { safePdfText } from '@/lib/utils/pdfText'
 import type { InventoryItem, MealLog, WasteEntry, WasteReason } from '@/types/kitchen'
 
 const NAVY = rgb(0.043, 0.239, 0.42)
 const GOLD = rgb(0.91, 0.627, 0.125)
-const GRAY = rgb(0.4, 0.4, 0.4)
+const GRAY = rgb(0.45, 0.45, 0.45)
 const RED = rgb(0.85, 0.2, 0.2)
 const AMBER = rgb(0.85, 0.55, 0.1)
+const GREEN = rgb(0.1, 0.55, 0.35)
 const WHITE = rgb(1, 1, 1)
-const LIGHT_GRAY = rgb(0.95, 0.96, 0.98)
 
-export interface KitchenReportSummary {
-  totalSpend: number
-  totalStudents: number
-  totalStaff: number
-  costPerStudentPerDay: number
-  totalWasteValue: number
-  mostUsedIngredient: string
-  mostWastedItem: string
+function normalizeDate(date: unknown): string {
+  if (!date) return ''
+  if (typeof date === 'string') return date.slice(0, 10)
+  if (typeof date === 'object' && date !== null && 'toDate' in date) {
+    const toDate = (date as { toDate?: () => Date }).toDate
+    if (typeof toDate === 'function') {
+      return toDate.call(date).toISOString().slice(0, 10)
+    }
+  }
+  if (typeof date === 'object' && date !== null && 'seconds' in date) {
+    return new Date((date as { seconds: number }).seconds * 1000).toISOString().slice(0, 10)
+  }
+  return String(date).slice(0, 10)
 }
 
-export interface KitchenReportData {
-  periodType: 'weekly' | 'monthly'
-  periodLabel: string
-  startDate: string
-  endDate: string
-  generatedAt: Date
-  meals: MealLog[]
-  waste: WasteEntry[]
-  inventory: InventoryItem[]
-  summary: KitchenReportSummary
+function parseMealLog(id: string, data: Record<string, unknown>): MealLog {
+  return {
+    id,
+    date: normalizeDate(data.date),
+    mealType: data.mealType as MealLog['mealType'],
+    studentCount: Number(data.studentCount ?? 0),
+    staffCount: Number(data.staffCount ?? 0),
+    totalServings: Number(data.totalServings ?? 0),
+    ingredientsUsed: Array.isArray(data.ingredientsUsed)
+      ? (data.ingredientsUsed as MealLog['ingredientsUsed'])
+      : [],
+    estimatedCost: Number(data.estimatedCost ?? 0),
+    costPerPerson: Number(data.costPerPerson ?? 0),
+    notes: String(data.notes ?? ''),
+    loggedBy: String(data.loggedBy ?? ''),
+    loggedByName: String(data.loggedByName ?? ''),
+    createdAt: data.createdAt as MealLog['createdAt'],
+  }
+}
+
+function parseWaste(id: string, data: Record<string, unknown>): WasteEntry {
+  return {
+    id,
+    date: normalizeDate(data.date),
+    itemId: String(data.itemId ?? ''),
+    itemName: String(data.itemName ?? ''),
+    quantity: Number(data.quantity ?? 0),
+    unit: data.unit as WasteEntry['unit'],
+    reason: data.reason as WasteReason,
+    estimatedLoss: Number(data.estimatedLoss ?? 0),
+    mealLogId: data.mealLogId ? String(data.mealLogId) : undefined,
+    notes: String(data.notes ?? ''),
+    loggedBy: String(data.loggedBy ?? ''),
+    loggedByName: String(data.loggedByName ?? ''),
+    createdAt: data.createdAt as WasteEntry['createdAt'],
+  }
 }
 
 function lkr(n: number): string {
@@ -41,82 +76,75 @@ function truncate(text: string, max: number): string {
   return t.length > max ? `${t.slice(0, max - 1)}…` : t
 }
 
-function drawHeaderBar(page: PDFPage, width: number, height: number) {
-  page.drawRectangle({ x: 0, y: height - 72, width, height: 72, color: NAVY })
+async function fetchReportData(period: ReportPeriod) {
+  const [mealSnap, wasteSnap, invSnap] = await Promise.all([
+    getDocs(query(collection(db, 'mealLogs'), orderBy('createdAt', 'desc'))).catch(() =>
+      getDocs(collection(db, 'mealLogs')),
+    ),
+    getDocs(query(collection(db, 'wasteLog'), orderBy('date', 'asc'))).catch(() =>
+      getDocs(collection(db, 'wasteLog')),
+    ),
+    getDocs(collection(db, 'inventory')),
+  ])
+
+  const meals = mealSnap.docs
+    .map((d) => parseMealLog(d.id, d.data() as Record<string, unknown>))
+    .filter((m) => m.date >= period.startDate && m.date <= period.endDate)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.mealType.localeCompare(b.mealType))
+
+  const waste = wasteSnap.docs
+    .map((d) => parseWaste(d.id, d.data() as Record<string, unknown>))
+    .filter((w) => w.date >= period.startDate && w.date <= period.endDate)
+
+  const inventory = invSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() } as InventoryItem))
+    .filter((i) => i.isActive !== false)
+    .sort((a, b) => a.itemName.localeCompare(b.itemName))
+
+  return { meals, waste, inventory }
 }
 
-function drawFooter(page: PDFPage, font: PDFFont, pageNum: number) {
-  page.drawText(`Epic Campus Kitchen · Page ${pageNum}`, {
-    x: 40,
-    y: 28,
-    size: 8,
-    font,
-    color: GRAY,
-  })
-}
+export async function generateKitchenReportPDF(period: ReportPeriod): Promise<Uint8Array> {
+  const { meals, waste, inventory } = await fetchReportData(period)
 
-function drawTableHeader(
-  page: PDFPage,
-  font: PDFFont,
-  y: number,
-  cols: string[],
-  colX: number[],
-) {
-  page.drawRectangle({ x: 40, y: y - 4, width: 515, height: 18, color: LIGHT_GRAY })
-  cols.forEach((col, i) => {
-    page.drawText(col, { x: colX[i], y, size: 8, font, color: NAVY })
-  })
-}
-
-export function buildKitchenReportSummary(
-  meals: MealLog[],
-  waste: WasteEntry[],
-): KitchenReportSummary {
-  const totalSpend = meals.reduce((s, m) => s + (m.estimatedCost || 0), 0)
-  const totalStudents = meals.reduce((s, m) => s + (m.studentCount || 0), 0)
-  const totalStaff = meals.reduce((s, m) => s + (m.staffCount || 0), 0)
+  const totalSpent = meals.reduce((s, m) => s + m.estimatedCost, 0)
+  const totalStudents = meals.reduce((s, m) => s + m.studentCount, 0)
+  const totalStaff = meals.reduce((s, m) => s + m.staffCount, 0)
+  const totalWaste = waste.reduce((s, w) => s + w.estimatedLoss, 0)
   const uniqueDays = new Set(meals.map((m) => m.date)).size || 1
-  const costPerStudentPerDay =
-    totalStudents > 0 ? totalSpend / totalStudents / uniqueDays : 0
-
-  const totalWasteValue = waste.reduce((s, w) => s + (w.estimatedLoss || 0), 0)
+  const costPerStudentDay =
+    totalStudents > 0 ? totalSpent / totalStudents / uniqueDays : 0
 
   const ingredientTotals: Record<string, number> = {}
   meals.forEach((m) => {
     m.ingredientsUsed?.forEach((ing) => {
-      ingredientTotals[ing.itemName] =
-        (ingredientTotals[ing.itemName] || 0) + ing.qtyUsed
+      ingredientTotals[ing.itemName] = (ingredientTotals[ing.itemName] ?? 0) + ing.qtyUsed
     })
   })
   const mostUsed = Object.entries(ingredientTotals).sort((a, b) => b[1] - a[1])[0]
 
-  const wasteTotals: Record<string, number> = {}
+  const wasteByItem: Record<string, number> = {}
   waste.forEach((w) => {
-    wasteTotals[w.itemName] = (wasteTotals[w.itemName] || 0) + w.estimatedLoss
+    wasteByItem[w.itemName] = (wasteByItem[w.itemName] ?? 0) + w.estimatedLoss
   })
-  const mostWasted = Object.entries(wasteTotals).sort((a, b) => b[1] - a[1])[0]
+  const mostWasted = Object.entries(wasteByItem).sort((a, b) => b[1] - a[1])[0]
 
-  return {
-    totalSpend,
-    totalStudents,
-    totalStaff,
-    costPerStudentPerDay,
-    totalWasteValue,
-    mostUsedIngredient: mostUsed
-      ? `${mostUsed[0]} (${mostUsed[1]} total)`
-      : '—',
-    mostWastedItem: mostWasted ? mostWasted[0] : '—',
-  }
-}
+  const wasteByReason: Record<string, number> = {}
+  waste.forEach((w) => {
+    wasteByReason[w.reason] = (wasteByReason[w.reason] ?? 0) + w.estimatedLoss
+  })
 
-export async function generateKitchenReportPDF(data: KitchenReportData): Promise<Uint8Array> {
+  const wasteByDate: Record<string, number> = {}
+  waste.forEach((w) => {
+    wasteByDate[w.date] = (wasteByDate[w.date] ?? 0) + w.estimatedLoss
+  })
+
   const doc = await PDFDocument.create()
   const font = await doc.embedFont(StandardFonts.HelveticaBold)
   const fontReg = await doc.embedFont(StandardFonts.Helvetica)
-  const { width, height } = { width: 595, height: 842 }
-
-  const generatedStr = data.generatedAt.toLocaleString('en-GB', {
-    day: '2-digit',
+  const now = new Date()
+  const generatedAt = now.toLocaleString('en-GB', {
+    day: 'numeric',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
@@ -124,180 +152,188 @@ export async function generateKitchenReportPDF(data: KitchenReportData): Promise
   })
 
   // Page 1 — Cover
-  const p1 = doc.addPage([width, height])
-  drawHeaderBar(p1, width, height)
-  p1.drawText('EPIC CAMPUS', { x: 40, y: height - 48, size: 28, font, color: WHITE })
-  p1.drawText('Kitchen Cost Report', { x: 40, y: height - 100, size: 22, font, color: GOLD })
-  p1.drawText('Ahangama Main Campus', { x: 40, y: height - 130, size: 14, font: fontReg, color: GRAY })
-  p1.drawText(`Period: ${safePdfText(data.periodLabel)}`, {
-    x: 40,
-    y: height - 200,
-    size: 16,
-    font,
-    color: NAVY,
-  })
-  p1.drawText(`Generated: ${safePdfText(generatedStr)}`, {
-    x: 40,
-    y: height - 230,
-    size: 11,
-    font: fontReg,
-    color: GRAY,
-  })
-  p1.drawRectangle({ x: 40, y: 80, width: width - 80, height: 3, color: GOLD })
-  drawFooter(p1, fontReg, 1)
+  {
+    const page = doc.addPage([595, 842])
+    const { width, height } = page.getSize()
+    page.drawRectangle({ x: 0, y: height - 120, width, height: 120, color: NAVY })
+    page.drawText('EPIC CAMPUS', { x: 50, y: height - 70, size: 28, font, color: WHITE })
+    page.drawText('Kitchen Cost Report', { x: 50, y: height - 100, size: 16, font, color: GOLD })
+    page.drawText('Ahangama Main Campus', { x: 50, y: height - 200, size: 14, font: fontReg, color: GRAY })
+    page.drawText(`Period: ${safePdfText(period.label)}`, { x: 50, y: height - 240, size: 18, font, color: NAVY })
+    page.drawText(`Generated: ${safePdfText(generatedAt)}`, { x: 50, y: height - 280, size: 11, font: fontReg, color: GRAY })
+    page.drawRectangle({ x: 0, y: 0, width, height: 40, color: GOLD })
+    page.drawText('www.epiccampus.live', { x: 50, y: 14, size: 10, font: fontReg, color: NAVY })
+  }
 
   // Page 2 — Summary
-  const p2 = doc.addPage([width, height])
-  p2.drawText('SUMMARY', { x: 40, y: height - 60, size: 18, font, color: NAVY })
-  const summaryLines = [
-    `Total spend for period: ${lkr(data.summary.totalSpend)}`,
-    `Total meals served: ${data.summary.totalStudents} students + ${data.summary.totalStaff} staff`,
-    `Cost per student per day: ${lkr(data.summary.costPerStudentPerDay)}`,
-    `Total waste value: ${lkr(data.summary.totalWasteValue)}`,
-    `Most used ingredient: ${safePdfText(data.summary.mostUsedIngredient)}`,
-    `Most wasted item: ${safePdfText(data.summary.mostWastedItem)}`,
-  ]
-  summaryLines.forEach((line, i) => {
-    p2.drawText(line, { x: 40, y: height - 100 - i * 28, size: 12, font: fontReg, color: NAVY })
-  })
-  drawFooter(p2, fontReg, 2)
+  {
+    const page = doc.addPage([595, 842])
+    let y = 780
+    page.drawText('Summary', { x: 50, y, size: 20, font, color: NAVY })
+    y -= 40
+    const lines = [
+      `Total spend for period: ${lkr(totalSpent)}`,
+      `Total meals served: ${totalStudents} students + ${totalStaff} staff`,
+      `Cost per student per day: ${lkr(costPerStudentDay)}`,
+      `Total waste value: ${lkr(totalWaste)}`,
+      mostUsed
+        ? `Most used ingredient: ${mostUsed[0]} (${mostUsed[1].toFixed(1)} units)`
+        : 'Most used ingredient: —',
+      mostWasted
+        ? `Most wasted item: ${mostWasted[0]} (${lkr(mostWasted[1])})`
+        : 'Most wasted item: —',
+    ]
+    lines.forEach((line) => {
+      page.drawText(safePdfText(line), { x: 50, y, size: 12, font: fontReg, color: GRAY })
+      y -= 28
+    })
+  }
 
   // Page 3 — Daily breakdown
-  const p3 = doc.addPage([width, height])
-  p3.drawText('DAILY BREAKDOWN', { x: 40, y: height - 60, size: 18, font, color: NAVY })
-  const colX = [42, 95, 155, 205, 255, 340, 430]
-  const headers = ['Date', 'Meal', 'Stud.', 'Staff', 'Cost', 'Waste']
-  drawTableHeader(p3, font, height - 88, headers, colX)
+  {
+    const page = doc.addPage([595, 842])
+    let y = 780
+    page.drawText('Daily Breakdown', { x: 50, y, size: 18, font, color: NAVY })
+    y -= 30
+    const headers = ['Date', 'Meal', 'Students', 'Staff', 'Cost', 'Waste']
+    const colX = [50, 110, 200, 260, 320, 420]
+    headers.forEach((h, i) => {
+      page.drawText(h, { x: colX[i], y, size: 9, font, color: NAVY })
+    })
+    y -= 8
+    page.drawLine({ start: { x: 50, y }, end: { x: 545, y }, thickness: 1, color: GRAY })
+    y -= 16
 
-  const wasteByDate: Record<string, number> = {}
-  data.waste.forEach((w) => {
-    wasteByDate[w.date] = (wasteByDate[w.date] || 0) + w.estimatedLoss
-  })
+    let sumStudents = 0
+    let sumStaff = 0
+    let sumCost = 0
+    let sumWaste = 0
 
-  let y = height - 108
-  let totStud = 0
-  let totStaff = 0
-  let totCost = 0
-  let totWaste = 0
+    meals.forEach((m) => {
+      if (y < 80) return
+      const dayWaste = wasteByDate[m.date] ?? 0
+      sumStudents += m.studentCount
+      sumStaff += m.staffCount
+      sumCost += m.estimatedCost
+      sumWaste += dayWaste
+      const row = [
+        m.date.slice(5),
+        m.mealType,
+        String(m.studentCount),
+        String(m.staffCount),
+        lkr(m.estimatedCost),
+        lkr(dayWaste),
+      ]
+      row.forEach((cell, i) => {
+        page.drawText(truncate(cell, i === 4 || i === 5 ? 14 : 12), {
+          x: colX[i],
+          y,
+          size: 8,
+          font: fontReg,
+          color: GRAY,
+        })
+      })
+      y -= 14
+    })
 
-  const sortedMeals = [...data.meals].sort((a, b) => a.date.localeCompare(b.date))
-
-  for (const m of sortedMeals) {
-    if (y < 100) break
-    const wCost = wasteByDate[m.date] ?? 0
-    totStud += m.studentCount
-    totStaff += m.staffCount
-    totCost += m.estimatedCost
-    totWaste += wCost
-    p3.drawText(m.date.slice(5), { x: colX[0], y, size: 8, font: fontReg, color: GRAY })
-    p3.drawText(truncate(m.mealType, 10), { x: colX[1], y, size: 8, font: fontReg, color: GRAY })
-    p3.drawText(String(m.studentCount), { x: colX[2], y, size: 8, font: fontReg, color: GRAY })
-    p3.drawText(String(m.staffCount), { x: colX[3], y, size: 8, font: fontReg, color: GRAY })
-    p3.drawText(lkr(m.estimatedCost), { x: colX[4], y, size: 8, font: fontReg, color: GRAY })
-    p3.drawText(lkr(wCost), { x: colX[5], y, size: 8, font: fontReg, color: GRAY })
-    y -= 14
+    y -= 6
+    page.drawLine({ start: { x: 50, y: y + 10 }, end: { x: 545, y: y + 10 }, thickness: 1, color: NAVY })
+    const totals = ['TOTAL', '', String(sumStudents), String(sumStaff), lkr(sumCost), lkr(sumWaste)]
+    totals.forEach((cell, i) => {
+      page.drawText(truncate(cell, 14), { x: colX[i], y, size: 9, font, color: NAVY })
+    })
   }
 
-  y -= 6
-  p3.drawLine({ start: { x: 40, y }, end: { x: 555, y }, thickness: 1, color: NAVY })
-  y -= 14
-  p3.drawText('TOTALS', { x: colX[0], y, size: 8, font, color: NAVY })
-  p3.drawText(String(totStud), { x: colX[2], y, size: 8, font, color: NAVY })
-  p3.drawText(String(totStaff), { x: colX[3], y, size: 8, font, color: NAVY })
-  p3.drawText(lkr(totCost), { x: colX[4], y, size: 8, font, color: NAVY })
-  p3.drawText(lkr(totWaste), { x: colX[5], y, size: 8, font, color: NAVY })
-  drawFooter(p3, fontReg, 3)
-
-  // Page 4 — Inventory
-  const p4 = doc.addPage([width, height])
-  p4.drawText('INVENTORY STATUS', { x: 40, y: height - 60, size: 18, font, color: NAVY })
-  const invColX = [42, 200, 280, 360, 440]
-  drawTableHeader(p4, font, height - 88, ['Item', 'Stock', 'Min', 'Unit', 'Expiry'], invColX)
-
-  y = height - 108
-  const today = new Date()
-  for (const item of data.inventory.filter((i) => i.isActive !== false)) {
-    if (y < 60) break
-    const belowMin = item.currentStock <= item.minStockLevel
-    let expiringSoon = false
-    if (item.expiryDate) {
-      const exp = new Date(`${item.expiryDate.slice(0, 10)}T12:00:00`)
-      const days = Math.ceil((exp.getTime() - today.getTime()) / 86400000)
-      expiringSoon = days >= 0 && days <= 7
-    }
-
-    if (belowMin) {
-      p4.drawRectangle({ x: 38, y: y - 3, width: 520, height: 14, color: rgb(1, 0.92, 0.92) })
-    } else if (expiringSoon) {
-      p4.drawRectangle({ x: 38, y: y - 3, width: 520, height: 14, color: rgb(1, 0.97, 0.88) })
-    }
-
-    const textColor = belowMin ? RED : expiringSoon ? AMBER : GRAY
-    p4.drawText(truncate(item.itemName, 22), { x: invColX[0], y, size: 8, font: fontReg, color: textColor })
-    p4.drawText(String(item.currentStock), { x: invColX[1], y, size: 8, font: fontReg, color: textColor })
-    p4.drawText(String(item.minStockLevel), { x: invColX[2], y, size: 8, font: fontReg, color: textColor })
-    p4.drawText(item.unit, { x: invColX[3], y, size: 8, font: fontReg, color: textColor })
-    p4.drawText(item.expiryDate?.slice(0, 10) ?? '—', {
-      x: invColX[4],
-      y,
-      size: 8,
-      font: fontReg,
-      color: textColor,
-    })
-    y -= 14
-  }
-  drawFooter(p4, fontReg, 4)
-
-  // Page 5 — Waste
-  const p5 = doc.addPage([width, height])
-  p5.drawText('WASTE LOG', { x: 40, y: height - 60, size: 18, font, color: NAVY })
-
-  y = height - 90
-  for (const w of data.waste) {
-    if (y < 200) break
-    p5.drawText(`${w.date} — ${truncate(w.itemName, 20)} (${w.quantity} ${w.unit})`, {
-      x: 40,
-      y,
-      size: 9,
-      font: fontReg,
-      color: GRAY,
-    })
-    p5.drawText(`${w.reason} · ${lkr(w.estimatedLoss)}`, {
-      x: 60,
-      y: y - 12,
-      size: 8,
-      font: fontReg,
-      color: GRAY,
-    })
+  // Page 4 — Inventory status
+  {
+    const page = doc.addPage([595, 842])
+    let y = 780
+    page.drawText('Inventory Status', { x: 50, y, size: 18, font, color: NAVY })
     y -= 28
+    const headers = ['Item', 'Stock', 'Min', 'Unit', 'Status']
+    const colX = [50, 220, 290, 350, 420]
+    headers.forEach((h, i) => {
+      page.drawText(h, { x: colX[i], y, size: 9, font, color: NAVY })
+    })
+    y -= 16
+
+    inventory.forEach((item) => {
+      if (y < 60) return
+      const belowMin = item.currentStock <= item.minStockLevel
+      const expiringSoon =
+        item.expiryDate != null && daysUntilExpiry(item.expiryDate) <= 7 && daysUntilExpiry(item.expiryDate) >= 0
+      const expired = item.expiryDate != null && daysUntilExpiry(item.expiryDate) < 0
+
+      let status = 'OK'
+      let statusColor = GREEN
+      if (expired) {
+        status = 'EXPIRED'
+        statusColor = RED
+      } else if (belowMin) {
+        status = 'LOW STOCK'
+        statusColor = RED
+      } else if (expiringSoon) {
+        status = 'EXPIRING'
+        statusColor = AMBER
+      }
+
+      if (belowMin || expiringSoon) {
+        page.drawRectangle({ x: 48, y: y - 4, width: 500, height: 14, color: belowMin ? rgb(1, 0.92, 0.92) : rgb(1, 0.96, 0.88) })
+      }
+
+      page.drawText(truncate(item.itemName, 22), { x: colX[0], y, size: 8, font: fontReg, color: GRAY })
+      page.drawText(String(item.currentStock), { x: colX[1], y, size: 8, font: fontReg, color: GRAY })
+      page.drawText(String(item.minStockLevel), { x: colX[2], y, size: 8, font: fontReg, color: GRAY })
+      page.drawText(item.unit, { x: colX[3], y, size: 8, font: fontReg, color: GRAY })
+      page.drawText(status, { x: colX[4], y, size: 8, font, color: statusColor })
+      y -= 16
+    })
   }
 
-  const reasonCounts: Record<string, number> = {}
-  data.waste.forEach((w) => {
-    reasonCounts[w.reason] = (reasonCounts[w.reason] || 0) + 1
-  })
-  const totalWasteEntries = data.waste.length || 1
+  // Page 5 — Waste log
+  {
+    const page = doc.addPage([595, 842])
+    let y = 780
+    page.drawText('Waste Log', { x: 50, y, size: 18, font, color: NAVY })
+    y -= 28
 
-  p5.drawText('Reason breakdown:', { x: 40, y: 180, size: 12, font, color: NAVY })
-  const reasons: WasteReason[] = ['overcooked', 'expired', 'leftover', 'spoiled', 'dropped', 'other']
-  reasons.forEach((r, i) => {
-    const count = reasonCounts[r] || 0
-    const pct = Math.round((count / totalWasteEntries) * 100)
-    const label = r.charAt(0).toUpperCase() + r.slice(1)
-    p5.drawText(`${label}: ${pct}%`, { x: 40, y: 155 - i * 18, size: 10, font: fontReg, color: GRAY })
-  })
-  drawFooter(p5, fontReg, 5)
+    if (waste.length === 0) {
+      page.drawText('No waste entries for this period.', { x: 50, y, size: 11, font: fontReg, color: GRAY })
+    } else {
+      waste.slice(0, 25).forEach((w) => {
+        if (y < 120) return
+        page.drawText(
+          safePdfText(`${w.date.slice(5)} | ${w.itemName} | ${w.quantity} ${w.unit} | ${w.reason} | ${lkr(w.estimatedLoss)}`),
+          { x: 50, y, size: 8, font: fontReg, color: GRAY },
+        )
+        y -= 14
+      })
+    }
+
+    y -= 20
+    page.drawText('Reason breakdown:', { x: 50, y, size: 12, font, color: NAVY })
+    y -= 22
+    const totalReasonValue = Object.values(wasteByReason).reduce((s, v) => s + v, 0) || 1
+    Object.entries(wasteByReason).forEach(([reason, value]) => {
+      const pct = ((value / totalReasonValue) * 100).toFixed(0)
+      page.drawText(
+        safePdfText(`${reason.charAt(0).toUpperCase() + reason.slice(1)}: ${pct}% (${lkr(value)})`),
+        { x: 50, y, size: 10, font: fontReg, color: GRAY },
+      )
+      y -= 18
+    })
+  }
 
   return doc.save()
 }
 
-export function downloadKitchenReportPDF(bytes: Uint8Array, filename: string) {
-  const copy = Uint8Array.from(bytes)
-  const blob = new Blob([copy], { type: 'application/pdf' })
+export async function downloadKitchenReportPDF(period: ReportPeriod): Promise<void> {
+  const bytes = await generateKitchenReportPDF(period)
+  const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' })
   const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `EpicCampus-Kitchen-${period.filenameSlug}.pdf`
+  link.click()
   URL.revokeObjectURL(url)
 }

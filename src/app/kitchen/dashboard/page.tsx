@@ -6,14 +6,13 @@ import { collection, doc, getDoc, getDocs, query, setDoc, serverTimestamp, where
 import { db } from '@/lib/firebase/client'
 import { useKitchen } from '@/app/kitchen/context'
 import SinhalaToggle from '@/components/kitchen/SinhalaToggle'
-import { MEAL_SESSION_VISUAL, getFoodEmoji } from '@/lib/kitchen/foodImages'
-import { daysInMonth } from '@/lib/kitchen/dateHelpers'
-import { daysUntilExpiry, getExpiryStatus } from '@/lib/kitchen/expiryHelpers'
+import { daysUntilExpiry } from '@/lib/kitchen/expiryHelpers'
+import { getFoodEmoji, MEAL_SESSION_VISUAL } from '@/lib/kitchen/foodImages'
 import { useKitchenSinhala } from '@/lib/kitchen/useKitchenSinhala'
 import { formatLKR } from '@/lib/utils/formatCurrency'
-import type { MealLog, InventoryItem } from '@/types/kitchen'
+import type { InventoryItem, MealLog, MealType } from '@/types/kitchen'
 
-const MEAL_SESSIONS: { type: MealLog['mealType']; label: string }[] = [
+const MEAL_SESSIONS: { type: MealType; label: string }[] = [
   { type: 'breakfast', label: 'Breakfast' },
   { type: 'lunch', label: 'Lunch' },
   { type: 'dinner', label: 'Dinner' },
@@ -28,14 +27,33 @@ function thisMonthPrefix(): string {
   return new Date().toISOString().slice(0, 7)
 }
 
+function monthLabel(): string {
+  return new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+}
+
+function daysInCurrentMonth(): number {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+}
+
+function dayOfMonth(): number {
+  return new Date().getDate()
+}
+
 function weekAgo(): string {
   const d = new Date()
   d.setDate(d.getDate() - 7)
   return d.toISOString().slice(0, 10)
 }
 
-function monthLabel(): string {
-  return new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+function normalizeDate(date: unknown): string {
+  if (!date) return ''
+  if (typeof date === 'string') return date.slice(0, 10)
+  if (typeof date === 'object' && date !== null && 'toDate' in date) {
+    const toDate = (date as { toDate?: () => Date }).toDate
+    if (typeof toDate === 'function') return toDate.call(date).toISOString().slice(0, 10)
+  }
+  return String(date).slice(0, 10)
 }
 
 export default function KitchenDashboardPage() {
@@ -54,17 +72,6 @@ export default function KitchenDashboardPage() {
 
   const isAdmin = user?.role === 'admin' || user?.role === 'owner'
   const monthKey = thisMonthPrefix()
-  const now = new Date()
-  const daysInMo = daysInMonth(now.getFullYear(), now.getMonth())
-  const dayOfMonth = now.getDate()
-  const dailyAverage = dayOfMonth > 0 ? monthCost / dayOfMonth : 0
-  const projectedMonthEnd = dailyAverage * daysInMo
-  const budgetPct = monthlyBudget > 0 ? (monthCost / monthlyBudget) * 100 : 0
-  const remaining = monthlyBudget - monthCost
-
-  const expiringItems = inventoryItems
-    .filter((i) => i.expiryDate && daysUntilExpiry(i.expiryDate) <= 7)
-    .sort((a, b) => daysUntilExpiry(a.expiryDate!) - daysUntilExpiry(b.expiryDate!))
 
   useEffect(() => {
     async function load() {
@@ -81,7 +88,10 @@ export default function KitchenDashboardPage() {
           getDoc(doc(db, 'kitchenBudget', monthStr)),
         ])
 
-        const allMeals = mealSnap.docs.map((d) => ({ id: d.id, ...d.data() } as MealLog))
+        const allMeals = mealSnap.docs.map((d) => {
+          const data = d.data()
+          return { id: d.id, ...data, date: normalizeDate(data.date) } as MealLog
+        })
         setTodayLogs(allMeals.filter((m) => m.date === todayStr))
 
         const monthTotal = allMeals
@@ -101,6 +111,8 @@ export default function KitchenDashboardPage() {
 
         if (budgetSnap.exists()) {
           setMonthlyBudget(Number(budgetSnap.data().monthlyBudget) || 0)
+        } else {
+          setMonthlyBudget(0)
         }
       } catch (err) {
         console.error('[KitchenDashboard]', err)
@@ -109,11 +121,30 @@ export default function KitchenDashboardPage() {
       }
     }
     load()
-  }, [])
+  }, [monthKey])
+
+  const expiringItems = inventoryItems
+    .filter((i) => i.expiryDate && daysUntilExpiry(i.expiryDate) <= 7)
+    .sort((a, b) => daysUntilExpiry(a.expiryDate!) - daysUntilExpiry(b.expiryDate!))
+
+  const todayServings = todayLogs.reduce(
+    (s, m) => s + (m.studentCount || 0) + (m.staffCount || 0),
+    0,
+  )
+
+  const budgetPct = monthlyBudget > 0 ? (monthCost / monthlyBudget) * 100 : 0
+  const remaining = monthlyBudget - monthCost
+  const dailyAvg = dayOfMonth() > 0 ? monthCost / dayOfMonth() : 0
+  const projectedMonthEnd = dailyAvg * daysInCurrentMonth()
+
+  let barColor = 'bg-emerald-500'
+  if (budgetPct >= 100) barColor = 'bg-red-600'
+  else if (budgetPct >= 90) barColor = 'bg-red-500'
+  else if (budgetPct >= 70) barColor = 'bg-amber-500'
 
   async function saveBudget() {
     const amount = Number(budgetInput)
-    if (!amount || amount <= 0 || !user) return
+    if (!amount || amount <= 0) return
     setBudgetSaving(true)
     try {
       await setDoc(
@@ -121,7 +152,7 @@ export default function KitchenDashboardPage() {
         {
           monthlyBudget: amount,
           updatedAt: serverTimestamp(),
-          updatedBy: user.uid,
+          updatedBy: user?.uid ?? '',
         },
         { merge: true },
       )
@@ -133,18 +164,6 @@ export default function KitchenDashboardPage() {
       setBudgetSaving(false)
     }
   }
-
-  function progressColor(): string {
-    if (budgetPct >= 100) return 'bg-red-500'
-    if (budgetPct >= 90) return 'bg-red-500'
-    if (budgetPct >= 70) return 'bg-amber-500'
-    return 'bg-emerald-500'
-  }
-
-  const todayServings = todayLogs.reduce(
-    (s, m) => s + (m.studentCount || 0) + (m.staffCount || 0),
-    0,
-  )
 
   const statCards = [
     {
@@ -208,28 +227,27 @@ export default function KitchenDashboardPage() {
           <ul className="space-y-2">
             {expiringItems.map((item) => {
               const days = daysUntilExpiry(item.expiryDate!)
-              const status = getExpiryStatus(item)
               const colorClass =
-                status === 'expired'
+                days < 0
                   ? 'text-red-600 dark:text-red-400'
-                  : status === 'alert'
+                  : days <= 3
                     ? 'text-amber-600 dark:text-amber-400'
                     : 'text-yellow-600 dark:text-yellow-400'
+              const daysLabel =
+                days < 0
+                  ? 'Expired'
+                  : days === 0
+                    ? 'Expires today'
+                    : days === 1
+                      ? '1 day left'
+                      : `${days} days left`
               return (
                 <li key={item.id} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="flex min-w-0 items-center gap-2">
+                  <span className="flex items-center gap-2 font-medium text-[#0D1B2A] dark:text-white">
                     <span className="text-xl">{getFoodEmoji(item.itemName)}</span>
-                    <span className="truncate font-medium text-[#0D1B2A] dark:text-white">
-                      {item.itemName}
-                    </span>
+                    {item.itemName}
                   </span>
-                  <span className={`shrink-0 font-semibold ${colorClass}`}>
-                    {days < 0
-                      ? `Expired ${Math.abs(days)}d ago`
-                      : days === 0
-                        ? 'Expires today'
-                        : `${days}d left`}
-                  </span>
+                  <span className={`shrink-0 font-semibold ${colorClass}`}>{daysLabel}</span>
                 </li>
               )
             })}
@@ -268,7 +286,7 @@ export default function KitchenDashboardPage() {
                 setBudgetInput(monthlyBudget > 0 ? String(monthlyBudget) : '')
                 setBudgetModalOpen(true)
               }}
-              className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-semibold text-[#0B3D6B] hover:bg-[#0B3D6B]/5 dark:text-[#E8A020]"
+              className="inline-flex items-center gap-1 rounded-lg border border-[#DDE3EC] px-3 py-1.5 text-sm font-medium text-[#0B3D6B] hover:bg-[#F5F7FB] dark:border-white/10 dark:text-white"
             >
               <span className="ti ti-pencil" aria-hidden="true" />
               Edit Budget
@@ -276,20 +294,16 @@ export default function KitchenDashboardPage() {
           )}
         </div>
 
-        {monthlyBudget <= 0 ? (
-          <p className="text-sm text-gray-500 dark:text-white/50">
-            No budget set for this month.{isAdmin ? ' Tap Edit Budget to set one.' : ''}
-          </p>
-        ) : (
+        {monthlyBudget > 0 ? (
           <>
             <div className="relative h-4 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
               <div
-                className={`h-full rounded-full transition-all ${progressColor()}`}
+                className={`h-full rounded-full transition-all ${barColor}`}
                 style={{ width: `${Math.min(100, budgetPct)}%` }}
               />
             </div>
-            {budgetPct >= 100 && (
-              <span className="mt-2 inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
+            {budgetPct > 100 && (
+              <span className="mt-2 inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
                 OVER BUDGET
               </span>
             )}
@@ -297,9 +311,7 @@ export default function KitchenDashboardPage() {
               <span className="font-bold text-[#0B3D6B] dark:text-white">
                 Spent: {formatLKR(monthCost)}
               </span>
-              <span className="text-gray-500 dark:text-white/50">
-                / {formatLKR(monthlyBudget)} budget
-              </span>
+              <span className="text-gray-500 dark:text-white/50">/ {formatLKR(monthlyBudget)} budget</span>
               <span
                 className={`font-semibold ${remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
               >
@@ -307,10 +319,14 @@ export default function KitchenDashboardPage() {
               </span>
             </div>
             <p className="mt-2 text-xs text-gray-500 dark:text-white/40">
-              Daily average: {formatLKR(dailyAverage)} | Projected month end:{' '}
-              {formatLKR(projectedMonthEnd)}
+              Daily average: {formatLKR(dailyAvg)} | Projected month end: {formatLKR(projectedMonthEnd)}
             </p>
           </>
+        ) : (
+          <p className="text-sm text-gray-500 dark:text-white/50">
+            No budget set for this month.
+            {isAdmin && ' Click Edit Budget to set one.'}
+          </p>
         )}
       </div>
 
@@ -408,13 +424,11 @@ export default function KitchenDashboardPage() {
             <div
               role="dialog"
               aria-modal="true"
-              className="w-full max-w-sm rounded-xl border border-[#DDE3EC] bg-white p-6 shadow-xl dark:border-gray-600 dark:bg-gray-900"
+              className="w-full max-w-sm rounded-xl border border-[#DDE3EC] bg-white p-6 shadow-xl dark:border-white/10 dark:bg-gray-900"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-lg font-bold text-[#0D1B2A] dark:text-white">
-                Set Monthly Budget
-              </h3>
-              <label className="mb-2 mt-4 block text-sm font-medium text-gray-600 dark:text-white/60">
+              <h3 className="text-lg font-bold text-[#0D1B2A] dark:text-white">Set Monthly Budget</h3>
+              <label className="mt-4 block text-sm font-medium text-gray-600 dark:text-white/70">
                 Monthly budget (LKR)
               </label>
               <input
@@ -422,21 +436,21 @@ export default function KitchenDashboardPage() {
                 min="0"
                 value={budgetInput}
                 onChange={(e) => setBudgetInput(e.target.value)}
-                className="w-full min-h-[48px] rounded-xl border border-[#DDE3EC] px-3 py-2 text-base dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                className="mt-2 w-full min-h-[48px] rounded-xl border border-[#DDE3EC] px-3 py-2 text-base dark:border-gray-600 dark:bg-gray-800 dark:text-white"
               />
-              <div className="mt-4 flex gap-3">
+              <div className="mt-5 flex gap-3">
                 <button
                   type="button"
                   onClick={() => setBudgetModalOpen(false)}
-                  className="flex-1 rounded-xl border border-[#DDE3EC] py-3 text-sm font-semibold text-gray-600"
+                  className="flex-1 min-h-[44px] rounded-xl border border-[#DDE3EC] text-sm font-semibold text-gray-600"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={saveBudget}
-                  disabled={budgetSaving || !budgetInput}
-                  className="flex-1 rounded-xl bg-[#E8A020] py-3 text-sm font-bold text-[#0B3D6B] disabled:opacity-50"
+                  disabled={budgetSaving}
+                  className="flex-1 min-h-[44px] rounded-xl bg-[#E8A020] text-sm font-bold text-[#0B3D6B] disabled:opacity-60"
                 >
                   {budgetSaving ? 'Saving…' : 'Save'}
                 </button>
