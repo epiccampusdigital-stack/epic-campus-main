@@ -413,26 +413,32 @@ export default function StudentForm({
       } else {
         const allSnap = await getDocs(collection(db, 'students'))
         const studentCode = await generateStudentCode(allSnap.size)
-        let uid: string | undefined
-
-        if (form.email.trim()) {
-          try {
-            uid = await createAuthAccount(studentDocId, form.email.trim(), form.name.trim())
-          } catch (authErr) {
-            console.warn('[StudentForm] Auth account skipped:', authErr)
-          }
-        }
 
         await setDoc(doc(db, 'students', studentDocId), {
           ...payload,
           studentCode,
-          uid: uid ?? null,
+          uid: null,
           feeSchedule: defaultFeeSchedule(),
           parentAccessCode: generateParentAccessCode(),
           parentAccessEnabled: true,
           createdAt: serverTimestamp(),
           createdBy: user.uid,
         })
+
+        if (form.email.trim()) {
+          try {
+            const uid = await createAuthAccount(
+              studentDocId,
+              form.email.trim(),
+              form.name.trim(),
+            )
+            if (uid) {
+              await updateDoc(doc(db, 'students', studentDocId), { uid })
+            }
+          } catch (authErr) {
+            console.warn('[StudentForm] Auth account skipped:', authErr)
+          }
+        }
 
         if (form.mobile.trim()) {
           await sendWhatsAppNotification(

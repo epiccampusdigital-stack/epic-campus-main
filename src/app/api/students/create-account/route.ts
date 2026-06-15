@@ -29,9 +29,13 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     })
 
-    await adminDb.collection('students').doc(studentId).update({
-      uid: userRecord.uid,
-    })
+    await adminDb.collection('students').doc(studentId).set(
+      {
+        uid: userRecord.uid,
+        email,
+      },
+      { merge: true },
+    )
 
     return NextResponse.json({ uid: userRecord.uid })
   } catch (err: unknown) {

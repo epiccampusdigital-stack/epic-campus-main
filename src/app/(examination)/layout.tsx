@@ -3,30 +3,12 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { onAuthStateChanged } from 'firebase/auth'
-import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore'
+import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase/client'
 import { EXAM_PORTAL_ROLES } from '@/lib/constants/roles'
 import { ExamContext } from '@/components/exam/ExamContext'
-import { parseStudent } from '@/lib/students/helpers'
+import { loadStudentProfile } from '@/lib/students/loadStudentProfile'
 import type { EpicUser, Role, Student } from '@/types'
-
-async function loadStudentProfile(
-  uid: string,
-  studentId?: string,
-): Promise<Student | null> {
-  if (studentId) {
-    const snap = await getDoc(doc(db, 'students', studentId))
-    if (snap.exists()) {
-      return parseStudent(snap.id, snap.data() as Record<string, unknown>)
-    }
-  }
-  const byUid = await getDocs(query(collection(db, 'students'), where('uid', '==', uid)))
-  if (!byUid.empty) {
-    const d = byUid.docs[0]
-    return parseStudent(d.id, d.data() as Record<string, unknown>)
-  }
-  return null
-}
 
 export default function ExaminationLayout({
   children,
@@ -74,10 +56,10 @@ export default function ExaminationLayout({
         setUser(epicUser)
 
         if (role === 'student') {
-          const profile = await loadStudentProfile(
-            firebaseUser.uid,
-            epicUser.studentId,
-          )
+          const profile = await loadStudentProfile(firebaseUser.uid, {
+            studentId: epicUser.studentId,
+            email: epicUser.email || firebaseUser.email || undefined,
+          })
           setStudent(profile)
         } else {
           setStudent(null)

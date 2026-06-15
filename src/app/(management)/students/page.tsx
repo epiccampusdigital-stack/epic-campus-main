@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { collection, getDocs, orderBy, query } from 'firebase/firestore'
-import { db } from '@/lib/firebase/client'
+import toast from 'react-hot-toast'
+import { auth, db } from '@/lib/firebase/client'
 import { COURSES } from '@/lib/constants/courses'
 import { parseAttempt } from '@/lib/exam/helpers'
 import {
@@ -67,6 +68,7 @@ export default function StudentsPage() {
   const [page, setPage] = useState(1)
   const [formOpen, setFormOpen] = useState(false)
   const [editStudent, setEditStudent] = useState<Student | null>(null)
+  const [fixingUids, setFixingUids] = useState(false)
 
   const loadStudents = useCallback(async () => {
     setLoading(true)
@@ -168,6 +170,50 @@ export default function StudentsPage() {
     setFormOpen(true)
   }
 
+  async function fixStudentUids() {
+    if (!auth.currentUser) {
+      toast.error('You must be logged in')
+      return
+    }
+    setFixingUids(true)
+    try {
+      const token = await auth.currentUser.getIdToken()
+      const res = await fetch('/api/admin/fix-student-uids', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = (await res.json()) as {
+        fixed?: number
+        alreadyCorrect?: number
+        notFound?: string[]
+        errors?: string[]
+        error?: string
+      }
+      if (!res.ok) {
+        throw new Error(data.error ?? 'Fix failed')
+      }
+      toast.success(
+        `Fixed ${data.fixed ?? 0} students · ${data.alreadyCorrect ?? 0} already correct`,
+      )
+      if (data.notFound?.length) {
+        console.warn('[fix-student-uids] No Auth account:', data.notFound)
+        toast(`No Auth account for ${data.notFound.length} student(s) — see console`, {
+          icon: '⚠️',
+        })
+      }
+      if (data.errors?.length) {
+        console.error('[fix-student-uids] Errors:', data.errors)
+      }
+      await loadStudents()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not fix student UIDs')
+    } finally {
+      setFixingUids(false)
+    }
+  }
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'owner'
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -179,14 +225,27 @@ export default function StudentsPage() {
               : 'Manage enrollments, profiles, and student records'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={openAdd}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#E8A020] px-5 py-2.5 font-jakarta text-sm font-bold text-[#0B3D6B] transition-colors hover:bg-[#F5B942]"
-        >
-          <span className="ti ti-plus" aria-hidden="true" />
-          Add Student
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => void fixStudentUids()}
+              disabled={fixingUids}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#0B3D6B] px-4 py-2.5 font-jakarta text-sm font-semibold text-[#0B3D6B] hover:bg-[#0B3D6B]/5 disabled:opacity-60"
+            >
+              <span className="ti ti-link" aria-hidden="true" />
+              {fixingUids ? 'Fixing…' : 'Fix UIDs'}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={openAdd}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#E8A020] px-5 py-2.5 font-jakarta text-sm font-bold text-[#0B3D6B] transition-colors hover:bg-[#F5B942]"
+          >
+            <span className="ti ti-plus" aria-hidden="true" />
+            Add Student
+          </button>
+        </div>
       </div>
 
       {teacherStat && (

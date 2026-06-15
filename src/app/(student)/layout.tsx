@@ -4,15 +4,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { onAuthStateChanged } from 'firebase/auth'
 import {
-  collection,
   doc,
   getDoc,
-  getDocs,
-  query,
-  where,
 } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase/client'
-import { parseStudent } from '@/lib/students/helpers'
+import { loadStudentProfile } from '@/lib/students/loadStudentProfile'
 import StudentSidebar from '@/components/student/StudentSidebar'
 import StudentBottomNav from '@/components/student/StudentBottomNav'
 import StudentTopBar from '@/components/student/StudentTopBar'
@@ -23,26 +19,6 @@ import {
 import type { EpicUser, Student } from '@/types'
 
 const LOAD_TIMEOUT_MS = 5000
-
-async function loadStudentProfile(
-  uid: string,
-  studentId?: string,
-): Promise<Student | null> {
-  if (studentId) {
-    const snap = await getDoc(doc(db, 'students', studentId))
-    if (snap.exists()) {
-      return parseStudent(snap.id, snap.data() as Record<string, unknown>)
-    }
-  }
-
-  const byUid = await getDocs(query(collection(db, 'students'), where('uid', '==', uid)))
-  if (!byUid.empty) {
-    const d = byUid.docs[0]
-    return parseStudent(d.id, d.data() as Record<string, unknown>)
-  }
-
-  return null
-}
 
 function PortalLoadingScreen() {
   return (
@@ -172,10 +148,10 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
             data.createdAt?.toDate?.()?.toISOString?.() ?? new Date().toISOString(),
         }
 
-        const profile = await loadStudentProfile(
-          firebaseUser.uid,
-          epicUser.studentId,
-        )
+        const profile = await loadStudentProfile(firebaseUser.uid, {
+          studentId: epicUser.studentId,
+          email: epicUser.email || firebaseUser.email || undefined,
+        })
 
         if (cancelled) return
         clearTimeout(timeoutId)
