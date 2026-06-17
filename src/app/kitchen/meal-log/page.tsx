@@ -3,25 +3,16 @@
 import { useEffect, useState } from 'react'
 import {
   collection,
-  addDoc,
   getDocs,
   query,
   orderBy,
   limit,
-  doc,
-  updateDoc,
-  serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { useKitchen } from '@/app/kitchen/context'
-import CountStepper from '@/components/kitchen/CountStepper'
-import KitchenBottomSheet from '@/components/kitchen/KitchenBottomSheet'
-import MealIngredientList, {
-  rowsToIngredients,
-  type IngredientRow,
-} from '@/components/kitchen/MealIngredientList'
+import MealLogWizard from '@/components/kitchen/MealLogWizard'
 import { fetchActiveInventory } from '@/lib/kitchen/fetchActiveInventory'
-import { getFoodEmoji, MEAL_SESSION_VISUAL } from '@/lib/kitchen/foodImages'
+import { MEAL_SESSION_VISUAL } from '@/lib/kitchen/foodImages'
 import { formatLKR } from '@/lib/utils/formatCurrency'
 import type { MealLog, MealType, InventoryItem } from '@/types/kitchen'
 
@@ -68,6 +59,11 @@ function parseMealLog(id: string, data: Record<string, unknown>): MealLog {
     loggedBy: String(data.loggedBy ?? ''),
     loggedByName: String(data.loggedByName ?? ''),
     createdAt: data.createdAt as MealLog['createdAt'],
+    dailyMenuId: data.dailyMenuId ? String(data.dailyMenuId) : undefined,
+    dailyMenuName: data.dailyMenuName ? String(data.dailyMenuName) : undefined,
+    dailyMenuSinhalaName: data.dailyMenuSinhalaName ? String(data.dailyMenuSinhalaName) : undefined,
+    mealTemplateId: data.mealTemplateId ? String(data.mealTemplateId) : undefined,
+    mealTemplateName: data.mealTemplateName ? String(data.mealTemplateName) : undefined,
   }
 }
 
@@ -77,19 +73,11 @@ export default function MealLogPage() {
   const [loading, setLoading] = useState(true)
   const [dateFilter, setDateFilter] = useState(today())
   const [typeFilter, setTypeFilter] = useState<MealType | 'all'>('all')
-  const [showSlide, setShowSlide] = useState(false)
+  const [showWizard, setShowWizard] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
-  const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
   const [toastKind, setToastKind] = useState<'success' | 'warning'>('success')
-
-  const [fDate, setFDate] = useState(today())
-  const [fType, setFType] = useState<MealType>('lunch')
-  const [fStudents, setFStudents] = useState('')
-  const [fStaff, setFStaff] = useState('')
-  const [fNotes, setFNotes] = useState('')
-  const [ingredients, setIngredients] = useState<IngredientRow[]>([{ itemId: '', qty: '' }])
 
   async function loadLogs() {
     setLoading(true)
@@ -120,11 +108,9 @@ export default function MealLogPage() {
         snap = { docs } as typeof allSnap
       }
 
-      const parsed = snap.docs.map((d) =>
-        parseMealLog(d.id, d.data() as Record<string, unknown>),
+      setLogs(
+        snap.docs.map((d) => parseMealLog(d.id, d.data() as Record<string, unknown>)),
       )
-      console.log('[MealLog] fetched', parsed.length, 'meal logs')
-      setLogs(parsed)
     } catch (err) {
       console.error('[MealLog]', err)
     } finally {
@@ -134,16 +120,15 @@ export default function MealLogPage() {
 
   async function loadInventory() {
     try {
-      const items = await fetchActiveInventory()
-      setInventoryItems(items)
+      setInventoryItems(await fetchActiveInventory())
     } catch (err) {
       console.error('[MealLog inventory]', err)
     }
   }
 
   useEffect(() => {
-    loadLogs()
-    loadInventory()
+    void loadLogs()
+    void loadInventory()
   }, [])
 
   function showToast(msg: string, kind: 'success' | 'warning' = 'success') {
@@ -152,150 +137,16 @@ export default function MealLogPage() {
     setTimeout(() => setToast(''), 4000)
   }
 
-  function openLogSlide() {
-    setIngredients([{ itemId: '', qty: '' }])
-    setFDate(today())
-    setFType('lunch')
-    setFStudents('')
-    setFStaff('')
-    setFNotes('')
+  function openWizard() {
     void loadInventory()
-    setShowSlide(true)
+    setShowWizard(true)
   }
 
   const filtered = logs.filter((l) => {
-    const docDate = l.date
-    const matchDate = !dateFilter || docDate === dateFilter
+    const matchDate = !dateFilter || l.date === dateFilter
     const matchType = typeFilter === 'all' || l.mealType === typeFilter
     return matchDate && matchType
   })
-
-  const totalServings = (Number(fStudents) || 0) + (Number(fStaff) || 0)
-
-  async function handleSave() {
-    if (!fStudents && !fStaff) return
-    setSaving(true)
-    try {
-      const usedIngredients = rowsToIngredients(ingredients, inventoryItems)
-      const totalCost = usedIngredients.reduce((s, i) => s + i.totalCost, 0)
-      const costPerPerson = totalServings > 0 ? totalCost / totalServings : 0
-
-      await addDoc(collection(db, 'mealLogs'), {
-        date: fDate,
-        mealType: fType,
-        studentCount: Number(fStudents) || 0,
-        staffCount: Number(fStaff) || 0,
-        totalServings,
-        ingredientsUsed: usedIngredients,
-        estimatedCost: totalCost,
-        costPerPerson,
-        notes: fNotes,
-        loggedBy: user?.uid ?? '',
-        loggedByName: user?.displayName ?? '',
-        createdAt: serverTimestamp(),
-      })
-
-      let inventoryErrors = 0
-      const updatedItems: Array<{
-        itemName: string
-        emoji: string
-        currentStock: number
-        minStockLevel: number
-        unit: string
-      }> = []
-
-      for (const ing of usedIngredients) {
-        const item = inventoryItems.find((i) => i.id === ing.itemId)
-        if (!item) continue
-        try {
-          const newStock = Math.max(0, item.currentStock - ing.qtyUsed)
-          updatedItems.push({
-            itemName: item.itemName,
-            emoji: getFoodEmoji(item.itemName),
-            currentStock: newStock,
-            minStockLevel: item.minStockLevel,
-            unit: item.unit,
-          })
-          await updateDoc(doc(db, 'inventory', ing.itemId), {
-            currentStock: newStock,
-            lastUpdated: serverTimestamp(),
-            updatedBy: user?.uid ?? '',
-            updatedByName: user?.displayName ?? '',
-          })
-          await addDoc(collection(db, 'inventory', ing.itemId, 'history'), {
-            action: 'deducted',
-            qty: ing.qtyUsed,
-            itemId: ing.itemId,
-            itemName: item.itemName,
-            emoji: getFoodEmoji(item.itemName),
-            unit: item.unit,
-            reason: 'meal-log',
-            mealType: fType,
-            date: fDate,
-            by: user?.uid ?? '',
-            byName: user?.displayName ?? '',
-            createdAt: serverTimestamp(),
-          })
-        } catch (err) {
-          inventoryErrors += 1
-          console.error('[MealLog inventory deduct]', ing.itemId, err)
-        }
-      }
-
-      const lowItems = updatedItems.filter((i) => i.currentStock <= i.minStockLevel)
-      if (lowItems.length > 0) {
-        fetch('/api/kitchen/low-stock-alert', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lowStockItems: lowItems }),
-        }).catch(() => {})
-      }
-
-      setShowSlide(false)
-      setFDate(today())
-      setFType('lunch')
-      setFStudents('')
-      setFStaff('')
-      setFNotes('')
-      setIngredients([{ itemId: '', qty: '' }])
-      if (inventoryErrors > 0) {
-        showToast(
-          `Meal logged, but ${inventoryErrors} inventory update(s) failed — check stock manually`,
-          'warning',
-        )
-      } else if (lowItems.length > 0) {
-        showToast('Meal logged successfully. ⚠️ Low stock alert sent to admin', 'warning')
-      } else {
-        showToast('Meal logged successfully')
-      }
-      await loadLogs()
-      await loadInventory()
-    } catch (err) {
-      console.error('[MealLog save]', err)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const slideFooter = (
-    <div className="flex gap-3">
-      <button
-        type="button"
-        onClick={() => setShowSlide(false)}
-        className="flex min-h-[48px] flex-1 items-center justify-center rounded-xl border border-[#DDE3EC] text-sm font-medium text-[#5A6A7A]"
-      >
-        Cancel
-      </button>
-      <button
-        type="button"
-        onClick={handleSave}
-        disabled={saving || (!fStudents && !fStaff)}
-        className="flex min-h-[48px] flex-1 items-center justify-center rounded-xl bg-[#E8A020] text-base font-bold text-white hover:bg-[#d4911c] disabled:opacity-50"
-      >
-        {saving ? 'Saving…' : 'Log Meal'}
-      </button>
-    </div>
-  )
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -313,7 +164,7 @@ export default function MealLogPage() {
         <h1 className="text-xl font-bold text-[#0D1B2A] dark:text-white">Meal Log</h1>
         <button
           type="button"
-          onClick={openLogSlide}
+          onClick={openWizard}
           className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-[#E8A020] text-base font-bold text-white hover:bg-[#d4911c] md:w-auto md:px-6"
         >
           <span className="ti ti-plus" /> Log New Meal
@@ -377,6 +228,9 @@ export default function MealLogPage() {
                       {log.mealType}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">{log.date}</p>
+                    {log.dailyMenuName && (
+                      <p className="text-xs text-[#E8A020]">📋 {log.dailyMenuName}</p>
+                    )}
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-sm font-semibold text-[#0D1B2A] dark:text-white">
@@ -417,87 +271,19 @@ export default function MealLogPage() {
         </div>
       )}
 
-      <KitchenBottomSheet
-        open={showSlide}
-        onClose={() => setShowSlide(false)}
-        title="Log Meal"
-        footer={slideFooter}
-      >
-        <div className="space-y-5">
-          <div>
-            <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
-              Date
-            </label>
-            <input
-              type="date"
-              value={fDate}
-              onChange={(e) => setFDate(e.target.value)}
-              className="w-full min-h-[48px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-2 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
-              Meal Type
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {MEAL_TYPES.map((m) => {
-                const visual = MEAL_SESSION_VISUAL[m.value]
-                return (
-                  <button
-                    key={m.value}
-                    type="button"
-                    onClick={() => setFType(m.value)}
-                    className={`flex min-h-[80px] flex-col items-center justify-center rounded-xl border-2 py-2 ${
-                      fType === m.value
-                        ? 'border-[#E8A020] bg-[#E8A020]/15'
-                        : 'border-[#DDE3EC] bg-white dark:border-gray-600 dark:bg-gray-900'
-                    }`}
-                  >
-                    <span className="text-[32px] leading-none">{visual?.emoji}</span>
-                    <span className="mt-1 text-sm font-semibold">{m.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
-                Students
-              </label>
-              <CountStepper value={fStudents} onChange={setFStudents} step={1} />
-            </div>
-            <div>
-              <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
-                Staff
-              </label>
-              <CountStepper value={fStaff} onChange={setFStaff} step={1} />
-            </div>
-          </div>
-
-          <MealIngredientList
-            inventory={inventoryItems}
-            rows={ingredients}
-            onChange={setIngredients}
-            totalServings={totalServings}
-            stickyCost
-          />
-
-          <div>
-            <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
-              Notes
-            </label>
-            <textarea
-              value={fNotes}
-              onChange={(e) => setFNotes(e.target.value)}
-              rows={3}
-              className="w-full min-h-[80px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-3 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-            />
-          </div>
-        </div>
-      </KitchenBottomSheet>
+      <MealLogWizard
+        open={showWizard}
+        onClose={() => setShowWizard(false)}
+        inventory={inventoryItems}
+        existingLogs={logs}
+        userId={user?.uid ?? ''}
+        userName={user?.displayName ?? ''}
+        onSaved={() => {
+          void loadLogs()
+          void loadInventory()
+        }}
+        onToast={showToast}
+      />
     </div>
   )
 }

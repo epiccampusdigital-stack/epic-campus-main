@@ -52,6 +52,11 @@ export interface MealLog {
   loggedBy: string
   loggedByName: string
   createdAt: Timestamp
+  dailyMenuId?: string
+  dailyMenuName?: string
+  dailyMenuSinhalaName?: string
+  mealTemplateId?: string
+  mealTemplateName?: string
 }
 
 export interface WasteEntry {
@@ -101,4 +106,59 @@ export interface KitchenAISuggestion {
   suggestion: string
   priority: 'high' | 'medium' | 'low'
   potentialSaving: string
+}
+
+export interface SelectedIngredient {
+  itemId: string
+  itemName: string
+  sinhalaName?: string
+  emoji: string
+  qty: number
+  unit: StockUnit
+  unitCost: number
+}
+
+export interface MealTemplateIngredient {
+  itemId: string
+  itemName: string
+  emoji: string
+  qty: number
+  unit: StockUnit
+  unitCost: number
+}
+
+export interface MealTemplate {
+  id: string
+  name: string
+  sinhalaName: string
+  mealType: MealType
+  ingredients: MealTemplateIngredient[]
+  createdAt: Timestamp
+  createdBy: string
+  location: string
+  usageCount: number
+}
+
+export interface DailyMenuIngredient {
+  itemId: string
+  itemName: string
+  sinhalaName?: string
+  emoji: string
+  baseQty: number
+  unit: StockUnit
+  unitCost: number
+}
+
+export interface DailyMenu {
+  id: string
+  menuName: string
+  sinhalaName: string
+  mealType: MealType
+  location: string
+  isActive: boolean
+  baseStudentCount: number
+  ingredients: DailyMenuIngredient[]
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  createdBy: string
 }
