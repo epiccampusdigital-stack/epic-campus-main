@@ -12,34 +12,36 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { useKitchen } from '@/app/kitchen/context'
-import CountStepper from '@/components/kitchen/CountStepper'
 import IngredientGrid from '@/components/kitchen/IngredientGrid'
 import KitchenBottomSheet from '@/components/kitchen/KitchenBottomSheet'
+import CountStepper from '@/components/kitchen/CountStepper'
 import { fetchActiveInventory } from '@/lib/kitchen/fetchActiveInventory'
 import { MEAL_SESSION_VISUAL } from '@/lib/kitchen/foodImages'
-import { useKitchenSinhala } from '@/lib/kitchen/useKitchenSinhala'
-import type { DailyMenu, DailyMenuIngredient, MealType, SelectedIngredient } from '@/types/kitchen'
+import { selectedToMenuIngredients } from '@/lib/kitchen/ingredientSelection'
+import type { DailyMenu, MealType, InventoryItem, SelectedIngredient } from '@/types/kitchen'
 
-const MEAL_TYPES: { value: MealType; label: string; emoji: string }[] = [
-  { value: 'breakfast', label: 'Breakfast', emoji: '🌅' },
-  { value: 'lunch', label: 'Lunch', emoji: '☀️' },
-  { value: 'dinner', label: 'Dinner', emoji: '🌙' },
-  { value: 'tea', label: 'Tea', emoji: '☕' },
-]
+const KITCHEN_LOCATION = 'Ahangama'
 
-const LOCATION = 'Ahangama'
+const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'tea']
 
-function parseDailyMenu(id: string, data: Record<string, unknown>): DailyMenu {
+const MEAL_LABELS: Record<MealType, string> = {
+  breakfast: 'Breakfast',
+  lunch: 'Lunch',
+  dinner: 'Dinner',
+  tea: 'Tea',
+}
+
+function parseMenu(id: string, data: Record<string, unknown>): DailyMenu {
   return {
     id,
     menuName: String(data.menuName ?? ''),
     sinhalaName: String(data.sinhalaName ?? ''),
     mealType: data.mealType as MealType,
-    location: String(data.location ?? LOCATION),
+    location: String(data.location ?? KITCHEN_LOCATION),
     isActive: data.isActive !== false,
     baseStudentCount: Number(data.baseStudentCount ?? 30),
     ingredients: Array.isArray(data.ingredients)
-      ? (data.ingredients as DailyMenuIngredient[])
+      ? (data.ingredients as DailyMenu['ingredients'])
       : [],
     createdAt: data.createdAt as DailyMenu['createdAt'],
     updatedAt: data.updatedAt as DailyMenu['updatedAt'],
@@ -47,37 +49,27 @@ function parseDailyMenu(id: string, data: Record<string, unknown>): DailyMenu {
   }
 }
 
-function menuToSelected(menu: DailyMenu): SelectedIngredient[] {
-  return menu.ingredients.map((ing) => ({
-    itemId: ing.itemId,
-    itemName: ing.itemName,
-    sinhalaName: ing.sinhalaName,
-    emoji: ing.emoji,
-    qty: ing.baseQty,
-    unit: ing.unit,
-    unitCost: ing.unitCost,
-  }))
-}
-
-function selectedToMenuIngredients(selected: SelectedIngredient[]): DailyMenuIngredient[] {
-  return selected
-    .filter((s) => s.qty > 0)
-    .map((s) => ({
-      itemId: s.itemId,
-      itemName: s.itemName,
-      sinhalaName: s.sinhalaName,
-      emoji: s.emoji,
-      baseQty: s.qty,
-      unit: s.unit,
-      unitCost: s.unitCost,
-    }))
+function menuToSelected(menu: DailyMenu, inventory: InventoryItem[]): SelectedIngredient[] {
+  return menu.ingredients.reduce<SelectedIngredient[]>((acc, ing) => {
+      const item = inventory.find((i) => i.id === ing.itemId)
+      if (!item) return acc
+      acc.push({
+        itemId: ing.itemId,
+        itemName: ing.itemName,
+        emoji: ing.emoji,
+        sinhalaName: ing.sinhalaName,
+        qty: ing.baseQty,
+        unit: ing.unit,
+        unitCost: item.unitCost,
+      })
+      return acc
+    }, [])
 }
 
 export default function DailyMenusPage() {
   const { user } = useKitchen()
-  const { sinhala } = useKitchenSinhala()
   const [menus, setMenus] = useState<DailyMenu[]>([])
-  const [inventory, setInventory] = useState<Awaited<ReturnType<typeof fetchActiveInventory>>>([])
+  const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [slideOpen, setSlideOpen] = useState(false)
   const [editing, setEditing] = useState<DailyMenu | null>(null)
@@ -87,7 +79,7 @@ export default function DailyMenusPage() {
   const [menuName, setMenuName] = useState('')
   const [sinhalaName, setSinhalaName] = useState('')
   const [mealType, setMealType] = useState<MealType>('breakfast')
-  const [baseCount, setBaseCount] = useState('30')
+  const [baseStudentCount, setBaseStudentCount] = useState('30')
   const [selected, setSelected] = useState<SelectedIngredient[]>([])
 
   async function loadMenus() {
@@ -96,23 +88,18 @@ export default function DailyMenusPage() {
       const snap = await getDocs(collection(db, 'dailyMenus'))
       setMenus(
         snap.docs
-          .map((d) => parseDailyMenu(d.id, d.data() as Record<string, unknown>))
-          .filter((m) => m.location === LOCATION)
-          .sort((a, b) => a.menuName.localeCompare(b.menuName)),
+          .map((d) => parseMenu(d.id, d.data() as Record<string, unknown>))
+          .filter((m) => m.location === KITCHEN_LOCATION)
+          .sort((a, b) => a.mealType.localeCompare(b.mealType)),
       )
-    } catch (err) {
-      console.error('[DailyMenus]', err)
     } finally {
       setLoading(false)
     }
   }
 
   async function loadInventory() {
-    try {
-      setInventory(await fetchActiveInventory())
-    } catch (err) {
-      console.error('[DailyMenus inventory]', err)
-    }
+    const items = await fetchActiveInventory()
+    setInventory(items)
   }
 
   useEffect(() => {
@@ -130,8 +117,9 @@ export default function DailyMenusPage() {
     setMenuName('')
     setSinhalaName('')
     setMealType('breakfast')
-    setBaseCount('30')
+    setBaseStudentCount('30')
     setSelected([])
+    void loadInventory()
     setSlideOpen(true)
   }
 
@@ -140,8 +128,9 @@ export default function DailyMenusPage() {
     setMenuName(menu.menuName)
     setSinhalaName(menu.sinhalaName)
     setMealType(menu.mealType)
-    setBaseCount(String(menu.baseStudentCount))
-    setSelected(menuToSelected(menu))
+    setBaseStudentCount(String(menu.baseStudentCount))
+    setSelected(menuToSelected(menu, inventory))
+    void loadInventory()
     setSlideOpen(true)
   }
 
@@ -153,9 +142,9 @@ export default function DailyMenusPage() {
         menuName: menuName.trim(),
         sinhalaName: sinhalaName.trim(),
         mealType,
-        location: LOCATION,
+        location: KITCHEN_LOCATION,
         isActive: true,
-        baseStudentCount: Number(baseCount) || 30,
+        baseStudentCount: Number(baseStudentCount) || 30,
         ingredients: selectedToMenuIngredients(selected),
         updatedAt: serverTimestamp(),
       }
@@ -173,9 +162,6 @@ export default function DailyMenusPage() {
       }
       setSlideOpen(false)
       await loadMenus()
-    } catch (err) {
-      console.error('[DailyMenus save]', err)
-      showToast('Failed to save menu')
     } finally {
       setSaving(false)
     }
@@ -183,25 +169,17 @@ export default function DailyMenusPage() {
 
   async function handleDelete(menu: DailyMenu) {
     if (!confirm(`Delete "${menu.menuName}"?`)) return
-    try {
-      await deleteDoc(doc(db, 'dailyMenus', menu.id))
-      showToast('Menu deleted')
-      await loadMenus()
-    } catch (err) {
-      console.error('[DailyMenus delete]', err)
-      showToast('Failed to delete menu')
-    }
+    await deleteDoc(doc(db, 'dailyMenus', menu.id))
+    showToast('Menu deleted')
+    await loadMenus()
   }
-
-  const baseStudentCount = Number(baseCount) || 30
-  const canSave = menuName.trim() && selected.some((s) => s.qty > 0)
 
   const slideFooter = (
     <button
       type="button"
-      disabled={saving || !canSave}
       onClick={() => void handleSave()}
-      className="flex min-h-[48px] w-full items-center justify-center rounded-xl bg-[#E8A020] text-base font-bold text-[#0B3D6B] disabled:opacity-50"
+      disabled={saving || !menuName.trim() || selected.length === 0}
+      className="flex min-h-[52px] w-full items-center justify-center rounded-xl bg-[#E8A020] text-base font-bold text-[#0B3D6B] disabled:opacity-50"
     >
       {saving ? 'Saving…' : 'Save Menu'}
     </button>
@@ -215,12 +193,12 @@ export default function DailyMenusPage() {
         </div>
       )}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-[#0D1B2A] dark:text-white">Daily Menus</h1>
         <button
           type="button"
           onClick={openCreate}
-          className="flex min-h-[48px] items-center justify-center rounded-xl bg-[#E8A020] px-5 text-sm font-bold text-[#0B3D6B]"
+          className="min-h-[48px] rounded-xl bg-[#E8A020] px-5 text-sm font-bold text-[#0B3D6B]"
         >
           Create New Menu
         </button>
@@ -233,62 +211,65 @@ export default function DailyMenusPage() {
           ))}
         </div>
       ) : (
-        MEAL_TYPES.map((section) => {
-          const sectionMenus = menus.filter((m) => m.mealType === section.value && m.isActive)
+        MEAL_TYPES.map((type) => {
+          const sectionMenus = menus.filter((m) => m.mealType === type && m.isActive)
+          const visual = MEAL_SESSION_VISUAL[type]
           return (
-            <section key={section.value}>
+            <section key={type}>
               <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-[#0D1B2A] dark:text-white">
-                <span>{section.emoji}</span>
-                {section.label}
+                <span>{visual?.emoji}</span> {MEAL_LABELS[type]}
               </h2>
               {sectionMenus.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-[#DDE3EC] py-8 text-center text-sm text-gray-500 dark:border-gray-600">
-                  No active menus for {section.label.toLowerCase()}
+                  No active menus for {MEAL_LABELS[type].toLowerCase()}
                 </p>
               ) : (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {sectionMenus.map((menu) => {
-                    const visual = MEAL_SESSION_VISUAL[menu.mealType]
-                    const preview = menu.ingredients
-                      .slice(0, 4)
-                      .map((i) => `${i.emoji} ${i.itemName}`)
-                      .join(' · ')
-                    return (
-                      <div
-                        key={menu.id}
-                        className="rounded-xl border border-white/90 bg-white/65 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]"
-                      >
-                        <div className="flex items-start gap-3">
-                          <span className="text-3xl">{visual?.emoji}</span>
-                          <div className="min-w-0 flex-1">
-                            <p className="font-bold text-[#0D1B2A] dark:text-white">{menu.menuName}</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {sectionMenus.map((menu) => (
+                    <div
+                      key={menu.id}
+                      className="rounded-xl border border-white/90 bg-white/65 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="text-3xl">
+                          {menu.ingredients[0]?.emoji ?? visual?.emoji}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-[#0D1B2A] dark:text-white">{menu.menuName}</p>
+                          {menu.sinhalaName && (
                             <p className="text-sm text-[#E8A020]">{menu.sinhalaName}</p>
-                            <p className="mt-1 text-xs text-gray-500">
-                              Base: {menu.baseStudentCount} students · {menu.ingredients.length}{' '}
-                              ingredients
-                            </p>
-                            <p className="mt-1 line-clamp-2 text-xs text-gray-400">{preview}</p>
-                          </div>
-                        </div>
-                        <div className="mt-3 flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openEdit(menu)}
-                            className="flex-1 rounded-lg border border-[#DDE3EC] py-2 text-xs font-semibold dark:border-gray-600"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleDelete(menu)}
-                            className="flex-1 rounded-lg border border-red-200 py-2 text-xs font-semibold text-red-600 dark:border-red-900"
-                          >
-                            Delete
-                          </button>
+                          )}
+                          <p className="mt-1 text-xs text-gray-500">
+                            Base: {menu.baseStudentCount} students · {menu.ingredients.length}{' '}
+                            ingredients
+                          </p>
+                          <p className="mt-2 line-clamp-2 text-xs text-gray-600 dark:text-gray-400">
+                            {menu.ingredients
+                              .slice(0, 5)
+                              .map((i) => `${i.emoji} ${i.itemName}`)
+                              .join(' · ')}
+                            {menu.ingredients.length > 5 ? '…' : ''}
+                          </p>
                         </div>
                       </div>
-                    )
-                  })}
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(menu)}
+                          className="min-h-[40px] flex-1 rounded-lg border border-[#DDE3EC] text-sm font-semibold dark:border-gray-600"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(menu)}
+                          className="min-h-[40px] flex-1 rounded-lg border border-red-200 text-sm font-semibold text-red-600"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </section>
@@ -304,57 +285,60 @@ export default function DailyMenusPage() {
       >
         <div className="space-y-5">
           <div>
-            <label className="mb-2 block text-sm font-bold">Menu name (English)</label>
+            <label className="mb-1 block text-sm font-bold">Menu name (English)</label>
             <input
               value={menuName}
               onChange={(e) => setMenuName(e.target.value)}
-              className="h-12 w-full rounded-xl border border-[#DDE3EC] px-3 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+              className="min-h-[48px] w-full rounded-xl border border-[#DDE3EC] px-3 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
             />
           </div>
           <div>
-            <label className="mb-2 block text-sm font-bold">Menu name (Sinhala)</label>
+            <label className="mb-1 block text-sm font-bold">Menu name (Sinhala)</label>
             <input
               value={sinhalaName}
               onChange={(e) => setSinhalaName(e.target.value)}
               placeholder="සිංහල නම"
-              className="h-12 w-full rounded-xl border border-[#DDE3EC] px-3 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+              className="min-h-[48px] w-full rounded-xl border border-[#DDE3EC] px-3 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
             />
           </div>
           <div>
             <label className="mb-2 block text-sm font-bold">Meal type</label>
             <div className="grid grid-cols-2 gap-2">
-              {MEAL_TYPES.map((m) => (
-                <button
-                  key={m.value}
-                  type="button"
-                  onClick={() => setMealType(m.value)}
-                  className={`flex min-h-[56px] flex-col items-center justify-center rounded-xl border-2 ${
-                    mealType === m.value
-                      ? 'border-[#E8A020] bg-[#E8A020]/15'
-                      : 'border-[#DDE3EC] bg-white dark:border-gray-600 dark:bg-gray-900'
-                  }`}
-                >
-                  <span className="text-2xl">{m.emoji}</span>
-                  <span className="text-xs font-semibold">{m.label}</span>
-                </button>
-              ))}
+              {MEAL_TYPES.map((t) => {
+                const v = MEAL_SESSION_VISUAL[t]
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setMealType(t)}
+                    className={`min-h-[72px] rounded-xl border-2 ${
+                      mealType === t
+                        ? 'border-[#E8A020] bg-[#E8A020]/10'
+                        : 'border-[#DDE3EC] dark:border-gray-600'
+                    }`}
+                  >
+                    <span className="text-2xl">{v?.emoji}</span>
+                    <p className="text-sm font-semibold">{MEAL_LABELS[t]}</p>
+                  </button>
+                )
+              })}
             </div>
           </div>
           <div>
             <label className="mb-2 block text-sm font-bold">Base student count</label>
-            <CountStepper value={baseCount} onChange={setBaseCount} min={1} />
-            <p className="mt-1 text-xs text-gray-500">
-              Quantities below are for {baseStudentCount} students
-            </p>
+            <CountStepper value={baseStudentCount} onChange={setBaseStudentCount} step={1} />
           </div>
-          <IngredientGrid
-            inventoryItems={inventory}
-            selected={selected}
-            onChange={setSelected}
-            sinhala={sinhala}
-            baseStudentCount={baseStudentCount}
-            labelQuantitiesFor={baseStudentCount}
-          />
+          <div>
+            <p className="mb-2 text-sm font-bold text-[#0B3D6B] dark:text-white">
+              Ingredients — quantities below are for {baseStudentCount || 30} students
+            </p>
+            <IngredientGrid
+              inventoryItems={inventory}
+              selected={selected}
+              onChange={setSelected}
+              showTotals={false}
+            />
+          </div>
         </div>
       </KitchenBottomSheet>
     </div>

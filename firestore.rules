@@ -173,18 +173,6 @@ service cloud.firestore {
         request.auth.token.role == 'accountant';
     }
 
-    match /dailyMenus/{menuId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null &&
-        request.auth.token.role in ['kitchen', 'admin', 'owner'];
-    }
-
-    match /mealTemplates/{templateId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null &&
-        request.auth.token.role in ['kitchen', 'admin', 'owner'];
-    }
-
     match /wasteLog/{doc} {
       allow read, write: if request.auth != null &&
         request.auth.token.role in ['kitchen', 'admin', 'owner'];
@@ -204,6 +192,18 @@ service cloud.firestore {
         request.auth.token.role in ['kitchen', 'admin', 'owner', 'accountant'];
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner'];
+    }
+
+    match /dailyMenus/{menuId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'kitchen', 'owner'];
+    }
+
+    match /mealTemplates/{templateId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'kitchen', 'owner'];
     }
 
     match /expenses/{doc} {

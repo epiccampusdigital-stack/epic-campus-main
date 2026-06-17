@@ -3,28 +3,31 @@
 import { useEffect, useState } from 'react'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
-import { MEAL_SESSION_VISUAL } from '@/lib/kitchen/foodImages'
-import { rescaleMenuIngredients, scaleQuantity } from '@/lib/kitchen/mealLogHelpers'
 import CountStepper from '@/components/kitchen/CountStepper'
-import type { DailyMenu, InventoryItem, MealType, SelectedIngredient } from '@/types/kitchen'
+import { getFoodEmoji } from '@/lib/kitchen/foodImages'
+import { scaleQuantity } from '@/lib/kitchen/ingredientSelection'
+import type { DailyMenu, InventoryItem, MealType } from '@/types/kitchen'
+
+const KITCHEN_LOCATION = 'Ahangama'
 
 interface DailyMenuLoaderProps {
   mealType: MealType
+  studentCount: number
   inventory: InventoryItem[]
-  defaultStudentCount: number
-  selected: SelectedIngredient[]
-  onChange: (selected: SelectedIngredient[]) => void
   appliedMenu: DailyMenu | null
-  onMenuApplied: (menu: DailyMenu | null) => void
+  onSelectMenu: (menu: DailyMenu) => void
+  onClearMenu: () => void
+  onTodayCountChange: (count: number) => void
+  todayCount: number
 }
 
-function parseDailyMenu(id: string, data: Record<string, unknown>): DailyMenu {
+function parseMenu(id: string, data: Record<string, unknown>): DailyMenu {
   return {
     id,
     menuName: String(data.menuName ?? ''),
     sinhalaName: String(data.sinhalaName ?? ''),
     mealType: data.mealType as MealType,
-    location: String(data.location ?? 'Ahangama'),
+    location: String(data.location ?? KITCHEN_LOCATION),
     isActive: data.isActive !== false,
     baseStudentCount: Number(data.baseStudentCount ?? 30),
     ingredients: Array.isArray(data.ingredients)
@@ -38,19 +41,15 @@ function parseDailyMenu(id: string, data: Record<string, unknown>): DailyMenu {
 
 export default function DailyMenuLoader({
   mealType,
+  studentCount,
   inventory,
-  defaultStudentCount,
-  selected,
-  onChange,
   appliedMenu,
-  onMenuApplied,
+  onSelectMenu,
+  onClearMenu,
+  onTodayCountChange,
+  todayCount,
 }: DailyMenuLoaderProps) {
   const [menus, setMenus] = useState<DailyMenu[]>([])
-  const [scaleCount, setScaleCount] = useState(String(defaultStudentCount || 30))
-
-  useEffect(() => {
-    setScaleCount(String(defaultStudentCount || 30))
-  }, [defaultStudentCount])
 
   useEffect(() => {
     async function load() {
@@ -63,13 +62,15 @@ export default function DailyMenuLoader({
           ),
         )
         setMenus(
-          snap.docs.map((d) => parseDailyMenu(d.id, d.data() as Record<string, unknown>)),
+          snap.docs
+            .map((d) => parseMenu(d.id, d.data() as Record<string, unknown>))
+            .filter((m) => m.location === KITCHEN_LOCATION || !m.location),
         )
       } catch {
         const snap = await getDocs(collection(db, 'dailyMenus'))
         setMenus(
           snap.docs
-            .map((d) => parseDailyMenu(d.id, d.data() as Record<string, unknown>))
+            .map((d) => parseMenu(d.id, d.data() as Record<string, unknown>))
             .filter((m) => m.mealType === mealType && m.isActive),
         )
       }
@@ -77,103 +78,103 @@ export default function DailyMenuLoader({
     void load()
   }, [mealType])
 
-  useEffect(() => {
-    if (!appliedMenu) return
-    const today = Number(scaleCount) || appliedMenu.baseStudentCount
-    onChange(rescaleMenuIngredients(appliedMenu.ingredients, appliedMenu.baseStudentCount, today, inventory))
-  }, [scaleCount, appliedMenu?.id])
+  if (menus.length === 0 && !appliedMenu) return null
 
-  if (menus.length === 0) return null
-
-  const today = Number(scaleCount) || 0
   const multiplier =
     appliedMenu && appliedMenu.baseStudentCount > 0
-      ? Math.round((today / appliedMenu.baseStudentCount) * 100) / 100
+      ? Math.round((todayCount / appliedMenu.baseStudentCount) * 100) / 100
       : 1
-
-  const stockIssues = selected
-    .map((s) => {
-      const item = inventory.find((i) => i.id === s.itemId)
-      if (!item || s.qty <= item.currentStock) return null
-      return { ...s, available: item.currentStock }
-    })
-    .filter(Boolean) as Array<SelectedIngredient & { available: number }>
 
   return (
     <div className="space-y-3 rounded-xl border border-[#0B3D6B]/20 bg-[#0B3D6B]/5 p-4">
       <p className="text-sm font-bold text-[#0B3D6B] dark:text-white">📋 Load Daily Menu</p>
-      <div className="flex gap-3 overflow-x-auto pb-1">
-        {menus.map((menu) => {
-          const visual = MEAL_SESSION_VISUAL[menu.mealType]
-          const active = appliedMenu?.id === menu.id
-          return (
+
+      {!appliedMenu && (
+        <div className="space-y-2">
+          {menus.map((menu) => (
             <button
               key={menu.id}
               type="button"
-              onClick={() => {
-                onMenuApplied(menu)
-                const count = Number(scaleCount) || defaultStudentCount || menu.baseStudentCount
-                onChange(
-                  rescaleMenuIngredients(menu.ingredients, menu.baseStudentCount, count, inventory),
-                )
-              }}
-              className={`min-w-[200px] shrink-0 rounded-xl border p-3 text-left ${
-                active
-                  ? 'border-[#E8A020] bg-[#E8A020]/10'
-                  : 'border-[#DDE3EC] bg-white dark:border-gray-600 dark:bg-gray-900'
-              }`}
+              onClick={() => onSelectMenu(menu)}
+              className="flex w-full items-center gap-3 rounded-xl border border-[#DDE3EC] bg-white p-4 text-left dark:border-gray-600 dark:bg-gray-900"
             >
-              <span className="text-2xl">{visual?.emoji}</span>
-              <p className="mt-1 text-sm font-bold">{menu.menuName}</p>
-              <p className="text-xs text-[#E8A020]">{menu.sinhalaName}</p>
-              <p className="mt-1 text-[10px] text-gray-500">
-                Base: {menu.baseStudentCount} students · {menu.ingredients.length} ingredients
-              </p>
-              <p className="mt-1 line-clamp-1 text-[10px] text-gray-400">
-                {menu.ingredients.map((i) => `${i.emoji} ${i.itemName}`).join(' · ')}
-              </p>
+              <span className="text-3xl">
+                {menu.ingredients[0]?.emoji ?? getFoodEmoji(menu.ingredients[0]?.itemName ?? '')}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-[#0D1B2A] dark:text-white">{menu.menuName}</p>
+                {menu.sinhalaName && (
+                  <p className="text-sm text-[#E8A020]">{menu.sinhalaName}</p>
+                )}
+                <p className="text-xs text-gray-500">
+                  Base: {menu.baseStudentCount} students · {menu.ingredients.length} ingredients
+                </p>
+              </div>
             </button>
-          )
-        })}
-      </div>
+          ))}
+        </div>
+      )}
 
       {appliedMenu && (
-        <div className="rounded-xl border border-[#DDE3EC] bg-white p-4 dark:border-gray-600 dark:bg-gray-900">
-          <p className="text-sm font-bold text-[#0D1B2A] dark:text-white">
-            Adjust for today&apos;s student count
-          </p>
-          <p className="mt-1 text-xs text-gray-500">Base: {appliedMenu.baseStudentCount} students</p>
-          <div className="mt-3 max-w-xs">
-            <p className="mb-1 text-xs font-medium">Today:</p>
-            <CountStepper value={scaleCount} onChange={setScaleCount} step={1} min={1} />
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="font-bold text-[#0D1B2A] dark:text-white">{appliedMenu.menuName}</p>
+              {appliedMenu.sinhalaName && (
+                <p className="text-sm text-[#E8A020]">{appliedMenu.sinhalaName}</p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={onClearMenu}
+              className="text-xs font-semibold text-gray-500 underline"
+            >
+              Clear
+            </button>
           </div>
-          <p className="mt-2 text-xs text-gray-500">
-            Quantities scale automatically ({multiplier}× multiplier)
-          </p>
-          <ul className="mt-3 space-y-1 text-xs text-gray-600 dark:text-gray-400">
-            {appliedMenu.ingredients.slice(0, 6).map((ing) => {
-              const scaled = scaleQuantity(ing.baseQty, appliedMenu.baseStudentCount, today)
+
+          <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
+            <p className="mb-3 text-sm font-semibold text-[#0B3D6B] dark:text-white">
+              Adjust for today&apos;s student count
+            </p>
+            <p className="text-xs text-gray-500">Base: {appliedMenu.baseStudentCount} students</p>
+            <div className="mt-2 flex items-center gap-3">
+              <span className="text-sm text-gray-600">Today:</span>
+              <CountStepper
+                value={String(todayCount || studentCount || appliedMenu.baseStudentCount)}
+                onChange={(v) => onTodayCountChange(Number(v) || 0)}
+                step={1}
+              />
+              <span className="text-sm text-gray-500">students</span>
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              Quantities will scale automatically · {todayCount || studentCount}/
+              {appliedMenu.baseStudentCount} = {multiplier}× multiplier
+            </p>
+          </div>
+
+          <ul className="space-y-1 text-sm">
+            {appliedMenu.ingredients.map((ing) => {
+              const scaled = scaleQuantity(
+                ing.baseQty,
+                appliedMenu.baseStudentCount,
+                todayCount || studentCount || appliedMenu.baseStudentCount,
+              )
+              const item = inventory.find((i) => i.id === ing.itemId)
+              const short = item && scaled > item.currentStock
               return (
-                <li key={ing.itemId}>
-                  {ing.emoji} {ing.itemName}: {ing.baseQty} {ing.unit} → {scaled} {ing.unit} (for{' '}
-                  {today} students)
+                <li key={ing.itemId} className={short ? 'text-red-600' : 'text-gray-600'}>
+                  {ing.emoji} {ing.itemName}: {ing.baseQty} {ing.unit} → {scaled} {ing.unit}
+                  {short && (
+                    <span className="block text-xs">
+                      ⚠️ Not enough {ing.itemName} — need {scaled} {ing.unit}, only{' '}
+                      {item.currentStock} {ing.unit} in stock. Order more or reduce quantity.
+                    </span>
+                  )}
                 </li>
               )
             })}
           </ul>
-          {stockIssues.map((s) => (
-            <p key={s.itemId} className="mt-2 text-xs font-medium text-red-600">
-              ⚠️ Not enough {s.itemName} — need {s.qty} {s.unit}, only {s.available} {s.unit} in
-              stock. Order more or reduce quantity.
-            </p>
-          ))}
-          <button
-            type="button"
-            onClick={() => onMenuApplied(null)}
-            className="mt-3 text-xs font-semibold text-[#5A6A7A] underline"
-          >
-            Clear menu
-          </button>
         </div>
       )}
     </div>

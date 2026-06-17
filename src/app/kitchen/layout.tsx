@@ -16,7 +16,7 @@ const NAV = [
   { label: 'Dashboard', href: '/kitchen/dashboard', icon: 'ti-home' },
   { label: 'Inventory', href: '/kitchen/inventory', icon: 'ti-package' },
   { label: 'Meal Log', href: '/kitchen/meal-log', icon: 'ti-soup' },
-  { label: 'Daily Menus', href: '/kitchen/menus', icon: 'ti-calendar-event' },
+  { label: 'Daily Menus', href: '/kitchen/menus', icon: 'ti-book-2' },
   { label: 'Waste Tracker', href: '/kitchen/waste', icon: 'ti-trash' },
   { label: 'Order Requests', href: '/kitchen/orders', icon: 'ti-clipboard-list' },
   { label: 'Reports', href: '/kitchen/reports', icon: 'ti-chart-bar' },

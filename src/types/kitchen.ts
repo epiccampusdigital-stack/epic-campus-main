@@ -52,11 +52,6 @@ export interface MealLog {
   loggedBy: string
   loggedByName: string
   createdAt: Timestamp
-  dailyMenuId?: string
-  dailyMenuName?: string
-  dailyMenuSinhalaName?: string
-  mealTemplateId?: string
-  mealTemplateName?: string
 }
 
 export interface WasteEntry {
@@ -111,8 +106,8 @@ export interface KitchenAISuggestion {
 export interface SelectedIngredient {
   itemId: string
   itemName: string
-  sinhalaName?: string
   emoji: string
+  sinhalaName?: string
   qty: number
   unit: StockUnit
   unitCost: number
