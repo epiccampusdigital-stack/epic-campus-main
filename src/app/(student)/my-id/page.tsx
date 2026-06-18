@@ -10,13 +10,22 @@ export default function MyIdPage() {
   const { student, user } = useStudentPortal()
   const [downloading, setDownloading] = useState(false)
 
-  if (!student) return null
-
   const fallbackId = user?.uid
     ? `EC-${new Date().getFullYear()}-${user.uid.slice(0, 4).toUpperCase()}`
     : undefined
 
-  const cardProps = studentToIdCardProps(student, fallbackId)
+  const effectiveStudent = student ?? {
+    id: user?.uid ?? 'unknown',
+    name: user?.displayName ?? user?.email ?? 'Student',
+    courseId: undefined,
+    enrollmentDate: undefined,
+    batchStartDate: undefined,
+    location: undefined,
+    photoUrl: undefined,
+    studentCode: undefined,
+  }
+
+  const cardProps = studentToIdCardProps(effectiveStudent as any, fallbackId)
 
   async function handleDownload() {
     setDownloading(true)

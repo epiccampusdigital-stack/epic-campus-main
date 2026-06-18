@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { collection, getDocs, query, where } from 'firebase/firestore'
-import { db } from '@/lib/firebase/client'
+import { collection, getDocs, query, where, doc, getDoc, setDoc } from 'firebase/firestore'
+import { auth, db } from '@/lib/firebase/client'
 import { parseAttendance } from '@/lib/attendance/helpers'
 import { parsePayment } from '@/lib/payments/helpers'
 import CourseDashboard from '@/components/student/CourseDashboard'
@@ -14,34 +14,39 @@ import type { AttendanceRecord, Payment } from '@/types'
 
 export default function MyDashboardPage() {
   const { student } = useStudentPortal()
+  const [fallbackStudent, setFallbackStudent] = useState<any | null>(null)
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [examCount, setExamCount] = useState(0)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!student) return
+    const uid = auth.currentUser?.uid
+
+    if (!student && !uid && !fallbackStudent) return
 
     async function load() {
       setLoading(true)
       try {
+        const studentId = student?.id ?? fallbackStudent?.id
+
         const [attSnap, paySnap, examSnap] = await Promise.all([
           getDocs(
             query(
               collection(db, 'attendance'),
-              where('studentId', '==', student!.id),
+              where('studentId', '==', studentId),
             ),
           ).catch(() => ({ docs: [] })),
           getDocs(
             query(
               collection(db, 'payments'),
-              where('studentId', '==', student!.id),
+              where('studentId', '==', studentId),
             ),
           ).catch(() => ({ docs: [] })),
           getDocs(
             query(
               collection(db, 'examResults'),
-              where('studentId', '==', student!.id),
+              where('studentId', '==', studentId),
             ),
           ).catch(() => ({ docs: [] })),
         ])
@@ -64,8 +69,48 @@ export default function MyDashboardPage() {
       }
     }
 
-    load()
-  }, [student])
+    // If there's no context student, try to hydrate a minimal student record from auth/users
+    async function ensureStudentFromAuth() {
+      const uid = auth.currentUser?.uid
+      if (!uid) return
+
+      try {
+        const studSnap = await getDoc(doc(db, 'students', uid)).catch(() => null)
+        if (studSnap && studSnap.exists()) {
+          setFallbackStudent({ id: uid, ...(studSnap.data() ?? {}) })
+          return
+        }
+
+        const userSnap = await getDoc(doc(db, 'users', uid)).catch(() => null)
+        if (userSnap && userSnap.exists()) {
+          const udata = userSnap.data() ?? {}
+          const minimal = {
+            id: uid,
+            name: String(udata.displayName ?? udata.email ?? ''),
+            uid,
+            courseId: udata.courseId ?? undefined,
+          }
+          // create minimal students doc (merge)
+          await setDoc(doc(db, 'students', uid), minimal, { merge: true }).catch(() => null)
+          setFallbackStudent(minimal)
+          return
+        }
+      } catch (err) {
+        console.error('[MyDashboard] ensureStudentFromAuth error', err)
+      }
+    }
+
+    // Kick off ensure first so load() has studentId available
+    if (!student && !fallbackStudent) {
+      ensureStudentFromAuth().then(() => load())
+    } else {
+      load()
+    }
+
+    return () => {
+      // noop
+    }
+  }, [student, fallbackStudent])
 
   if (!student) return null
 

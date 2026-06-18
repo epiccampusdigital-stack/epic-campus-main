@@ -154,7 +154,7 @@ export default function MyResultsPage() {
             <EmptyState
               icon="ti-certificate"
               title="No exam results yet"
-              subtitle="Your scores will appear here after you complete an exam."
+              subtitle="No exam results yet. Start your first exam to see results here."
             />
             <div className="mt-4 text-center">
               <Link
