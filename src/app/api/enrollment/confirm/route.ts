@@ -2,18 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { FieldValue } from 'firebase-admin/firestore'
 import { adminAuth, adminDb } from '@/lib/firebase/admin'
 import { sendWhatsApp } from '@/lib/twilio'
-import { generateTempPassword } from '@/lib/enrollment/helpers'
+import {
+  createStudentAccount,
+  generateEnrollmentPassword,
+  generateStudentCode,
+} from '@/lib/students/createStudentAccount'
 
 export const dynamic = 'force-dynamic'
 
 const ALLOWED_ROLES = ['admin', 'owner', 'reception']
-const PROGRAM_COURSE_MAP: Record<string, string> = {
-  'japan-ssw': 'japan-ssw',
-  korea: 'korea-d2d4',
-  china: 'china',
-  ielts: 'ielts',
-  nvq: 'nvq-it',
-}
 
 async function verifyStaff(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get('authorization') || ''
@@ -36,7 +33,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { enrollmentId } = await req.json()
+    const { enrollmentId, studentCode, location, batchIntake } = await req.json()
     if (!enrollmentId) {
       return NextResponse.json({ error: 'enrollmentId is required' }, { status: 400 })
     }
@@ -58,70 +55,46 @@ export async function POST(req: NextRequest) {
     const fullName = `${String(e.firstName ?? '')} ${String(e.lastName ?? '')}`.trim()
     const email = String(e.email ?? '')
     const phone = String(e.phone ?? '')
-    const tempPassword = generateTempPassword()
+    const resolvedStudentCode =
+      String(studentCode ?? '').trim() || (await generateStudentCode())
+    const password = generateEnrollmentPassword(String(e.firstName ?? 'Student'), phone)
 
-    const userRecord = await adminAuth.createUser({
+    const result = await createStudentAccount({
       email,
-      password: tempPassword,
+      password,
       displayName: fullName,
-    })
-
-    const allSnap = await adminDb.collection('students').get()
-    const year = new Date().getFullYear()
-    const seq = String(allSnap.size + 1).padStart(3, '0')
-    const studentCode = `EC-${year}-${seq}`
-    const courseId = PROGRAM_COURSE_MAP[String(e.program)] ?? 'japan-ssw'
-    const parentAccessCode = String(Math.floor(100000 + Math.random() * 900000))
-
-    await adminDb.collection('students').doc(userRecord.uid).set({
-      studentCode,
-      uid: userRecord.uid,
-      name: fullName,
-      nic: '',
-      email,
-      mobile: phone,
+      studentCode: resolvedStudentCode,
+      phone,
       address: String(e.address ?? ''),
       dateOfBirth: String(e.dateOfBirth ?? ''),
-      courseId,
-      batchId: `${courseId}-${year}`,
-      branchId: 'galle',
-      location: String(e.location ?? 'galle'),
+      program: String(e.program ?? 'japan-ssw'),
+      location: String(location ?? e.location ?? 'galle'),
+      batchIntake: batchIntake ? String(batchIntake) : undefined,
       batchDuration: String(e.batchDuration ?? '45days'),
       batchCustomDays: e.batchCustomDays ?? null,
-      registrationFee: 25_000,
-      feeAmount: 85_000,
-      feeCurrency: 'LKR',
-      paymentStatus: e.courseFeePaid ? 'paid' : e.registrationFeePaid ? 'partial' : 'pending',
-      status: 'active',
-      visaStatus: 'not-started',
-      parentAccessCode,
-      parentAccessEnabled: true,
-      createdAt: FieldValue.serverTimestamp(),
+      registrationFeePaid: Boolean(e.registrationFeePaid),
+      courseFeePaid: Boolean(e.courseFeePaid),
+      totalPaid: Number(e.totalPaid ?? 0),
       createdBy: staffUid,
     })
 
-    await adminDb.collection('users').doc(userRecord.uid).set({
-      uid: userRecord.uid,
-      email,
-      displayName: fullName,
-      role: 'student',
-      studentId: userRecord.uid,
-      createdAt: new Date().toISOString(),
-    })
-
     await enrollRef.update({
-      studentId: userRecord.uid,
+      studentId: result.uid,
       status: 'confirmed',
+      studentCode: result.studentCode,
+      approvedAt: FieldValue.serverTimestamp(),
+      approvedBy: staffUid,
     })
 
     if (phone) {
+      const firstName = String(e.firstName ?? fullName)
       await sendWhatsApp(
         phone,
-        `Hi ${fullName}, welcome to EPIC Campus! 🎉\n\nYour student account is ready.\nEmail: ${email}\nPassword: ${tempPassword}\n\nLogin at: epiccampus.live\n\nSee you soon! — EPIC Campus`,
+        `🎉 Welcome to Epic Campus, ${firstName}!\nYour account has been created.\nLogin at: www.epiccampus.live/login\nEmail: ${result.email}\nPassword: ${result.password}\nPlease change your password after first login.\n📞 Questions? Call us: 076 254 8383`,
       )
     }
 
-    return NextResponse.json({ uid: userRecord.uid, studentCode })
+    return NextResponse.json(result)
   } catch (err) {
     console.error('[enrollment/confirm]', err)
     const message = err instanceof Error ? err.message : 'Failed to create account'

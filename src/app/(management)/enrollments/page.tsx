@@ -9,15 +9,22 @@ import {
   PROGRAM_LABEL_MAP,
   ENROLLMENT_STATUS_STYLES,
   PAYMENT_STATUS_STYLES,
+  LOCATION_OPTIONS,
   formatLKR,
   formatEnrollmentDate,
 } from '@/lib/enrollment/helpers'
 import { useManagement } from '@/components/layout/ManagementContext'
 import type { EnrollmentApplication, EnrollmentProgram, StudentLocation } from '@/types'
 
-type StatusFilter = 'all' | 'pending' | 'confirmed' | 'rejected'
+type StatusTab = 'pending' | 'confirmed' | 'rejected'
 type ProgramFilter = 'all' | EnrollmentProgram
 type LocationFilter = 'all' | StudentLocation
+
+const STATUS_TABS: { id: StatusTab; label: string }[] = [
+  { id: 'pending', label: 'Pending' },
+  { id: 'confirmed', label: 'Approved' },
+  { id: 'rejected', label: 'Rejected' },
+]
 
 function StatCard({
   label,
@@ -29,23 +36,35 @@ function StatCard({
   color: string
 }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <p className="text-sm font-medium text-gray-500">{label}</p>
       <p className={`mt-1 font-jakarta text-3xl font-bold ${color}`}>{value}</p>
     </div>
   )
 }
 
+function defaultStudentCode(existingCount: number): string {
+  const year = new Date().getFullYear()
+  return `EC-${year}-${String(existingCount + 1).padStart(3, '0')}`
+}
+
 export default function EnrollmentsPage() {
   const { user } = useManagement()
   const [enrollments, setEnrollments] = useState<EnrollmentApplication[]>([])
   const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [statusTab, setStatusTab] = useState<StatusTab>('pending')
   const [programFilter, setProgramFilter] = useState<ProgramFilter>('all')
   const [locationFilter, setLocationFilter] = useState<LocationFilter>('all')
   const [viewApp, setViewApp] = useState<EnrollmentApplication | null>(null)
-  const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [approveTarget, setApproveTarget] = useState<EnrollmentApplication | null>(null)
+  const [rejectTarget, setRejectTarget] = useState<EnrollmentApplication | null>(null)
+  const [studentCode, setStudentCode] = useState('')
+  const [approveLocation, setApproveLocation] = useState<StudentLocation>('ahangama')
+  const [batchIntake, setBatchIntake] = useState(String(new Date().getFullYear()))
+  const [rejectionReason, setRejectionReason] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [actionSuccess, setActionSuccess] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -74,108 +93,130 @@ export default function EnrollmentsPage() {
     const pending = enrollments.filter((e) => e.status === 'pending').length
     const confirmed = enrollments.filter((e) => e.status === 'confirmed').length
     const paidToday = enrollments.filter(
-      (e) =>
-        e.stripePaymentStatus === 'paid' &&
-        e.createdAt.slice(0, 10) === today,
+      (e) => e.stripePaymentStatus === 'paid' && e.createdAt.slice(0, 10) === today,
     ).length
     return { total, pending, confirmed, paidToday }
   }, [enrollments, today])
 
   const filtered = useMemo(() => {
     return enrollments.filter((e) => {
-      if (statusFilter !== 'all' && e.status !== statusFilter) return false
+      if (e.status !== statusTab) return false
       if (programFilter !== 'all' && e.program !== programFilter) return false
       if (locationFilter !== 'all' && e.location !== locationFilter) return false
       return true
     })
-  }, [enrollments, statusFilter, programFilter, locationFilter])
+  }, [enrollments, statusTab, programFilter, locationFilter])
 
-  async function handleCreateAccount(enrollment: EnrollmentApplication) {
-    if (!auth.currentUser) return
+  function openApproveModal(enrollment: EnrollmentApplication) {
     setActionError('')
-    setConfirmingId(enrollment.id)
+    setActionSuccess('')
+    setApproveTarget(enrollment)
+    setStudentCode(defaultStudentCode(enrollments.length))
+    setApproveLocation(enrollment.location || 'ahangama')
+    setBatchIntake(String(new Date().getFullYear()))
+  }
+
+  async function handleApprove() {
+    if (!auth.currentUser || !approveTarget) return
+    setActionError('')
+    setSubmitting(true)
     try {
       const token = await auth.currentUser.getIdToken()
-      const res = await fetch('/api/enrollment/confirm', {
+      const res = await fetch('/api/students/create-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ enrollmentId: enrollment.id }),
+        body: JSON.stringify({
+          enrollmentId: approveTarget.id,
+          studentCode: studentCode.trim(),
+          location: approveLocation,
+          batchIntake: batchIntake.trim(),
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
         setActionError(data.error || 'Failed to create account')
         return
       }
+      setActionSuccess(`Account created for ${approveTarget.firstName} ${approveTarget.lastName}`)
+      setApproveTarget(null)
       await load()
     } catch {
       setActionError('Network error. Please try again.')
     } finally {
-      setConfirmingId(null)
+      setSubmitting(false)
     }
   }
 
-  const isAdminOrOwner = user?.role === 'admin' || user?.role === 'owner'
-  const [rejectingId, setRejectingId] = useState<string | null>(null)
-
-  async function handleReject(enrollment: EnrollmentApplication) {
-    if (!auth.currentUser) return
+  async function handleReject() {
+    if (!auth.currentUser || !rejectTarget) return
     setActionError('')
-    setRejectingId(enrollment.id)
+    setSubmitting(true)
     try {
       const token = await auth.currentUser.getIdToken()
       const res = await fetch('/api/enrollment/reject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ enrollmentId: enrollment.id }),
+        body: JSON.stringify({
+          enrollmentId: rejectTarget.id,
+          rejectionReason: rejectionReason.trim(),
+        }),
       })
+      const data = await res.json()
       if (!res.ok) {
-        const data = await res.json()
         setActionError(data.error || 'Failed to reject')
         return
       }
+      setActionSuccess(`Enrollment rejected for ${rejectTarget.firstName} ${rejectTarget.lastName}`)
+      setRejectTarget(null)
+      setRejectionReason('')
       await load()
     } catch {
       setActionError('Network error.')
     } finally {
-      setRejectingId(null)
+      setSubmitting(false)
     }
   }
 
+  const isStaff = user?.role === 'admin' || user?.role === 'owner' || user?.role === 'reception'
   const selectCls =
-    'rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-700 outline-none focus:border-[#0B3D6B] bg-white'
+    'rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-700 outline-none focus:border-[#0B3D6B] bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200'
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
-      {/* Header */}
       <div>
         <h1 className="font-jakarta text-2xl font-bold text-[#0B3D6B] dark:text-white">
           Online Enrollments
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          Manage student enrollment applications from the website
+          Review applications, approve and create student login accounts
         </p>
       </div>
 
-      {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total Applications" value={stats.total} color="text-[#0B3D6B]" />
         <StatCard label="Pending" value={stats.pending} color="text-amber-600" />
-        <StatCard label="Confirmed" value={stats.confirmed} color="text-emerald-600" />
+        <StatCard label="Approved" value={stats.confirmed} color="text-emerald-600" />
         <StatCard label="Paid Today" value={stats.paidToday} color="text-[#E8A020]" />
       </div>
 
-      {/* Filters */}
+      <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-1 dark:border-gray-700">
+        {STATUS_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setStatusTab(tab.id)}
+            className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
+              statusTab === tab.id
+                ? 'border-b-2 border-[#E8A020] text-[#0B3D6B] dark:text-[#E8A020]'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-wrap items-center gap-3">
-        <select
-          className={selectCls}
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-        >
-          <option value="all">All Statuses</option>
-          <option value="pending">Pending</option>
-          <option value="confirmed">Confirmed</option>
-          <option value="rejected">Rejected</option>
-        </select>
         <select
           className={selectCls}
           value={programFilter}
@@ -194,14 +235,15 @@ export default function EnrollmentsPage() {
           onChange={(e) => setLocationFilter(e.target.value as LocationFilter)}
         >
           <option value="all">All Locations</option>
-          <option value="ahangama">Ahangama</option>
-          <option value="galle">Galle</option>
-          <option value="waduraba">Waduraba</option>
-          <option value="pinnaduwa">Pinnaduwa</option>
+          {LOCATION_OPTIONS.map((loc) => (
+            <option key={loc.value} value={loc.value}>
+              {loc.label}
+            </option>
+          ))}
         </select>
         <button
           type="button"
-          onClick={load}
+          onClick={() => void load()}
           className="ml-auto flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
         >
           <span className="ti ti-refresh" />
@@ -214,205 +256,251 @@ export default function EnrollmentsPage() {
           {actionError}
         </div>
       )}
+      {actionSuccess && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          {actionSuccess}
+        </div>
+      )}
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <span className="ti ti-loader-2 animate-spin text-2xl text-[#0B3D6B]" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="py-16 text-center">
-            <span className="ti ti-clipboard-off text-4xl text-gray-300" />
-            <p className="mt-3 text-sm text-gray-500">No enrollment applications found</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-[#F5F7FB] dark:border-gray-700 dark:bg-gray-700/50">
-                  {[
-                    'Name',
-                    'Program',
-                    'Location',
-                    'Amount Paid',
-                    'Payment',
-                    'Account',
-                    'Date',
-                    'Actions',
-                  ].map((h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-                {filtered.map((e) => (
-                  <tr
-                    key={e.id}
-                    className="transition-colors hover:bg-[#F5F7FB]/50 dark:hover:bg-gray-700/30"
-                  >
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-[#0B3D6B] dark:text-white">
-                        {e.firstName} {e.lastName}
-                      </p>
-                      <p className="text-xs text-gray-400">{e.email}</p>
-                    </td>
-                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
-                      {PROGRAM_LABEL_MAP[e.program]}
-                    </td>
-                    <td className="px-4 py-3 capitalize text-gray-700 dark:text-gray-300">
-                      {e.location}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">
-                      {e.totalPaid > 0 ? formatLKR(e.totalPaid) : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${PAYMENT_STATUS_STYLES[e.stripePaymentStatus]}`}
-                      >
-                        {e.stripePaymentStatus}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${ENROLLMENT_STATUS_STYLES[e.status]}`}
-                      >
-                        {e.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
-                      {formatEnrollmentDate(e.createdAt)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setViewApp(e)}
-                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                        >
-                          View
-                        </button>
-                        {!e.studentId && e.stripePaymentStatus === 'paid' && (
-                          <button
-                            type="button"
-                            onClick={() => void handleCreateAccount(e)}
-                            disabled={confirmingId === e.id}
-                            className="rounded-lg bg-[#0B3D6B] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0a3460] disabled:opacity-50"
-                          >
-                            {confirmingId === e.id ? (
-                              <span className="ti ti-loader-2 animate-spin" />
-                            ) : (
-                              'Create Account'
-                            )}
-                          </button>
-                        )}
-                        {e.studentId && (
-                          <span className="flex items-center gap-1 text-xs text-emerald-600">
-                            <span className="ti ti-circle-check" />
-                            Account Active
-                          </span>
-                        )}
-                        {isAdminOrOwner && e.status !== 'rejected' && (
-                          <button
-                            type="button"
-                            onClick={() => void handleReject(e)}
-                            disabled={rejectingId === e.id}
-                            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-                          >
-                            {rejectingId === e.id ? (
-                              <span className="ti ti-loader-2 animate-spin" />
-                            ) : (
-                              'Reject'
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* View Application Modal */}
-      {viewApp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setViewApp(null)}
-          />
-          <div className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-jakarta text-lg font-bold text-[#0B3D6B] dark:text-white">
-                Enrollment Application
-              </h2>
-              <button
-                type="button"
-                onClick={() => setViewApp(null)}
-                className="rounded-full p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                <span className="ti ti-x text-gray-500" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-sm">
-              {[
-                ['Name', `${viewApp.firstName} ${viewApp.lastName}`],
-                ['Email', viewApp.email],
-                ['Phone', viewApp.phone],
-                ['Date of Birth', viewApp.dateOfBirth || '—'],
-                ['Address', viewApp.address || '—'],
-                ['Program', PROGRAM_LABEL_MAP[viewApp.program]],
-                ['Location', viewApp.location],
-                ['Batch Duration', viewApp.batchDuration],
-                ['Amount Paid', viewApp.totalPaid > 0 ? formatLKR(viewApp.totalPaid) : '—'],
-                ['Registration Fee', viewApp.registrationFeePaid ? '✅ Paid' : '❌ Not paid'],
-                ['Course Fee', viewApp.courseFeePaid ? '✅ Paid' : '❌ Not paid'],
-                ['Payment Status', viewApp.stripePaymentStatus],
-                ['Application Status', viewApp.status],
-                ['Student ID', viewApp.studentId || '—'],
-                ['Reference', viewApp.id.slice(0, 16).toUpperCase()],
-                ['Applied On', formatEnrollmentDate(viewApp.createdAt)],
-              ].map(([label, value]) => (
-                <div key={label} className="flex justify-between gap-4 border-b border-gray-50 pb-2">
-                  <span className="font-medium text-gray-500">{label}</span>
-                  <span className="text-right capitalize text-gray-800 dark:text-gray-200">
-                    {value}
-                  </span>
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <span className="ti ti-loader-2 animate-spin text-2xl text-[#0B3D6B]" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-2xl border border-gray-100 bg-white py-16 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <span className="ti ti-clipboard-off text-4xl text-gray-300" />
+          <p className="mt-3 text-sm text-gray-500">No {statusTab} enrollments</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((e) => (
+            <div
+              key={e.id}
+              className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-jakarta text-lg font-bold text-[#0B3D6B] dark:text-white">
+                    {e.firstName} {e.lastName}
+                  </p>
+                  <p className="text-sm text-gray-500">{e.email}</p>
+                  <p className="text-sm text-gray-500">{e.phone}</p>
                 </div>
-              ))}
+                <span
+                  className={`inline-flex shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${ENROLLMENT_STATUS_STYLES[e.status]}`}
+                >
+                  {e.status === 'confirmed' ? 'Approved' : e.status}
+                </span>
+              </div>
+
+              <div className="mt-4 space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                <p>
+                  <span className="font-medium">Course:</span> {PROGRAM_LABEL_MAP[e.program]}
+                </p>
+                <p>
+                  <span className="font-medium">Paid:</span>{' '}
+                  {e.totalPaid > 0 ? formatLKR(e.totalPaid) : '—'}
+                </p>
+                <p>
+                  <span className="font-medium">Submitted:</span>{' '}
+                  {formatEnrollmentDate(e.createdAt)}
+                </p>
+                <p>
+                  <span
+                    className={`inline-flex rounded-full border px-2 py-0.5 text-xs capitalize ${PAYMENT_STATUS_STYLES[e.stripePaymentStatus]}`}
+                  >
+                    Payment: {e.stripePaymentStatus}
+                  </span>
+                </p>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewApp(e)}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  View
+                </button>
+                {isStaff && e.status === 'pending' && !e.studentId && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => openApproveModal(e)}
+                      className="rounded-lg bg-[#E8A020] px-3 py-1.5 text-xs font-bold text-[#0B3D6B] hover:bg-[#d4911c]"
+                    >
+                      ✓ Approve & Create Account
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRejectTarget(e)
+                        setRejectionReason('')
+                        setActionError('')
+                      }}
+                      className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                    >
+                      ✗ Reject
+                    </button>
+                  </>
+                )}
+                {e.studentId && (
+                  <span className="flex items-center gap-1 text-xs text-emerald-600">
+                    <span className="ti ti-circle-check" />
+                    Account active
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {approveTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setApproveTarget(null)} />
+          <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800">
+            <h2 className="font-jakarta text-lg font-bold text-[#0B3D6B] dark:text-white">
+              Approve & Create Account
+            </h2>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+              {approveTarget.firstName} {approveTarget.lastName} · {approveTarget.email}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              This will create a login account and send credentials via WhatsApp
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-500">Student ID</label>
+                <input
+                  value={studentCode}
+                  onChange={(ev) => setStudentCode(ev.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-500">Location</label>
+                <select
+                  value={approveLocation}
+                  onChange={(ev) => setApproveLocation(ev.target.value as StudentLocation)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                >
+                  {LOCATION_OPTIONS.map((loc) => (
+                    <option key={loc.value} value={loc.value}>
+                      {loc.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-500">
+                  Batch / Intake
+                </label>
+                <input
+                  value={batchIntake}
+                  onChange={(ev) => setBatchIntake(ev.target.value)}
+                  placeholder="e.g. 2026"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                />
+              </div>
             </div>
 
             <div className="mt-6 flex gap-3">
-              {!viewApp.studentId && viewApp.stripePaymentStatus === 'paid' && (
-                <button
-                  type="button"
-                  onClick={() => { void handleCreateAccount(viewApp); setViewApp(null) }}
-                  disabled={confirmingId === viewApp.id}
-                  className="flex-1 rounded-xl bg-[#0B3D6B] py-2.5 text-sm font-semibold text-white hover:bg-[#0a3460]"
-                >
-                  Create Student Account
-                </button>
-              )}
               <button
                 type="button"
-                onClick={() => setViewApp(null)}
-                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                onClick={() => setApproveTarget(null)}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium"
               >
-                Close
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={submitting || !studentCode.trim()}
+                onClick={() => void handleApprove()}
+                className="flex-1 rounded-xl bg-[#E8A020] py-2.5 text-sm font-bold text-[#0B3D6B] disabled:opacity-50"
+              >
+                {submitting ? 'Creating…' : 'Confirm & Create Account'}
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {rejectTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setRejectTarget(null)} />
+          <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800">
+            <h2 className="font-jakarta text-lg font-bold text-red-600">Reject Enrollment</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              {rejectTarget.firstName} {rejectTarget.lastName}
+            </p>
+            <div className="mt-4">
+              <label className="mb-1 block text-xs font-medium text-gray-500">
+                Reason (optional)
+              </label>
+              <textarea
+                value={rejectionReason}
+                onChange={(ev) => setRejectionReason(ev.target.value)}
+                rows={3}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+              />
+            </div>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setRejectTarget(null)}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => void handleReject()}
+                className="flex-1 rounded-xl border-2 border-red-500 py-2.5 text-sm font-bold text-red-600 disabled:opacity-50"
+              >
+                {submitting ? 'Rejecting…' : 'Confirm Rejection'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewApp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setViewApp(null)} />
+          <div className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-jakarta text-lg font-bold text-[#0B3D6B] dark:text-white">
+                Enrollment Application
+              </h2>
+              <button type="button" onClick={() => setViewApp(null)} className="rounded-full p-1.5 hover:bg-gray-100">
+                <span className="ti ti-x text-gray-500" />
+              </button>
+            </div>
+            <div className="space-y-3 text-sm">
+              {[
+                ['Name', `${viewApp.firstName} ${viewApp.lastName}`],
+                ['Email', viewApp.email],
+                ['Phone', viewApp.phone],
+                ['Program', PROGRAM_LABEL_MAP[viewApp.program]],
+                ['Location', viewApp.location],
+                ['Amount Paid', viewApp.totalPaid > 0 ? formatLKR(viewApp.totalPaid) : '—'],
+                ['Payment', viewApp.stripePaymentStatus],
+                ['Status', viewApp.status === 'confirmed' ? 'Approved' : viewApp.status],
+                ['Student ID', viewApp.studentId || '—'],
+                ['Applied On', formatEnrollmentDate(viewApp.createdAt)],
+              ].map(([label, value]) => (
+                <div key={label} className="flex justify-between gap-4 border-b border-gray-50 pb-2">
+                  <span className="font-medium text-gray-500">{label}</span>
+                  <span className="text-right capitalize text-gray-800 dark:text-gray-200">{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

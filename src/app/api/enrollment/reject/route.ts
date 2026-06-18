@@ -1,33 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { FieldValue } from 'firebase-admin/firestore'
 import { adminAuth, adminDb } from '@/lib/firebase/admin'
+import { sendWhatsApp } from '@/lib/twilio'
 
 export const dynamic = 'force-dynamic'
 
-async function verifyAdmin(req: NextRequest): Promise<boolean> {
+async function verifyStaff(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get('authorization') || ''
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
-  if (!token) return false
+  if (!token) return null
   try {
     const decoded = await adminAuth.verifyIdToken(token)
     const snap = await adminDb.collection('users').doc(decoded.uid).get()
     const role = String(snap.data()?.role ?? '')
-    return role === 'admin' || role === 'owner'
+    if (!['admin', 'owner', 'reception'].includes(role)) return null
+    return decoded.uid
   } catch {
-    return false
+    return null
   }
 }
 
 export async function POST(req: NextRequest) {
-  const ok = await verifyAdmin(req)
-  if (!ok) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const staffUid = await verifyStaff(req)
+  if (!staffUid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { enrollmentId } = await req.json()
+  const { enrollmentId, rejectionReason } = await req.json()
   if (!enrollmentId) return NextResponse.json({ error: 'enrollmentId required' }, { status: 400 })
 
-  await adminDb
-    .collection('enrollmentApplications')
-    .doc(String(enrollmentId))
-    .update({ status: 'rejected' })
+  const enrollRef = adminDb.collection('enrollmentApplications').doc(String(enrollmentId))
+  const enrollSnap = await enrollRef.get()
+  if (!enrollSnap.exists) {
+    return NextResponse.json({ error: 'Enrollment not found' }, { status: 404 })
+  }
 
-  return NextResponse.json({ ok: true })
+  const e = enrollSnap.data()!
+  const phone = String(e.phone ?? '')
+  const fullName = `${String(e.firstName ?? '')} ${String(e.lastName ?? '')}`.trim()
+
+  await enrollRef.update({
+    status: 'rejected',
+    rejectionReason: rejectionReason ? String(rejectionReason) : '',
+    rejectedAt: FieldValue.serverTimestamp(),
+    rejectedBy: staffUid,
+  })
+
+  if (phone) {
+    await sendWhatsApp(
+      phone,
+      `We're sorry, your enrollment could not be approved at this time. Please contact us: 076 254 8383`,
+    )
+  }
+
+  return NextResponse.json({ ok: true, name: fullName })
 }
