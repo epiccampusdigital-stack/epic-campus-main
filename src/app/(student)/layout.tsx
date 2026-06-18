@@ -18,8 +18,6 @@ import {
 } from '@/components/student/StudentContext'
 import type { EpicUser, Student } from '@/types'
 
-const LOAD_TIMEOUT_MS = 5000
-
 function PortalLoadingScreen() {
   return (
     <div className="flex h-screen flex-col items-center justify-center bg-[#eef2f7] dark:bg-[#080d18] px-6 transition-colors duration-300">
@@ -43,46 +41,6 @@ function PortalLoadingScreen() {
   )
 }
 
-function ProfileSetupError() {
-  const whatsappUrl = `https://wa.me/94771234567?text=${encodeURIComponent(
-    'Hi Epic Campus, my student portal profile is not set up yet. Please help.',
-  )}`
-
-  return (
-    <div className="flex h-screen flex-col items-center justify-center bg-[#eef2f7] dark:bg-[#080d18] px-6 text-center transition-colors duration-300">
-      <div className="mb-6 flex items-center justify-center rounded-xl bg-[#0B3D6B] px-6 py-4">
-        <img
-          src="/images/logo-transparent.png"
-          alt="Epic Campus"
-          className="h-12 w-auto"
-        />
-      </div>
-      <div className="max-w-md rounded-xl border border-[#DDE3EC] bg-white p-8 shadow-sm">
-        <span
-          className="ti ti-user-exclamation mb-4 block text-4xl text-[#E8A020]"
-          aria-hidden="true"
-        />
-        <h1 className="font-jakarta text-xl font-bold text-[#0D1B2A]">
-          Profile not ready yet
-        </h1>
-        <p className="mt-3 font-inter text-sm leading-relaxed text-[#5A6A7A]">
-          Your student profile is being set up. Please contact Epic Campus and we&apos;ll
-          get you access as soon as possible.
-        </p>
-        <a
-          href={whatsappUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#25D366] px-5 py-3 font-jakarta text-sm font-bold text-white hover:bg-[#20bd5a]"
-        >
-          <span className="ti ti-brand-whatsapp text-xl" aria-hidden="true" />
-          Contact Epic Campus
-        </a>
-      </div>
-    </div>
-  )
-}
-
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
@@ -102,7 +60,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     let cancelled = false
-    let timeoutId: ReturnType<typeof setTimeout> | undefined
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (cancelled) return
@@ -131,12 +88,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
 
         setStatus('loading')
 
-        timeoutId = setTimeout(() => {
-          if (!cancelled) {
-            setStatus('profile_unavailable')
-          }
-        }, LOAD_TIMEOUT_MS)
-
         const epicUser: EpicUser = {
           uid: firebaseUser.uid,
           email: String(data.email ?? firebaseUser.email ?? ''),
@@ -154,37 +105,32 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         })
 
         if (cancelled) return
-        clearTimeout(timeoutId)
 
         setUser(epicUser)
         if (!profile) {
-          setStatus('profile_unavailable')
+          console.error('[StudentLayout] Profile load failed for authenticated student:', firebaseUser.uid)
+          setStatus('loading')
           return
         }
 
         setStudent(profile)
         setStatus('ready')
-      } catch {
+      } catch (err) {
         if (!cancelled) {
-          clearTimeout(timeoutId)
-          setStatus('profile_unavailable')
+          console.error('[StudentLayout] Auth/profile error:', err)
+          setStatus('loading')
         }
       }
     })
 
     return () => {
       cancelled = true
-      if (timeoutId) clearTimeout(timeoutId)
       unsubscribe()
     }
   }, [router, refreshToken])
 
   if (status === 'loading') {
     return <PortalLoadingScreen />
-  }
-
-  if (status === 'profile_unavailable') {
-    return <ProfileSetupError />
   }
 
   if (status !== 'ready' || !user || !student) {

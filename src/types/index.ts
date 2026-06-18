@@ -434,6 +434,8 @@ export interface ExamPaper {
   speakingMinutes: number
   language?: ExamPaperLanguage
   courseIds?: string[]
+  isPublished?: boolean
+  order?: number
 }
 
 export interface ReadingQuestion {

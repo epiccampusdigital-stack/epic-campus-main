@@ -4,12 +4,54 @@ import {
   getDoc,
   getDocs,
   query,
+  setDoc,
   updateDoc,
   where,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { parseStudent } from '@/lib/students/helpers'
 import type { Student } from '@/types'
+
+async function createMinimalStudentFromUser(
+  uid: string,
+  userData: Record<string, unknown>,
+  studentDocId: string,
+): Promise<Student> {
+  const minimal: Record<string, unknown> = {
+    uid,
+    email: String(userData.email ?? ''),
+    name: String(userData.displayName ?? userData.name ?? 'Student'),
+    mobile: String(userData.mobile ?? ''),
+    courseId: 'japan-ssw',
+    batchId: String(userData.batchId ?? ''),
+    branchId: String(userData.branchId ?? 'galle-main'),
+    status: 'active',
+    paymentStatus: 'pending',
+    createdAt: new Date().toISOString(),
+    createdBy: 'portal-auto',
+  }
+
+  await setDoc(doc(db, 'students', studentDocId), minimal, { merge: true })
+
+  if (userData.studentId !== studentDocId) {
+    try {
+      await setDoc(
+        doc(db, 'users', uid),
+        { studentId: studentDocId },
+        { merge: true },
+      )
+    } catch (err) {
+      console.warn('[loadStudentProfile] Could not sync studentId on user doc:', err)
+    }
+  }
+
+  console.info('[loadStudentProfile] Auto-created minimal student profile:', {
+    uid,
+    studentDocId,
+  })
+
+  return parseStudent(studentDocId, { ...minimal, uid })
+}
 
 export async function loadStudentProfile(
   uid: string,
@@ -75,7 +117,14 @@ export async function loadStudentProfile(
     }
   }
 
-  console.warn('[loadStudentProfile] No student profile found for uid:', uid, {
+  const userSnap = await getDoc(doc(db, 'users', uid))
+  if (userSnap.exists()) {
+    const userData = userSnap.data() as Record<string, unknown>
+    const studentDocId = studentId || String(userData.studentId ?? uid)
+    return createMinimalStudentFromUser(uid, userData, studentDocId)
+  }
+
+  console.warn('[loadStudentProfile] No student profile or user doc for uid:', uid, {
     studentId,
     email,
   })

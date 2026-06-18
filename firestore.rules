@@ -13,20 +13,23 @@ service cloud.firestore {
     match /students/{studentId} {
       allow read: if request.auth != null && (
         request.auth.uid == studentId ||
+        resource.data.uid == request.auth.uid ||
         request.auth.token.role in ['admin', 'owner', 'reception', 'accountant', 'teacher']
       );
       allow create: if request.auth != null;
       allow update: if request.auth != null && (
         request.auth.uid == studentId ||
+        resource.data.uid == request.auth.uid ||
         request.auth.token.role in ['admin', 'owner', 'reception']
       );
     }
 
-    // Payments — staff only
+    // Payments — staff or owning student
     match /payments/{paymentId} {
       allow read: if request.auth != null && (
         request.auth.token.role in ['admin', 'owner', 'accountant', 'reception'] ||
-        resource.data.studentId == request.auth.uid
+        resource.data.studentId == request.auth.uid ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.studentId == resource.data.studentId
       );
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'accountant', 'reception'];
@@ -50,10 +53,37 @@ service cloud.firestore {
     match /examResults/{resultId} {
       allow read: if request.auth != null && (
         resource.data.studentId == request.auth.uid ||
-        request.auth.token.role in ['admin', 'teacher', 'examCoordinator']
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.studentId == resource.data.studentId ||
+        request.auth.token.role in ['admin', 'teacher', 'examCoordinator', 'owner']
       );
       allow write: if request.auth != null &&
-        request.auth.token.role in ['admin', 'teacher', 'examCoordinator'];
+        request.auth.token.role in ['admin', 'teacher', 'examCoordinator', 'owner'];
+    }
+
+    match /examPapers/{paperId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'teacher', 'examCoordinator', 'owner'];
+
+      match /{subcollection}/{docId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null &&
+          request.auth.token.role in ['admin', 'teacher', 'examCoordinator', 'owner'];
+      }
+    }
+
+    match /examAttempts/{attemptId} {
+      allow read: if request.auth != null && (
+        resource.data.studentId == request.auth.uid ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.studentId == resource.data.studentId ||
+        request.auth.token.role in ['admin', 'teacher', 'examCoordinator', 'owner']
+      );
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (
+        resource.data.studentId == request.auth.uid ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.studentId == resource.data.studentId ||
+        request.auth.token.role in ['admin', 'teacher', 'examCoordinator', 'owner']
+      );
     }
 
     // Leads — staff only

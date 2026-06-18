@@ -48,11 +48,18 @@ export default function MyResultsPage() {
             const data = d.data() as Record<string, unknown>
             let examTitle = String(data.examTitle ?? '')
             if (data.examId) {
-              const examSnap = await getDoc(doc(db, 'exams', String(data.examId))).catch(
-                () => null,
-              )
+              const examSnap = await getDoc(
+                doc(db, 'examPapers', String(data.examId)),
+              ).catch(() => null)
               if (examSnap?.exists()) {
                 examTitle = String(examSnap.data()?.title ?? examTitle)
+              } else {
+                const legacySnap = await getDoc(doc(db, 'exams', String(data.examId))).catch(
+                  () => null,
+                )
+                if (legacySnap?.exists()) {
+                  examTitle = String(legacySnap.data()?.title ?? examTitle)
+                }
               }
             }
             return parseExamAttempt(d.id, data, examTitle || undefined)

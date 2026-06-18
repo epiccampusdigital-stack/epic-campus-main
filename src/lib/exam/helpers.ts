@@ -10,6 +10,7 @@ import {
   deleteDoc,
   query,
   where,
+  orderBy,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import {
@@ -133,35 +134,71 @@ export function computeTotalScore(scores: {
   )
 }
 
+function parseExamPaperDoc(id: string, data: Record<string, unknown>): ExamPaper {
+  const fallback = getPaperById(id)
+  const code = String(data.code ?? fallback?.code ?? id)
+  const orderMatch = code.match(/(\d+)$/)
+  return {
+    id,
+    code,
+    title: String(data.title ?? fallback?.title ?? ''),
+    level: (data.level as ExamPaper['level']) ?? fallback?.level ?? 'A1',
+    description: String(data.description ?? fallback?.description ?? ''),
+    status: (data.status as ExamPaper['status']) ?? fallback?.status ?? 'active',
+    readingCount: Number(data.readingCount ?? fallback?.readingCount ?? 5),
+    listeningCount: Number(data.listeningCount ?? fallback?.listeningCount ?? 5),
+    readingMinutes: Number(data.readingMinutes ?? fallback?.readingMinutes ?? 60),
+    listeningMinutes: Number(data.listeningMinutes ?? fallback?.listeningMinutes ?? 30),
+    writingMinutes: Number(data.writingMinutes ?? fallback?.writingMinutes ?? 45),
+    speakingMinutes: Number(data.speakingMinutes ?? fallback?.speakingMinutes ?? 15),
+    language: data.language as ExamPaper['language'] | undefined,
+    courseIds: Array.isArray(data.courseIds)
+      ? (data.courseIds as string[])
+      : fallback?.courseIds,
+    isPublished: data.isPublished !== false,
+    order: Number(
+      data.order ??
+        orderMatch?.[1] ??
+        (fallback ? EXAM_PAPERS.findIndex((p) => p.id === id) + 1 : 99),
+    ),
+  }
+}
+
+export function isStudentVisiblePaper(paper: ExamPaper): boolean {
+  if (paper.isPublished === false) return false
+  return paper.status !== 'draft'
+}
+
 export async function fetchExamPapers(): Promise<ExamPaper[]> {
   try {
-    const snap = await getDocs(collection(db, 'examPapers'))
-    if (snap.empty) return EXAM_PAPERS
-    return snap.docs.map((d) => {
-      const data = d.data()
-      const fallback = getPaperById(d.id)
-      return {
-        id: d.id,
-        code: String(data.code ?? fallback?.code ?? d.id),
-        title: String(data.title ?? fallback?.title ?? ''),
-        level: (data.level as ExamPaper['level']) ?? fallback?.level ?? 'A1',
-        description: String(data.description ?? fallback?.description ?? ''),
-        status: (data.status as ExamPaper['status']) ?? 'active',
-        readingCount: Number(data.readingCount ?? fallback?.readingCount ?? 5),
-        listeningCount: Number(data.listeningCount ?? fallback?.listeningCount ?? 5),
-        readingMinutes: Number(data.readingMinutes ?? fallback?.readingMinutes ?? 60),
-        listeningMinutes: Number(data.listeningMinutes ?? fallback?.listeningMinutes ?? 30),
-        writingMinutes: Number(data.writingMinutes ?? fallback?.writingMinutes ?? 45),
-        speakingMinutes: Number(data.speakingMinutes ?? fallback?.speakingMinutes ?? 15),
-        language: data.language as ExamPaper['language'] | undefined,
-        courseIds: Array.isArray(data.courseIds)
-          ? (data.courseIds as string[])
-          : fallback?.courseIds,
+    try {
+      const publishedSnap = await getDocs(
+        query(
+          collection(db, 'examPapers'),
+          where('isPublished', '==', true),
+          orderBy('order', 'asc'),
+        ),
+      )
+      if (!publishedSnap.empty) {
+        return publishedSnap.docs
+          .map((d) => parseExamPaperDoc(d.id, d.data() as Record<string, unknown>))
+          .filter(isStudentVisiblePaper)
       }
-    })
-  } catch {
-    return EXAM_PAPERS
+    } catch (err) {
+      console.warn('[fetchExamPapers] published query failed, falling back:', err)
+    }
+
+    const snap = await getDocs(collection(db, 'examPapers'))
+    if (!snap.empty) {
+      return snap.docs
+        .map((d) => parseExamPaperDoc(d.id, d.data() as Record<string, unknown>))
+        .filter(isStudentVisiblePaper)
+        .sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
+    }
+  } catch (err) {
+    console.warn('[fetchExamPapers] Firestore read failed, using local papers:', err)
   }
+  return EXAM_PAPERS.filter(isStudentVisiblePaper)
 }
 
 async function fetchSubcollection<T>(
@@ -230,7 +267,7 @@ export async function seedExamPapersIfEmpty(): Promise<void> {
   if (!snap.empty) return
 
   const batch = writeBatch(db)
-  for (const paper of EXAM_PAPERS) {
+  EXAM_PAPERS.forEach((paper, index) => {
     batch.set(doc(db, 'examPapers', paper.id), {
       id: paper.id,
       code: paper.code,
@@ -238,14 +275,18 @@ export async function seedExamPapersIfEmpty(): Promise<void> {
       level: paper.level,
       description: paper.description,
       status: paper.status,
+      isPublished: true,
+      order: index + 1,
       readingCount: paper.readingCount,
       listeningCount: paper.listeningCount,
       readingMinutes: paper.readingMinutes,
       listeningMinutes: paper.listeningMinutes,
       writingMinutes: paper.writingMinutes,
       speakingMinutes: paper.speakingMinutes,
+      language: 'bilingual',
+      courseIds: ['japan-ssw'],
     })
-  }
+  })
   await batch.commit()
 
   const j001Batch = writeBatch(db)

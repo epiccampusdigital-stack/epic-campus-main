@@ -15,11 +15,36 @@ export async function GET() {
   try {
     const snap = await adminDb.collection('examPapers').get()
     if (!snap.empty) {
-      return NextResponse.json({ seeded: false, message: 'Papers already exist' })
+      const batch = adminDb.batch()
+      let patched = 0
+      snap.docs.forEach((docSnap, index) => {
+        const data = docSnap.data()
+        if (data.isPublished === false) return
+        if (data.isPublished === true && data.order != null) return
+        batch.set(
+          docSnap.ref,
+          {
+            isPublished: true,
+            order: data.order ?? index + 1,
+            status: data.status ?? 'active',
+          },
+          { merge: true },
+        )
+        patched += 1
+      })
+      if (patched > 0) await batch.commit()
+      return NextResponse.json({
+        seeded: false,
+        patched,
+        message:
+          patched > 0
+            ? `Papers already exist — published ${patched} paper(s)`
+            : 'Papers already exist',
+      })
     }
 
     const batch = adminDb.batch()
-    for (const paper of EXAM_PAPERS) {
+    EXAM_PAPERS.forEach((paper, index) => {
       const ref = adminDb.collection('examPapers').doc(paper.id)
       batch.set(ref, {
         id: paper.id,
@@ -28,6 +53,8 @@ export async function GET() {
         level: paper.level,
         description: paper.description,
         status: paper.status,
+        isPublished: true,
+        order: index + 1,
         readingCount: paper.readingCount,
         listeningCount: paper.listeningCount,
         readingMinutes: paper.readingMinutes,
@@ -37,7 +64,7 @@ export async function GET() {
         language: 'bilingual',
         courseIds: ['japan-ssw'],
       })
-    }
+    })
     await batch.commit()
 
     const j001Batch = adminDb.batch()

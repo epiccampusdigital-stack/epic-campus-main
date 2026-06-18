@@ -37,7 +37,7 @@ export default function MyDashboardPage() {
               collection(db, 'payments'),
               where('studentId', '==', student!.id),
             ),
-          ),
+          ).catch(() => ({ docs: [] })),
           getDocs(
             query(
               collection(db, 'examResults'),
