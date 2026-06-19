@@ -15,7 +15,6 @@ type Message = {
   senderRole: string
   senderName: string
   senderId: string
-  recipient?: 'admin' | 'teacher'
   createdAt: any
   read: boolean
 }
@@ -25,9 +24,12 @@ type Conversation = {
   studentId: string
   studentName: string
   studentEmail: string
-  lastMessage: string
-  lastAt: any
+  lastMessageAdmin?: string
+  lastAtAdmin?: any
   unreadByAdmin: number
+  lastMessageTeacher?: string
+  lastAtTeacher?: any
+  unreadByTeacher: number
   unreadByStudent: number
 }
 
@@ -39,6 +41,7 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'teacher'>('all')
+  const [activeThread, setActiveThread] = useState<'admin' | 'teacher'>('admin')
   const [followUpStudent, setFollowUpStudent] = useState<WhatsAppFollowUpStudent | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -46,8 +49,11 @@ export default function MessagesPage() {
   const filteredConversations = conversations.filter((c) => {
     const matchSearch = !searchQuery.trim() ||
       (c.studentName || '').toLowerCase().includes(searchQuery.trim().toLowerCase())
-    const matchRole = roleFilter === 'all' ||
-      (c as any).lastRecipient === roleFilter
+    const matchRole = roleFilter === 'all'
+      ? true
+      : roleFilter === 'admin'
+        ? Number(c.unreadByAdmin ?? 0) > 0 || Boolean(c.lastMessageAdmin)
+        : Number(c.unreadByTeacher ?? 0) > 0 || Boolean(c.lastMessageTeacher)
     return matchSearch && matchRole
   })
 
@@ -72,24 +78,47 @@ export default function MessagesPage() {
     })
   }, [])
 
+  const getMillis = useCallback((value: any): number => {
+    if (!value) return 0
+    if (typeof value?.toDate === 'function') return value.toDate().getTime()
+    const dt = new Date(value)
+    return Number.isNaN(dt.getTime()) ? 0 : dt.getTime()
+  }, [])
+
+  const getLastForConversation = useCallback((c: Conversation) => {
+    const adminAt = getMillis(c.lastAtAdmin)
+    const teacherAt = getMillis(c.lastAtTeacher)
+    if (teacherAt > adminAt) {
+      return { text: c.lastMessageTeacher || '', at: c.lastAtTeacher }
+    }
+    return { text: c.lastMessageAdmin || '', at: c.lastAtAdmin }
+  }, [getMillis])
+
   // Load conversations
   useEffect(() => {
-    const q = query(collection(db, 'messages'), orderBy('lastAt', 'desc'))
+    const q = query(collection(db, 'messages'), orderBy('studentName', 'asc'))
     const unsub = onSnapshot(
       q,
       (snap) => {
-        const list = snap.docs.map(
-          (d) =>
-            ({
-              id: d.id,
-              studentId: d.id,
-              ...(d.data() as Record<string, any>),
-            }) as Conversation
-        )
+        const list = snap.docs
+          .map(
+            (d) =>
+              ({
+                id: d.id,
+                studentId: d.id,
+                ...(d.data() as Record<string, any>),
+              }) as Conversation
+          )
+          .sort((a, b) => {
+            const aTime = Math.max(getMillis(a.lastAtAdmin), getMillis(a.lastAtTeacher))
+            const bTime = Math.max(getMillis(b.lastAtAdmin), getMillis(b.lastAtTeacher))
+            return bTime - aTime
+          })
         setConversations(list)
         setLoading(false)
         if (!selectedId && list.length > 0) {
           setSelectedId(list[0].studentId)
+          setActiveThread('admin')
         }
       },
       (err) => {
@@ -98,7 +127,7 @@ export default function MessagesPage() {
       }
     )
     return unsub
-  }, [selectedId])
+  }, [selectedId, getMillis])
 
   // Load thread and mark as read
   useEffect(() => {
@@ -107,13 +136,16 @@ export default function MessagesPage() {
       return
     }
 
-    // Mark unreadByAdmin = 0
-    void setDoc(doc(db, 'messages', selectedId), { unreadByAdmin: 0 }, { merge: true }).catch(
-      console.error
-    )
+    const threadName = activeThread === 'admin' ? 'thread_admin' : 'thread_teacher'
+
+    if (activeThread === 'admin') {
+      void setDoc(doc(db, 'messages', selectedId), { unreadByAdmin: 0 }, { merge: true }).catch(console.error)
+    } else {
+      void setDoc(doc(db, 'messages', selectedId), { unreadByTeacher: 0 }, { merge: true }).catch(console.error)
+    }
 
     const q = query(
-      collection(db, 'messages', selectedId, 'thread'),
+      collection(db, 'messages', selectedId, threadName),
       orderBy('createdAt', 'asc')
     )
     const unsub = onSnapshot(
@@ -133,7 +165,7 @@ export default function MessagesPage() {
     )
 
     return unsub
-  }, [selectedId])
+  }, [selectedId, activeThread])
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -145,9 +177,10 @@ export default function MessagesPage() {
     if (!user) return
 
     const role = user.role === 'teacher' ? 'teacher' : 'admin'
+    const threadName = activeThread === 'admin' ? 'thread_admin' : 'thread_teacher'
 
     try {
-      await addDoc(collection(db, 'messages', selectedId, 'thread'), {
+      await addDoc(collection(db, 'messages', selectedId, threadName), {
         text,
         senderRole: role,
         senderName: user.displayName || user.email || '',
@@ -156,16 +189,29 @@ export default function MessagesPage() {
         read: false,
       })
 
-      await setDoc(
-        doc(db, 'messages', selectedId),
-        {
-          lastMessage: text,
-          lastAt: serverTimestamp(),
-          unreadByAdmin: 0,
-          unreadByStudent: increment(1),
-        },
-        { merge: true }
-      )
+      if (activeThread === 'admin') {
+        await setDoc(
+          doc(db, 'messages', selectedId),
+          {
+            lastMessageAdmin: text,
+            lastAtAdmin: serverTimestamp(),
+            unreadByAdmin: 0,
+            unreadByStudent: increment(1),
+          },
+          { merge: true }
+        )
+      } else {
+        await setDoc(
+          doc(db, 'messages', selectedId),
+          {
+            lastMessageTeacher: text,
+            lastAtTeacher: serverTimestamp(),
+            unreadByTeacher: 0,
+            unreadByStudent: increment(1),
+          },
+          { merge: true }
+        )
+      }
     } catch (err) {
       console.error('[MessagesPage] send error', err)
     }
@@ -232,7 +278,10 @@ export default function MessagesPage() {
               <button
                 key={c.studentId}
                 type="button"
-                onClick={() => setSelectedId(c.studentId)}
+                onClick={() => {
+                  setSelectedId(c.studentId)
+                  setActiveThread('admin')
+                }}
                 className={`w-full border-l-4 px-4 py-3 text-left transition-colors ${
                   selectedId === c.studentId
                     ? 'border-l-[#E8A020] bg-[#0B3D6B]/10 dark:bg-white/[0.06]'
@@ -241,29 +290,28 @@ export default function MessagesPage() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <p className="truncate font-medium text-[#0D1B2A] dark:text-white">{c.studentName}</p>
+                </div>
+                <div className="mt-1 flex items-center gap-1.5">
                   {Number(c.unreadByAdmin) > 0 && (
-                    <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#E8A020] px-1.5 text-xs font-bold text-[#0B3D6B]">
-                      {c.unreadByAdmin}
+                    <span className="inline-flex items-center rounded-full bg-[#E8A020] px-2 py-0.5 text-[10px] font-bold text-[#0B3D6B]">
+                      Admin: {c.unreadByAdmin}
+                    </span>
+                  )}
+                  {Number(c.unreadByTeacher) > 0 && (
+                    <span className="inline-flex items-center rounded-full bg-[#1A6BAD]/20 px-2 py-0.5 text-[10px] font-bold text-[#1A6BAD]">
+                      Teacher: {c.unreadByTeacher}
                     </span>
                   )}
                 </div>
                 <p className="mt-0.5 truncate text-xs text-[#5A6A7A] dark:text-white/50">
-                  {c.lastMessage || 'No messages yet'}
+                  {getLastForConversation(c).text || 'No messages yet'}
                 </p>
-                {(c as any).lastRecipient === 'teacher' && (
-                  <span className="text-[10px] text-[#E8A020] font-medium">
-                    → For Teacher
-                  </span>
-                )}
-                {(c as any).lastRecipient === 'admin' && (
-                  <span className="text-[10px] text-[#0B3D6B] dark:text-white/40 font-medium">
-                    → For Admin
-                  </span>
-                )}
                 <p className="mt-1 text-xs text-gray-400 dark:text-white/30">
-                  {c.lastAt
+                  {getLastForConversation(c).at
                     ? new Date(
-                        c.lastAt.toDate ? c.lastAt.toDate() : c.lastAt
+                        getLastForConversation(c).at.toDate
+                          ? getLastForConversation(c).at.toDate()
+                          : getLastForConversation(c).at
                       ).toLocaleString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -310,6 +358,33 @@ export default function MessagesPage() {
                 </div>
               </div>
 
+              <div className="flex gap-2 px-6 py-3 border-b border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.02]">
+                <button
+                  type="button"
+                  onClick={() => setActiveThread('admin')}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    activeThread === 'admin'
+                      ? 'bg-[#0B3D6B] text-white dark:bg-[#E8A020] dark:text-[#0B3D6B]'
+                      : 'border border-[#DDE3EC] dark:border-white/[0.12] text-[#5A6A7A] dark:text-white/50'
+                  }`}
+                >
+                  <span className="ti ti-user-shield" />
+                  Admin Thread
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveThread('teacher')}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    activeThread === 'teacher'
+                      ? 'bg-[#0B3D6B] text-white dark:bg-[#E8A020] dark:text-[#0B3D6B]'
+                      : 'border border-[#DDE3EC] dark:border-white/[0.12] text-[#5A6A7A] dark:text-white/50'
+                  }`}
+                >
+                  <span className="ti ti-school" />
+                  Teacher Thread
+                </button>
+              </div>
+
               {/* Messages */}
               <div className="flex-1 space-y-3 overflow-y-auto bg-[#F5F7FB] dark:bg-white/[0.02] p-4">
                 {messages.length === 0 && (
@@ -331,13 +406,6 @@ export default function MessagesPage() {
                         >
                           {m.text}
                         </div>
-                        {m.recipient && (
-                          <span className={`text-[10px] text-gray-400 dark:text-white/30 ${
-                            isStudent ? '' : 'text-right block'
-                          }`}>
-                            → {m.recipient === 'teacher' ? 'To: Teacher' : 'To: Admin'}
-                          </span>
-                        )}
                         <p
                           className={`mt-1 text-xs text-gray-400 dark:text-white/40 ${
                             isStudent ? '' : 'text-right'

@@ -17,40 +17,50 @@ import { db } from '@/lib/firebase/client'
 
 export default function StudentMessagesPage() {
   const { user, student } = useStudentPortal()
-  const [messages, setMessages] = useState<any[]>([])
+  const [recipient, setRecipient] = useState<'admin' | 'teacher'>('admin')
+  const [adminMessages, setAdminMessages] = useState<any[]>([])
+  const [teacherMessages, setTeacherMessages] = useState<any[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [recipient, setRecipient] = useState<'admin' | 'teacher'>('admin')
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!student) return
     let cancelled = false
 
-    const parentRef = doc(db, 'messages', student.id)
-    // mark unreadByStudent = 0 on mount
-    void setDoc(parentRef, { unreadByStudent: 0 }, { merge: true }).catch(console.error)
+    void setDoc(doc(db, 'messages', student.id), { unreadByStudent: 0 }, { merge: true }).catch(console.error)
 
-    const q = query(collection(db, 'messages', student.id, 'thread'), orderBy('createdAt', 'asc'))
-    const unsub = onSnapshot(q, (snap) => {
+    const qAdmin = query(collection(db, 'messages', student.id, 'thread_admin'), orderBy('createdAt', 'asc'))
+    const unsubAdmin = onSnapshot(qAdmin, (snap) => {
       if (cancelled) return
-      setMessages(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, any>) })))
+      setAdminMessages(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })))
       setLoading(false)
     }, (err) => {
-      console.error('[StudentMessages] thread snapshot error', err)
+      console.error('[StudentMessages] admin thread error', err)
       if (!cancelled) setLoading(false)
+    })
+
+    const qTeacher = query(collection(db, 'messages', student.id, 'thread_teacher'), orderBy('createdAt', 'asc'))
+    const unsubTeacher = onSnapshot(qTeacher, (snap) => {
+      if (cancelled) return
+      setTeacherMessages(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })))
+    }, (err) => {
+      console.error('[StudentMessages] teacher thread error', err)
     })
 
     return () => {
       cancelled = true
-      unsub()
+      unsubAdmin()
+      unsubTeacher()
     }
   }, [student])
 
+  const messages = recipient === 'admin' ? adminMessages : teacherMessages
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, recipient])
 
   async function handleSend() {
     if (!input.trim() || sending || !student || !user) return
@@ -58,27 +68,38 @@ export default function StudentMessagesPage() {
     try {
       const text = input.trim()
       setInput('')
+      const threadName = recipient === 'admin' ? 'thread_admin' : 'thread_teacher'
 
-      await addDoc(collection(db, 'messages', student.id, 'thread'), {
+      await addDoc(collection(db, 'messages', student.id, threadName), {
         text,
         senderRole: 'student',
         senderName: student.name,
         senderId: student.id,
-        recipient,
         createdAt: serverTimestamp(),
         read: false,
       })
 
-      await setDoc(doc(db, 'messages', student.id), {
-        studentId: student.id,
-        studentName: student.name,
-        studentEmail: student.email ?? '',
-        lastMessage: text,
-        lastAt: serverTimestamp(),
-        unreadByAdmin: increment(1),
-        unreadByStudent: 0,
-        lastRecipient: recipient,
-      }, { merge: true })
+      if (recipient === 'admin') {
+        await setDoc(doc(db, 'messages', student.id), {
+          studentId: student.id,
+          studentName: student.name,
+          studentEmail: student.email ?? '',
+          lastMessageAdmin: text,
+          lastAtAdmin: serverTimestamp(),
+          unreadByAdmin: increment(1),
+          unreadByStudent: 0,
+        }, { merge: true })
+      } else {
+        await setDoc(doc(db, 'messages', student.id), {
+          studentId: student.id,
+          studentName: student.name,
+          studentEmail: student.email ?? '',
+          lastMessageTeacher: text,
+          lastAtTeacher: serverTimestamp(),
+          unreadByTeacher: increment(1),
+          unreadByStudent: 0,
+        }, { merge: true })
+      }
     } catch (err) {
       console.error('[StudentMessages] send error', err)
     } finally {
@@ -103,7 +124,9 @@ export default function StudentMessagesPage() {
     <div className="flex h-[calc(100vh-10rem)] flex-col overflow-hidden rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] shadow-sm">
       <div className="border-b border-[#DDE3EC] dark:border-white/[0.08] px-6 py-4">
         <h2 className="font-jakarta text-lg font-bold text-[#0B3D6B] dark:text-[#E8A020]">Messages</h2>
-        <p className="text-sm text-[#5A6A7A] dark:text-white/50">Chat with EPIC Campus</p>
+        <p className="text-sm text-[#5A6A7A] dark:text-white/50">
+          {recipient === 'admin' ? 'Chat with Admin (Ishara)' : 'Chat with My Teacher'}
+        </p>
         <div className="flex gap-2 mt-3">
           <button
             type="button"
@@ -135,7 +158,9 @@ export default function StudentMessagesPage() {
       <div className="flex-1 space-y-3 overflow-y-auto bg-[#F5F7FB] dark:bg-white/[0.02] p-4">
         {messages.length === 0 && (
           <p className="py-8 text-center text-sm text-[#5A6A7A] dark:text-white/50">
-            No messages yet. Send a message to get started.
+            {recipient === 'admin'
+              ? 'No messages with Admin yet. Send a message to Admin (Ishara).'
+              : 'No messages with your Teacher yet.'}
           </p>
         )}
         {messages.map((m) => {
