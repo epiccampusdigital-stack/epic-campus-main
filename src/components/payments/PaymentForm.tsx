@@ -54,6 +54,7 @@ interface PaymentFormProps {
   onClose: () => void
   payment?: Payment | null
   students: Student[]
+  defaultStudentId?: string
   onSaved: () => void
 }
 
@@ -85,6 +86,7 @@ export default function PaymentForm({
   onClose,
   payment,
   students,
+  defaultStudentId,
   onSaved,
 }: PaymentFormProps) {
   const { user } = useManagement()
@@ -97,11 +99,14 @@ export default function PaymentForm({
 
   useEffect(() => {
     if (open) {
-      setForm(payment ? paymentToForm(payment) : EMPTY)
+      setForm(payment ? paymentToForm(payment) : {
+        ...EMPTY,
+        studentId: defaultStudentId ?? '',
+      })
       setStudentSearch('')
       setError('')
     }
-  }, [open, payment])
+  }, [open, payment, defaultStudentId])
 
   const filteredStudents = useMemo(() => {
     const q = studentSearch.trim().toLowerCase()

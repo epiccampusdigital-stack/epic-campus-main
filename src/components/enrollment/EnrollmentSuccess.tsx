@@ -51,11 +51,11 @@ export default function EnrollmentSuccess({ enrollmentId }: { enrollmentId: stri
           <span className="ti ti-circle-check text-4xl text-emerald-600" />
         </div>
         <h1 className="mt-6 font-jakarta text-3xl font-bold text-[#0B3D6B]">
-          Enrollment Successful!
+          Application Received!
         </h1>
         <p className="mt-4 text-gray-600">
-          Your enrollment has been received. We will contact you within 24 hours with your login
-          details.
+          Your enrollment application has been received. Our team will contact you within 24
+          hours with the next steps.
         </p>
         <Link
           href="/"
@@ -76,11 +76,11 @@ export default function EnrollmentSuccess({ enrollmentId }: { enrollmentId: stri
           <span className="ti ti-circle-check text-4xl text-emerald-600" />
         </div>
         <h1 className="mt-6 font-jakarta text-3xl font-bold text-[#0B3D6B]">
-          Enrollment Successful!
+          Application Received!
         </h1>
         <p className="mt-3 text-gray-600">
-          Welcome to EPIC Campus, <strong>{enrollment.firstName}</strong>! Your enrollment has been
-          confirmed.
+          Thank you, <strong>{enrollment.firstName}</strong>. Your enrollment application is now
+          pending approval. Our admissions team will contact you shortly.
         </p>
       </div>
 
@@ -96,15 +96,21 @@ export default function EnrollmentSuccess({ enrollmentId }: { enrollmentId: stri
               enrollment.location.charAt(0).toUpperCase() + enrollment.location.slice(1)
             }
           />
-          <ReceiptRow label="Amount Paid" value={formatLKR(enrollment.totalPaid)} />
-          <ReceiptRow label="Reference" value={enrollment.id.slice(0, 12).toUpperCase()} />
           <ReceiptRow
-            label="Date"
-            value={formatEnrollmentDate(enrollment.createdAt)}
+            label="Amount Requested"
+            value={enrollment.requestedAmount != null ? formatLKR(enrollment.requestedAmount) : 'Pending'}
           />
+          {enrollment.paymentOption && (
+            <ReceiptRow
+              label="Payment Option"
+              value={enrollment.paymentOption === 'registration' ? 'Registration only' : enrollment.paymentOption === 'full' ? 'Full payment' : 'Custom amount'}
+            />
+          )}
+          <ReceiptRow label="Reference" value={enrollment.id.slice(0, 12).toUpperCase()} />
+          <ReceiptRow label="Date" value={formatEnrollmentDate(enrollment.createdAt)} />
           <ReceiptRow
-            label="Payment Status"
-            value={enrollment.stripePaymentStatus === 'paid' ? '✅ Confirmed' : '⏳ Processing'}
+            label="Application Status"
+            value={enrollment.status === 'pending' ? 'Pending approval' : 'Approved'}
           />
         </div>
       </div>

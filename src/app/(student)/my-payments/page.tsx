@@ -21,11 +21,11 @@ const ReceiptModal = dynamic(() => import('@/components/payments/ReceiptModal'),
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-[#DDE3EC] bg-white p-5">
-      <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+    <div className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+      <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">
         {label}
       </p>
-      <p className="mt-1 font-jakarta text-2xl font-bold text-[#0B3D6B]">{value}</p>
+      <p className="mt-1 font-jakarta text-2xl font-bold text-[#0B3D6B] dark:text-[#E8A020]">{value}</p>
     </div>
   )
 }
@@ -69,8 +69,8 @@ export default function MyPaymentsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A]">My Payments</h2>
-        <p className="text-sm text-[#5A6A7A]">Fee history and receipts</p>
+        <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white">My Payments</h2>
+        <p className="text-sm text-[#5A6A7A] dark:text-white/50">Fee history and receipts</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -95,55 +95,55 @@ export default function MyPaymentsPage() {
       </div>
 
       {student.feeAmount != null && student.feeAmount > 0 && (
-        <div className="rounded-xl border border-[#DDE3EC] bg-white p-4">
-          <h3 className="font-jakarta text-sm font-bold text-[#0B3D6B]">Payment Schedule</h3>
-          <p className="mt-1 text-sm text-[#5A6A7A]">
+        <div className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-4">
+          <h3 className="font-jakarta text-sm font-bold text-[#0B3D6B] dark:text-[#E8A020]">Payment Schedule</h3>
+          <p className="mt-1 text-sm text-[#5A6A7A] dark:text-white/50">
             Course fee: {formatAmount(student.feeAmount, student.feeCurrency ?? 'LKR')} · Status:{' '}
             <span className="capitalize">{student.paymentStatus ?? 'pending'}</span>
           </p>
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white">
+      <div className="overflow-hidden rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04]">
         {loading ? (
-          <div className="animate-pulse divide-y divide-[#DDE3EC]">
+          <div className="animate-pulse divide-y divide-[#DDE3EC] dark:divide-white/[0.06]">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="h-14 px-4 py-4">
-                <div className="h-3 w-full rounded bg-[#DDE3EC]" />
+                <div className="h-3 w-full rounded bg-[#DDE3EC] dark:bg-white/10" />
               </div>
             ))}
           </div>
         ) : payments.length === 0 ? (
-          <p className="px-6 py-12 text-center text-sm text-[#5A6A7A]">No payments recorded yet.</p>
+          <p className="px-6 py-12 text-center text-sm text-[#5A6A7A] dark:text-white/50">No payments recorded yet.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[800px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB]">
+                <tr className="border-b border-[#DDE3EC] dark:border-white/[0.08] bg-[#F5F7FB] dark:bg-white/[0.03]">
                   {['Receipt No', 'Date', 'Amount', 'Type', 'Method', 'Status', ''].map((h) => (
                     <th
                       key={h || 'action'}
-                      className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]"
+                      className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50"
                     >
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#DDE3EC]">
+              <tbody className="divide-y divide-[#DDE3EC] dark:divide-white/[0.06]">
                 {payments.map((p) => (
-                  <tr key={p.id} className="hover:bg-[#F5F7FB]/60">
-                    <td className="px-4 py-3 font-medium text-[#0B3D6B]">{p.receiptNumber}</td>
-                    <td className="px-4 py-3 text-[#5A6A7A]">{formatPaymentDate(p.paymentDate)}</td>
-                    <td className="px-4 py-3 font-semibold">{formatAmount(p.amount, p.currency)}</td>
-                    <td className="px-4 py-3 capitalize text-[#5A6A7A]">{getTypeLabel(p.type)}</td>
-                    <td className="px-4 py-3 text-[#5A6A7A]">{getMethodLabel(p.method)}</td>
-                    <td className="px-4 py-3 capitalize">{p.status}</td>
+                  <tr key={p.id} className="hover:bg-[#F5F7FB]/60 dark:hover:bg-white/[0.05]">
+                    <td className="px-4 py-3 font-medium text-[#0B3D6B] dark:text-[#E8A020]">{p.receiptNumber}</td>
+                    <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/50">{formatPaymentDate(p.paymentDate)}</td>
+                    <td className="px-4 py-3 font-semibold dark:text-white">{formatAmount(p.amount, p.currency)}</td>
+                    <td className="px-4 py-3 capitalize text-[#5A6A7A] dark:text-white/50">{getTypeLabel(p.type)}</td>
+                    <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/50">{getMethodLabel(p.method)}</td>
+                    <td className="px-4 py-3 capitalize dark:text-white">{p.status}</td>
                     <td className="px-4 py-3">
                       <button
                         type="button"
                         onClick={() => setReceiptPayment(p)}
-                        className="rounded-lg px-3 py-1.5 text-xs font-semibold text-[#0B3D6B] hover:bg-[#0B3D6B]/10"
+                        className="rounded-lg px-3 py-1.5 text-xs font-semibold text-[#0B3D6B] dark:text-[#E8A020] hover:bg-[#0B3D6B]/10 dark:hover:bg-white/[0.08]"
                       >
                         Download
                       </button>

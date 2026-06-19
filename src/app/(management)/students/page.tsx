@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { collection, getDocs, orderBy, query } from 'firebase/firestore'
 import toast from 'react-hot-toast'
@@ -12,12 +13,9 @@ import {
   filterStudentsByTeacherStat,
   type TeacherStatFilter,
 } from '@/lib/dashboard/teacherStats'
-import { parseStudent } from '@/lib/students/helpers'
+import { parseStudent, STATUS_STYLES } from '@/lib/students/helpers'
 import StudentForm from '@/components/students/StudentForm'
-import StudentTable, {
-  StudentTableEmpty,
-  StudentTableMeta,
-} from '@/components/students/StudentTable'
+import { StudentTableEmpty, StudentTableMeta } from '@/components/students/StudentTable'
 import { getDefaultLocationFilter } from '@/lib/locations/helpers'
 import LocationFilterSelect from '@/components/ui/LocationFilterSelect'
 import { useManagement } from '@/components/layout/ManagementContext'
@@ -60,7 +58,7 @@ export default function StudentsPage() {
   const [examResults, setExamResults] = useState<ExamResult[]>([])
   const [examAttempts, setExamAttempts] = useState<ExamAttempt[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [courseFilter, setCourseFilter] = useState<CourseId | ''>('')
   const [locationFilter, setLocationFilter] = useState<StudentLocation | ''>('')
   const [statusFilter, setStatusFilter] = useState<Student['status'] | ''>('')
@@ -125,23 +123,25 @@ export default function StudentsPage() {
     if (teacherStat) {
       list = filterStudentsByTeacherStat(list, teacherStat, examResults, examAttempts)
     }
-    const q = search.trim().toLowerCase()
+    const q = searchQuery.trim().toLowerCase()
     return list.filter((s) => {
       if (courseFilter && s.courseId !== courseFilter) return false
       if (statusFilter && s.status !== statusFilter) return false
       if (batchFilter && s.batchId !== batchFilter) return false
       if (locationFilter && s.location !== locationFilter) return false
       if (!q) return true
+      const studentRecord = s as unknown as Record<string, unknown>
       return (
         s.name.toLowerCase().includes(q) ||
         (s.email?.toLowerCase().includes(q) ?? false) ||
         s.mobile.includes(q) ||
-        s.studentCode.toLowerCase().includes(q)
+        s.studentCode.toLowerCase().includes(q) ||
+        String(studentRecord.registrationNumber ?? '').toLowerCase().includes(q)
       )
     })
   }, [
     students,
-    search,
+    searchQuery,
     courseFilter,
     statusFilter,
     batchFilter,
@@ -153,12 +153,14 @@ export default function StudentsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [search, courseFilter, statusFilter, batchFilter, locationFilter])
+  }, [searchQuery, courseFilter, statusFilter, batchFilter, locationFilter])
+
+  const displayedStudents = filtered
 
   const paginated = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE
-    return filtered.slice(start, start + PAGE_SIZE)
-  }, [filtered, page])
+    return displayedStudents.slice(start, start + PAGE_SIZE)
+  }, [displayedStudents, page])
 
   function openAdd() {
     setEditStudent(null)
@@ -268,8 +270,8 @@ export default function StudentsPage() {
             />
             <input
               type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search name, email, phone…"
               className="w-full rounded-lg border border-[#DDE3EC] py-2.5 pl-10 pr-3 font-inter text-base text-[#0D1B2A] outline-none focus:border-[#E8A020] sm:text-sm"
             />
@@ -313,18 +315,111 @@ export default function StudentsPage() {
         </div>
       </div>
 
-      {!loading && filtered.length === 0 ? (
+      {!loading && displayedStudents.length === 0 ? (
         <StudentTableEmpty onAdd={openAdd} />
       ) : (
         <>
-          <StudentTable
-            students={paginated}
-            loading={loading}
-            onEdit={openEdit}
-          />
-          {!loading && filtered.length > 0 && (
+          <div className="overflow-x-auto rounded-xl border border-[#DDE3EC] bg-white">
+            <table className="min-w-full">
+              <thead className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:border-white/[0.08] dark:bg-white/[0.02]">
+                <tr>
+                  <th className="px-4 py-3 text-left font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">
+                    Student
+                  </th>
+                  <th className="px-4 py-3 text-left font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">
+                    Contact
+                  </th>
+                  <th className="px-4 py-3 text-left font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">
+                    Student Code
+                  </th>
+                  <th className="px-4 py-3 text-left font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">
+                    ID Status
+                  </th>
+                  <th className="px-4 py-3 text-left font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#DDE3EC] dark:divide-white/[0.08]">
+                {loading
+                  ? Array.from({ length: 6 }).map((_, index) => (
+                      <tr key={index}>
+                        <td colSpan={6} className="px-4 py-4">
+                          <div className="h-4 w-full animate-pulse rounded bg-[#DDE3EC] dark:bg-white/[0.08]" />
+                        </td>
+                      </tr>
+                    ))
+                  : paginated.map((s) => {
+                      const studentRecord = s as unknown as Record<string, unknown>
+                      const registrationNumber = String(studentRecord.registrationNumber ?? '').trim()
+                      const studentIdNum = String(studentRecord.studentId ?? '').trim()
+                      const hasIds = Boolean(registrationNumber && studentIdNum)
+                      return (
+                        <tr key={s.id}>
+                          <td className="px-4 py-3">
+                            <div>
+                              <p className="font-jakarta text-sm font-semibold text-[#0D1B2A] dark:text-white">
+                                {s.name}
+                              </p>
+                              <p className="text-xs text-[#5A6A7A] dark:text-white/50">{s.batchId || '—'}</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-sm text-[#0D1B2A] dark:text-white">{s.email || '—'}</p>
+                            <p className="text-xs text-[#5A6A7A] dark:text-white/50">{s.mobile || '—'}</p>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-[#0D1B2A] dark:text-white">{s.studentCode}</td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[s.status]}`}
+                            >
+                              {s.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {hasIds ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                                <span className="ti ti-check text-[10px]" />
+                                Assigned
+                              </span>
+                            ) : (
+                              <a
+                                href={`/students/${s.id}`}
+                                className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-900/30 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300 hover:underline"
+                              >
+                                Pending
+                              </a>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <Link
+                                href={`/students/${s.id}`}
+                                className="rounded-lg border border-[#DDE3EC] px-2.5 py-1 text-xs font-medium text-[#0B3D6B] hover:bg-[#F5F7FB]"
+                              >
+                                View
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={() => openEdit(s)}
+                                className="rounded-lg border border-[#0B3D6B] px-2.5 py-1 text-xs font-semibold text-[#0B3D6B] hover:bg-[#0B3D6B]/5"
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+              </tbody>
+            </table>
+          </div>
+          {!loading && displayedStudents.length > 0 && (
             <StudentTableMeta
-              total={filtered.length}
+              total={displayedStudents.length}
               page={page}
               pageSize={PAGE_SIZE}
               onPageChange={setPage}

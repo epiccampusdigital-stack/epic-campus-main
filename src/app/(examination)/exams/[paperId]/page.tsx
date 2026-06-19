@@ -12,7 +12,7 @@ import type { ExamPaper } from '@/types'
 const SECTIONS = [
   { name: 'Reading', detail: '40 questions · 60 min', icon: '📖' },
   { name: 'Listening', detail: '40 questions · 30 min', icon: '🎧' },
-  { name: 'Writing', detail: '2 tasks · 45 min', icon: '✍️' },
+  { name: 'Writing', detail: '2 tasks · 45 min', icon: '✏️' },
   { name: 'Speaking', detail: '3 prompts · 15 min', icon: '🎤' },
 ]
 
@@ -67,7 +67,7 @@ export default function ExamGreetingPage() {
         ← Back to exams
       </Link>
 
-      <div className="rounded-xl border border-[#DDE3EC] bg-white p-6 sm:p-8">
+      <div className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-6 sm:p-8">
         <div className="mb-4 flex items-center gap-3">
           <span
             className={`rounded-full border px-3 py-1 text-sm font-semibold ${getLevelBadgeColor(paper.level)}`}

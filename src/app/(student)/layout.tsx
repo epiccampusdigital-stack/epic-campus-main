@@ -109,7 +109,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         setUser(epicUser)
         if (!profile) {
           console.error('[StudentLayout] Profile load failed for authenticated student:', firebaseUser.uid)
-          setStatus('loading')
+          setStatus('profile_unavailable')
           return
         }
 

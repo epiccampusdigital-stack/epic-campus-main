@@ -8,7 +8,7 @@ const NAV = [
   { label: 'Exams', href: '/exams', icon: 'ti-writing' },
   { label: 'Results', href: '/my-results', icon: 'ti-certificate' },
   { label: 'Book', href: '/book-consultation', icon: 'ti-calendar' },
-  { label: 'Profile', href: '/my-payments', icon: 'ti-user' },
+  { label: 'Profile', href: '/my-id', icon: 'ti-user' },
 ]
 
 export default function StudentBottomNav() {
@@ -20,7 +20,7 @@ export default function StudentBottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#DDE3EC] bg-white pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] pb-[env(safe-area-inset-bottom)] md:hidden"
       aria-label="Student navigation"
     >
       <ul className="flex items-stretch justify-around">
@@ -31,11 +31,11 @@ export default function StudentBottomNav() {
               <Link
                 href={item.href}
                 className={`flex flex-col items-center gap-0.5 px-1 py-2.5 text-[10px] font-medium transition-colors ${
-                  active ? 'text-[#E8A020]' : 'text-[#5A6A7A]'
+                  active ? 'text-[#E8A020] dark:text-[#E8A020]' : 'text-[#5A6A7A] dark:text-white/40'
                 }`}
               >
                 <span
-                  className={`ti ${item.icon} text-xl ${active ? 'text-[#E8A020]' : 'text-[#0B3D6B]'}`}
+                  className={`ti ${item.icon} text-xl ${active ? 'text-[#E8A020]' : 'text-[#0B3D6B] dark:text-white/60'}`}
                   aria-hidden="true"
                 />
                 {item.label}

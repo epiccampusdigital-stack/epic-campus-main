@@ -39,7 +39,7 @@ export default function EnrollPage() {
           <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-500">
             <span className="flex items-center gap-1.5">
               <span className="ti ti-lock text-[#E8A020]" />
-              Secure Stripe payment
+              Secure application submission
             </span>
             <span className="flex items-center gap-1.5">
               <span className="ti ti-shield-check text-[#E8A020]" />
@@ -47,7 +47,7 @@ export default function EnrollPage() {
             </span>
             <span className="flex items-center gap-1.5">
               <span className="ti ti-headset text-[#E8A020]" />
-              Support within 24 hours
+              Our team will contact you within 24 hours
             </span>
           </div>
         </div>

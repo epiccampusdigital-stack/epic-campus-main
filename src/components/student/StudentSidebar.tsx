@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { collection, onSnapshot, query, where } from 'firebase/firestore'
+import { collection, onSnapshot, query, where, doc } from 'firebase/firestore'
 import { signOut } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase/client'
 import { COURSE_MAP } from '@/lib/constants/courses'
@@ -23,7 +23,7 @@ const BASE_NAV_ITEMS = [
   { label: 'Messages', href: '/student/messages', icon: 'ti-message' },
   { label: 'AI Study Assistant', href: '/student/assistant', icon: 'ti-robot' },
   { label: 'Book Consultation', href: '/book-consultation', icon: 'ti-calendar' },
-  { label: 'My Visa', href: '/student/visa', icon: 'ti-plane' },
+  { label: 'My Visa', href: '/my-visa', icon: 'ti-plane' },
 ]
 
 const EXAM_NAV_ITEM = { label: 'Take Exam', href: '/exams', icon: 'ti-pencil' }
@@ -39,17 +39,11 @@ export default function StudentSidebar() {
 
   useEffect(() => {
     if (!student) return
-    const q = query(
-      collection(db, 'conversations'),
-      where('studentId', '==', student.id),
-    )
-    const unsub = onSnapshot(q, (snap) => {
-      const total = snap.docs.reduce(
-        (sum, d) => sum + (Number(d.data().unreadByStudent) || 0),
-        0,
-      )
-      setUnreadMessages(total)
-    })
+    const docRef = doc(db, 'messages', student.id)
+    const unsub = onSnapshot(docRef, (snap: any) => {
+      const data = snap.exists() ? (snap.data() as Record<string, any>) : {}
+      setUnreadMessages(Number(data.unreadByStudent) || 0)
+    }, (err: any) => console.error('[StudentSidebar] messages doc snapshot', err))
     return () => unsub()
   }, [student])
 

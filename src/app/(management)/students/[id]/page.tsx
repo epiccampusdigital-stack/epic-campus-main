@@ -247,6 +247,10 @@ export default function StudentProfilePage() {
   const [idCardOpen, setIdCardOpen] = useState(false)
   const [idDownloading, setIdDownloading] = useState(false)
   const [followUpOpen, setFollowUpOpen] = useState(false)
+  const [regNumber, setRegNumber] = useState('')
+  const [studentIdNum, setStudentIdNum] = useState('')
+  const [savingIds, setSavingIds] = useState(false)
+  const [idSaveMsg, setIdSaveMsg] = useState('')
 
   // Fee schedule state
   const [feeSchedule, setFeeSchedule] = useState<{
@@ -266,9 +270,12 @@ export default function StudentProfilePage() {
         setStudent(null)
         return
       }
-      const s = parseStudent(studentSnap.id, studentSnap.data() as Record<string, unknown>)
+      const studentData = studentSnap.data() as Record<string, unknown>
+      const s = parseStudent(studentSnap.id, studentData)
       setStudent(s)
-      const rawFs = (studentSnap.data() as Record<string, unknown>).feeSchedule as Record<string, unknown> | undefined
+      setRegNumber(String(studentData.registrationNumber ?? ''))
+      setStudentIdNum(String(studentData.studentId ?? ''))
+      const rawFs = studentData.feeSchedule as Record<string, unknown> | undefined
       if (rawFs) {
         setFeeSchedule({
           registrationFee: Number(rawFs.registrationFee ?? 25000),
@@ -585,6 +592,62 @@ export default function StudentProfilePage() {
                     {feeSaving ? 'Saving…' : 'Save Fee Schedule'}
                   </button>
                 </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+              <h3 className="mb-4 font-jakarta text-sm font-bold uppercase tracking-wide text-[#0B3D6B] dark:text-white">
+                Student Identifiers
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">
+                    Registration Number
+                  </label>
+                  <input
+                    value={regNumber}
+                    onChange={(e) => setRegNumber(e.target.value)}
+                    placeholder="e.g. REG-2024-001"
+                    className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.06] px-3 py-2 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#0B3D6B]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">
+                    Student ID Number
+                  </label>
+                  <input
+                    value={studentIdNum}
+                    onChange={(e) => setStudentIdNum(e.target.value)}
+                    placeholder="e.g. EC-2024-001"
+                    className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.06] px-3 py-2 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#0B3D6B]"
+                  />
+                </div>
+                {idSaveMsg && (
+                  <p className="text-xs text-emerald-600">{idSaveMsg}</p>
+                )}
+                <button
+                  type="button"
+                  disabled={savingIds}
+                  onClick={async () => {
+                    setSavingIds(true)
+                    setIdSaveMsg('')
+                    try {
+                      await updateDoc(doc(db, 'students', studentId), {
+                        registrationNumber: regNumber.trim() || null,
+                        studentId: studentIdNum.trim() || null,
+                      })
+                      setIdSaveMsg('Identifiers saved successfully')
+                      setTimeout(() => setIdSaveMsg(''), 3000)
+                    } catch (err) {
+                      console.error(err)
+                      setIdSaveMsg('Failed to save — try again')
+                    } finally {
+                      setSavingIds(false)
+                    }
+                  }}
+                  className="w-full rounded-xl bg-[#E8A020] py-2.5 text-sm font-bold text-[#0B3D6B] hover:bg-[#d4911c] disabled:opacity-50"
+                >
+                  {savingIds ? 'Saving…' : 'Save Identifiers'}
+                </button>
               </div>
             </div>
             <div className="grid gap-8 lg:grid-cols-2">

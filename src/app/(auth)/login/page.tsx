@@ -20,6 +20,7 @@ import {
   AuthBottomLink,
   AuthErrorBanner,
 } from '@/components/auth/AuthShell'
+import Link from 'next/link'
 
 function getRedirectPath(role: string): string {
   switch (role) {
@@ -270,11 +271,12 @@ export default function LoginPage() {
                 Sign in
               </GoldSubmitButton>
 
-              <AuthBottomLink
-                text="Don't have an account?"
-                linkText="Enroll online →"
-                href="/enroll"
-              />
+              <p className="mt-6 text-sm">
+                <span className="text-gray-600">Already a student? </span>
+                <Link href="/signup" className="font-semibold text-[#E8A020] hover:underline">
+                  Create your account →
+                </Link>
+              </p>
             </form>
           </div>
 

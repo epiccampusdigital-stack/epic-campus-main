@@ -25,6 +25,8 @@ export default function MyDashboardPage() {
 
     if (!student && !uid && !fallbackStudent) return
 
+    let cancelled = false
+
     async function load() {
       setLoading(true)
       try {
@@ -51,6 +53,8 @@ export default function MyDashboardPage() {
           ).catch(() => ({ docs: [] })),
         ])
 
+        if (cancelled) return
+
         const att = attSnap.docs
           .map((d) => parseAttendance(d.id, d.data() as Record<string, unknown>))
           .sort((a, b) => b.date.localeCompare(a.date))
@@ -63,9 +67,13 @@ export default function MyDashboardPage() {
         )
         setExamCount(examSnap.docs.length)
       } catch (err) {
-        console.error('[MyDashboard]', err)
+        if (!cancelled) {
+          console.error('[MyDashboard]', err)
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
 
@@ -77,7 +85,9 @@ export default function MyDashboardPage() {
       try {
         const studSnap = await getDoc(doc(db, 'students', uid)).catch(() => null)
         if (studSnap && studSnap.exists()) {
-          setFallbackStudent({ id: uid, ...(studSnap.data() ?? {}) })
+          if (!cancelled) {
+            setFallbackStudent({ id: uid, ...(studSnap.data() ?? {}) })
+          }
           return
         }
 
@@ -92,11 +102,15 @@ export default function MyDashboardPage() {
           }
           // create minimal students doc (merge)
           await setDoc(doc(db, 'students', uid), minimal, { merge: true }).catch(() => null)
-          setFallbackStudent(minimal)
+          if (!cancelled) {
+            setFallbackStudent(minimal)
+          }
           return
         }
       } catch (err) {
-        console.error('[MyDashboard] ensureStudentFromAuth error', err)
+        if (!cancelled) {
+          console.error('[MyDashboard] ensureStudentFromAuth error', err)
+        }
       }
     }
 
@@ -108,11 +122,23 @@ export default function MyDashboardPage() {
     }
 
     return () => {
-      // noop
+      cancelled = true
     }
   }, [student, fallbackStudent])
 
-  if (!student) return null
+  const activeStudent = student ?? fallbackStudent
+  if (!activeStudent) {
+    if (loading) {
+      return (
+        <div className="animate-pulse space-y-4 p-4">
+          <div className="h-32 rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />
+          <div className="h-20 rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />
+          <div className="h-20 rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />
+        </div>
+      )
+    }
+    return null
+  }
 
   if (loading) {
     return (
@@ -130,11 +156,11 @@ export default function MyDashboardPage() {
 
   return (
     <div className="space-y-4">
-      <CompletionCertificate student={student} />
-      <StudyStatsWidget studentId={student.id} />
-      <StudentSessionsWidget studentId={student.id} />
+      <CompletionCertificate student={activeStudent} />
+      <StudyStatsWidget studentId={activeStudent.id} />
+      <StudentSessionsWidget studentId={activeStudent.id} />
       <CourseDashboard
-        student={student}
+        student={activeStudent}
         attendance={attendance}
         examCount={examCount}
         payments={payments}

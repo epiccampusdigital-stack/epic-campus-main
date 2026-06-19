@@ -1,17 +1,10 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import {
-  ENROLLMENT_PROGRAMS,
-  LOCATION_OPTIONS,
-  BATCH_OPTIONS,
-  REGISTRATION_FEE,
-  COURSE_FEE,
-  TOTAL_FEE,
-  formatLKR,
-} from '@/lib/enrollment/helpers'
-import type { EnrollmentProgram, StudentLocation, BatchDuration } from '@/types'
+import { useState } from "react"
+import { ENROLLMENT_PROGRAMS, LOCATION_OPTIONS, BATCH_OPTIONS } from "@/lib/enrollment/helpers"
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { db } from "@/lib/firebase/client"
+import type { EnrollmentProgram, StudentLocation, BatchDuration } from "@/types"
 
 interface FormData {
   firstName: string
@@ -20,30 +13,26 @@ interface FormData {
   phone: string
   dateOfBirth: string
   address: string
-  program: EnrollmentProgram | ''
-  location: StudentLocation | ''
-  batchDuration: BatchDuration | ''
+  program: EnrollmentProgram | ""
+  location: StudentLocation | ""
+  batchDuration: BatchDuration | ""
   batchCustomDays: string
-  paymentOption: 'registration' | 'full' | 'custom' | ''
-  customAmount: string
 }
 
 const EMPTY: FormData = {
-  firstName: '',
-  lastName: '',
-  email: '',
-  phone: '',
-  dateOfBirth: '',
-  address: '',
-  program: '',
-  location: '',
-  batchDuration: '',
-  batchCustomDays: '',
-  paymentOption: '',
-  customAmount: '',
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  dateOfBirth: "",
+  address: "",
+  program: "",
+  location: "",
+  batchDuration: "",
+  batchCustomDays: "",
 }
 
-const STEP_LABELS = ['Personal Details', 'Program Selection', 'Payment']
+const STEP_LABELS = ["Personal Details", "Program Selection", "Confirmation"]
 
 function StepIndicator({ current, total }: { current: number; total: number }) {
   return (
@@ -57,24 +46,24 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
               <div
                 className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition-all ${
                   done
-                    ? 'bg-[#0B3D6B] text-white'
+                    ? "bg-[#0B3D6B] text-white"
                     : active
-                      ? 'border-2 border-[#E8A020] bg-white text-[#E8A020]'
-                      : 'border-2 border-gray-200 bg-white text-gray-400'
+                    ? "border-2 border-[#E8A020] bg-white text-[#E8A020]"
+                    : "border-2 border-gray-200 bg-white text-gray-400"
                 }`}
               >
                 {done ? <span className="ti ti-check text-sm" /> : i + 1}
               </div>
               <span
                 className={`hidden text-xs font-medium sm:block ${
-                  active ? 'text-[#0B3D6B]' : done ? 'text-gray-600' : 'text-gray-400'
+                  active ? "text-[#0B3D6B]" : done ? "text-gray-600" : "text-gray-400"
                 }`}
               >
                 {STEP_LABELS[i]}
               </span>
             </div>
             {i < total - 1 && (
-              <div className={`h-px w-10 ${done ? 'bg-[#0B3D6B]' : 'bg-gray-200'}`} />
+              <div className={`h-px w-10 ${done ? "bg-[#0B3D6B]" : "bg-gray-200"}`} />
             )}
           </div>
         )
@@ -106,15 +95,15 @@ function FormField({
 }
 
 const inputCls =
-  'w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-[#0B3D6B] focus:ring-2 focus:ring-[#0B3D6B]/10 disabled:bg-gray-50 disabled:text-gray-400'
+  "w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-[#0B3D6B] focus:ring-2 focus:ring-[#0B3D6B]/10 disabled:bg-gray-50 disabled:text-gray-400"
 
 export default function EnrollmentForm() {
-  const router = useRouter()
   const [step, setStep] = useState(0)
   const [form, setForm] = useState<FormData>(EMPTY)
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
   const [loading, setLoading] = useState(false)
-  const [apiError, setApiError] = useState('')
+  const [apiError, setApiError] = useState("")
+  const [submitted, setSubmitted] = useState(false)
 
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -123,42 +112,33 @@ export default function EnrollmentForm() {
 
   function validateStep0(): boolean {
     const errs: Partial<Record<keyof FormData, string>> = {}
-    if (!form.firstName.trim()) errs.firstName = 'First name is required'
-    if (!form.lastName.trim()) errs.lastName = 'Last name is required'
+    if (!form.firstName.trim()) errs.firstName = "First name is required"
+    if (!form.lastName.trim()) errs.lastName = "Last name is required"
     if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
-      errs.email = 'Enter a valid email address'
-    if (!form.phone.trim()) errs.phone = 'Phone number is required'
-    if (!form.dateOfBirth) errs.dateOfBirth = 'Date of birth is required'
-    if (!form.address.trim()) errs.address = 'Address is required'
+      errs.email = "Enter a valid email address"
+    if (!form.phone.trim()) errs.phone = "Phone number is required"
+    if (!form.dateOfBirth) errs.dateOfBirth = "Date of birth is required"
+    if (!form.address.trim()) errs.address = "Address is required"
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
 
   function validateStep1(): boolean {
     const errs: Partial<Record<keyof FormData, string>> = {}
-    if (!form.program) errs.program = 'Select a program'
-    if (!form.location) errs.location = 'Select a campus location'
-    if (!form.batchDuration) errs.batchDuration = 'Select a batch duration'
+    if (!form.program) errs.program = "Select a program"
+    if (!form.location) errs.location = "Select a campus location"
+    if (!form.batchDuration) errs.batchDuration = "Select a batch duration"
     if (
-      form.batchDuration === 'custom' &&
+      form.batchDuration === "custom" &&
       (!form.batchCustomDays || isNaN(Number(form.batchCustomDays)))
     )
-      errs.batchCustomDays = 'Enter number of days'
+      errs.batchCustomDays = "Enter number of days"
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
 
   function validateStep2(): boolean {
-    const errs: Partial<Record<keyof FormData, string>> = {}
-    if (!form.paymentOption) errs.paymentOption = 'Select a payment option'
-    if (form.paymentOption === 'custom') {
-      const amt = Number(form.customAmount)
-      if (!form.customAmount || isNaN(amt) || amt < 1000) {
-        errs.customAmount = 'Enter a valid amount (minimum LKR 1,000)'
-      }
-    }
-    setErrors(errs)
-    return Object.keys(errs).length === 0
+    return true
   }
 
   function nextStep() {
@@ -167,47 +147,26 @@ export default function EnrollmentForm() {
     setStep((s) => s + 1)
   }
 
-  function getPaymentAmount(): number {
-    if (form.paymentOption === 'registration') return REGISTRATION_FEE
-    if (form.paymentOption === 'full') return TOTAL_FEE
-    return Number(form.customAmount) || 0
-  }
-
   async function handleSubmit() {
     if (!validateStep2()) return
-    setApiError('')
+    setApiError("")
     setLoading(true)
     try {
-      const phone = form.phone.startsWith('+94') ? form.phone : `+94${form.phone.replace(/^0/, '')}`
-      const res = await fetch('/api/enrollment/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          firstName: form.firstName.trim(),
-          lastName: form.lastName.trim(),
-          email: form.email.trim(),
-          phone,
-          dateOfBirth: form.dateOfBirth,
-          address: form.address.trim(),
-          program: form.program,
-          location: form.location,
-          batchDuration: form.batchDuration,
-          batchCustomDays: form.batchCustomDays ? Number(form.batchCustomDays) : undefined,
-          paymentAmount: getPaymentAmount(),
-        }),
+      await addDoc(collection(db, "enrollmentApplications"), {
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        name: `${form.firstName.trim()} ${form.lastName.trim()}`,
+        email: form.email.trim(),
+        phone: form.phone,
+        program: form.program,
+        location: form.location,
+        batchDuration: form.batchDuration,
+        status: "pending",
+        createdAt: serverTimestamp(),
       })
-
-      const data = await res.json()
-      if (!res.ok) {
-        setApiError(data.error || 'Failed to create checkout session. Please try again.')
-        return
-      }
-
-      if (data.url) {
-        router.push(data.url)
-      }
-    } catch {
-      setApiError('Network error. Please check your connection and try again.')
+      setSubmitted(true)
+    } catch (err) {
+      setApiError("Failed to submit your application. Please try again.")
     } finally {
       setLoading(false)
     }
@@ -227,7 +186,7 @@ export default function EnrollmentForm() {
                 <input
                   className={inputCls}
                   value={form.firstName}
-                  onChange={(e) => set('firstName', e.target.value)}
+                  onChange={(e) => set("firstName", e.target.value)}
                   placeholder="Kasun"
                   autoComplete="given-name"
                 />
@@ -236,7 +195,7 @@ export default function EnrollmentForm() {
                 <input
                   className={inputCls}
                   value={form.lastName}
-                  onChange={(e) => set('lastName', e.target.value)}
+                  onChange={(e) => set("lastName", e.target.value)}
                   placeholder="Perera"
                   autoComplete="family-name"
                 />
@@ -247,7 +206,7 @@ export default function EnrollmentForm() {
                 className={inputCls}
                 type="email"
                 value={form.email}
-                onChange={(e) => set('email', e.target.value)}
+                onChange={(e) => set("email", e.target.value)}
                 placeholder="kasun@example.com"
                 autoComplete="email"
               />
@@ -259,8 +218,8 @@ export default function EnrollmentForm() {
                 </span>
                 <input
                   className="flex-1 px-4 py-3 text-sm text-gray-900 outline-none"
-                  value={form.phone.replace(/^\+94/, '').replace(/^0/, '')}
-                  onChange={(e) => set('phone', e.target.value.replace(/\D/g, ''))}
+                  value={form.phone.replace(/^\+94/, "").replace(/^0/, "")}
+                  onChange={(e) => set("phone", e.target.value.replace(/\D/g, ""))}
                   placeholder="771234567"
                   autoComplete="tel"
                 />
@@ -272,7 +231,7 @@ export default function EnrollmentForm() {
                   className={inputCls}
                   type="date"
                   value={form.dateOfBirth}
-                  onChange={(e) => set('dateOfBirth', e.target.value)}
+                  onChange={(e) => set("dateOfBirth", e.target.value)}
                   max={new Date().toISOString().slice(0, 10)}
                 />
               </FormField>
@@ -282,7 +241,7 @@ export default function EnrollmentForm() {
                 className={inputCls}
                 rows={2}
                 value={form.address}
-                onChange={(e) => set('address', e.target.value)}
+                onChange={(e) => set("address", e.target.value)}
                 placeholder="No. 59, Galle Road, Galle"
               />
             </FormField>
@@ -303,11 +262,11 @@ export default function EnrollmentForm() {
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => set('program', p.id)}
+                    onClick={() => set("program", p.id)}
                     className={`flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
                       form.program === p.id
-                        ? 'border-[#0B3D6B] bg-[#0B3D6B]/5'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? "border-[#0B3D6B] bg-[#0B3D6B]/5"
+                        : "border-gray-200 hover:border-gray-300"
                     }`}
                   >
                     <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#0B3D6B]/10 text-[10px] font-bold text-[#0B3D6B]">{p.flag}</span>
@@ -325,7 +284,7 @@ export default function EnrollmentForm() {
               <select
                 className={inputCls}
                 value={form.location}
-                onChange={(e) => set('location', e.target.value as StudentLocation)}
+                onChange={(e) => set("location", e.target.value as StudentLocation)}
               >
                 <option value="">Select campus location...</option>
                 {LOCATION_OPTIONS.map((l) => (
@@ -345,11 +304,11 @@ export default function EnrollmentForm() {
                   <button
                     key={b.value}
                     type="button"
-                    onClick={() => set('batchDuration', b.value)}
+                    onClick={() => set("batchDuration", b.value)}
                     className={`flex-1 rounded-xl border-2 py-3 text-sm font-medium transition-all ${
                       form.batchDuration === b.value
-                        ? 'border-[#0B3D6B] bg-[#0B3D6B]/5 text-[#0B3D6B]'
-                        : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                        ? "border-[#0B3D6B] bg-[#0B3D6B]/5 text-[#0B3D6B]"
+                        : "border-gray-200 text-gray-600 hover:border-gray-300"
                     }`}
                   >
                     {b.label}
@@ -359,7 +318,7 @@ export default function EnrollmentForm() {
               {errors.batchDuration && (
                 <p className="mt-1 text-xs text-red-600">{errors.batchDuration}</p>
               )}
-              {form.batchDuration === 'custom' && (
+              {form.batchDuration === "custom" && (
                 <div className="mt-3">
                   <FormField label="Number of Days" error={errors.batchCustomDays}>
                     <input
@@ -367,7 +326,7 @@ export default function EnrollmentForm() {
                       type="number"
                       min={1}
                       value={form.batchCustomDays}
-                      onChange={(e) => set('batchCustomDays', e.target.value)}
+                      onChange={(e) => set("batchCustomDays", e.target.value)}
                       placeholder="e.g. 60"
                     />
                   </FormField>
@@ -377,112 +336,41 @@ export default function EnrollmentForm() {
           </div>
         )}
 
-        {/* Step 2 — Payment */}
+        {/* Step 2 — Confirmation */}
         {step === 2 && (
           <div className="space-y-6">
-            <h2 className="font-jakarta text-xl font-bold text-[#0B3D6B]">Payment</h2>
-
-            <div className="rounded-xl border border-gray-100 bg-[#F5F7FB] p-5">
-              <h3 className="mb-3 text-sm font-semibold text-gray-700">Fee Summary</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between text-gray-600">
-                  <span>Registration Fee</span>
-                  <span>{formatLKR(REGISTRATION_FEE)}</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Course Fee</span>
-                  <span>{formatLKR(COURSE_FEE)}</span>
-                </div>
-                <div className="mt-2 flex justify-between border-t border-gray-200 pt-2 font-semibold text-[#0B3D6B]">
-                  <span>Total</span>
-                  <span>{formatLKR(TOTAL_FEE)}</span>
-                </div>
+            <h2 className="font-jakarta text-xl font-bold text-[#0B3D6B]">
+              Confirm Your Application
+            </h2>
+            <div className="rounded-xl border border-gray-100 bg-[#F5F7FB] p-5 space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Name</span>
+                <span className="font-medium text-[#0D1B2A]">{form.firstName} {form.lastName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Email</span>
+                <span className="font-medium text-[#0D1B2A]">{form.email}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Phone</span>
+                <span className="font-medium text-[#0D1B2A]">+94{form.phone}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Program</span>
+                <span className="font-medium text-[#0D1B2A]">{form.program}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Campus</span>
+                <span className="font-medium text-[#0D1B2A]">{form.location}</span>
               </div>
             </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Payment Option <span className="text-red-500">*</span>
-              </label>
-              <div className="space-y-3">
-                {[
-                  {
-                    value: 'registration' as const,
-                    label: 'Pay Registration Fee only',
-                    amount: formatLKR(REGISTRATION_FEE),
-                  },
-                  {
-                    value: 'full' as const,
-                    label: 'Pay Full Amount',
-                    amount: formatLKR(TOTAL_FEE),
-                  },
-                  {
-                    value: 'custom' as const,
-                    label: 'Pay Custom Amount',
-                    amount: '',
-                  },
-                ].map((opt) => (
-                  <label
-                    key={opt.value}
-                    className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-5 py-4 transition-all ${
-                      form.paymentOption === opt.value
-                        ? 'border-[#0B3D6B] bg-[#0B3D6B]/5'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentOption"
-                      value={opt.value}
-                      checked={form.paymentOption === opt.value}
-                      onChange={() => set('paymentOption', opt.value)}
-                      className="accent-[#0B3D6B]"
-                    />
-                    <span className="flex-1 text-sm font-medium text-gray-800">{opt.label}</span>
-                    {opt.amount && (
-                      <span className="font-semibold text-[#0B3D6B]">{opt.amount}</span>
-                    )}
-                  </label>
-                ))}
-              </div>
-              {errors.paymentOption && (
-                <p className="mt-1 text-xs text-red-600">{errors.paymentOption}</p>
-              )}
+            <div className="rounded-xl border border-[#0B3D6B]/20 bg-[#0B3D6B]/5 px-5 py-4">
+              <p className="text-sm text-gray-700">
+                Our team will review your application and contact you within{' '}
+                <strong className="text-[#0B3D6B]">24 hours</strong> to confirm
+                your enrollment.
+              </p>
             </div>
-
-            {form.paymentOption === 'custom' && (
-              <FormField label="Custom Amount (LKR)" required error={errors.customAmount}>
-                <div className="flex overflow-hidden rounded-xl border border-gray-200 focus-within:border-[#0B3D6B] focus-within:ring-2 focus-within:ring-[#0B3D6B]/10">
-                  <span className="flex items-center border-r border-gray-200 bg-gray-50 px-4 text-sm font-medium text-gray-500">
-                    LKR
-                  </span>
-                  <input
-                    className="flex-1 px-4 py-3 text-sm text-gray-900 outline-none"
-                    type="number"
-                    min={1000}
-                    value={form.customAmount}
-                    onChange={(e) => set('customAmount', e.target.value)}
-                    placeholder="Enter amount"
-                  />
-                </div>
-              </FormField>
-            )}
-
-            {form.paymentOption && form.paymentOption !== 'custom' && (
-              <div className="rounded-xl border border-[#E8A020]/30 bg-[#E8A020]/5 px-5 py-4">
-                <p className="text-sm text-gray-700">
-                  You will be charged{' '}
-                  <strong className="text-[#0B3D6B]">{formatLKR(getPaymentAmount())}</strong> via
-                  Stripe secure payment.
-                </p>
-              </div>
-            )}
-
-            {apiError && (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-                {apiError}
-              </div>
-            )}
           </div>
         )}
 
@@ -518,12 +406,12 @@ export default function EnrollmentForm() {
               {loading ? (
                 <>
                   <span className="ti ti-loader-2 animate-spin" />
-                  Processing...
+                  Submitting...
                 </>
               ) : (
                 <>
-                  <span className="ti ti-lock" />
-                  Proceed to Payment
+                  <span className="ti ti-send" />
+                  Submit Application
                 </>
               )}
             </button>

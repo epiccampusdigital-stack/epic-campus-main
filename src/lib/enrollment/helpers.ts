@@ -115,6 +115,8 @@ export function parseEnrollment(
     registrationFeePaid: Boolean(data.registrationFeePaid),
     courseFeePaid: Boolean(data.courseFeePaid),
     totalPaid: Number(data.totalPaid ?? 0),
+    requestedAmount: data.requestedAmount != null ? Number(data.requestedAmount) : undefined,
+    paymentOption: (data.paymentOption as 'registration' | 'full' | 'custom') ?? undefined,
     stripeSessionId: data.stripeSessionId ? String(data.stripeSessionId) : undefined,
     stripePaymentStatus: (data.stripePaymentStatus as EnrollmentPaymentStatus) ?? 'pending',
     status: (data.status as EnrollmentStatus) ?? 'pending',

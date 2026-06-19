@@ -94,10 +94,145 @@ export async function GET() {
     })
     await j001Batch.commit()
 
+    const j002Batch = adminDb.batch()
+    withIds(SAMPLE_READING_QUESTIONS, 'reading').forEach((q) => {
+      j002Batch.set(
+        adminDb.collection('examPapers').doc('j-002').collection('readingQuestions').doc(q.id),
+        q,
+      )
+    })
+    withIds(SAMPLE_LISTENING_QUESTIONS, 'listening').forEach((q) => {
+      j002Batch.set(
+        adminDb.collection('examPapers').doc('j-002').collection('listeningQuestions').doc(q.id),
+        q,
+      )
+    })
+    withIds(SAMPLE_WRITING_TASKS, 'writing').forEach((q) => {
+      j002Batch.set(
+        adminDb.collection('examPapers').doc('j-002').collection('writingTasks').doc(q.id),
+        q,
+      )
+    })
+    withIds(SAMPLE_SPEAKING_PROMPTS, 'speaking').forEach((q) => {
+      j002Batch.set(
+        adminDb.collection('examPapers').doc('j-002').collection('speakingPrompts').doc(q.id),
+        q,
+      )
+    })
+    await j002Batch.commit()
+
+    const j003Batch = adminDb.batch()
+    withIds(SAMPLE_READING_QUESTIONS, 'reading').forEach((q) => {
+      j003Batch.set(
+        adminDb.collection('examPapers').doc('j-003').collection('readingQuestions').doc(q.id),
+        q,
+      )
+    })
+    withIds(SAMPLE_LISTENING_QUESTIONS, 'listening').forEach((q) => {
+      j003Batch.set(
+        adminDb.collection('examPapers').doc('j-003').collection('listeningQuestions').doc(q.id),
+        q,
+      )
+    })
+    withIds(SAMPLE_WRITING_TASKS, 'writing').forEach((q) => {
+      j003Batch.set(
+        adminDb.collection('examPapers').doc('j-003').collection('writingTasks').doc(q.id),
+        q,
+      )
+    })
+    withIds(SAMPLE_SPEAKING_PROMPTS, 'speaking').forEach((q) => {
+      j003Batch.set(
+        adminDb.collection('examPapers').doc('j-003').collection('speakingPrompts').doc(q.id),
+        q,
+      )
+    })
+    await j003Batch.commit()
+
+    const j004Batch = adminDb.batch()
+    withIds(SAMPLE_READING_QUESTIONS, 'reading').forEach((q) => {
+      j004Batch.set(
+        adminDb.collection('examPapers').doc('j-004').collection('readingQuestions').doc(q.id),
+        q,
+      )
+    })
+    withIds(SAMPLE_LISTENING_QUESTIONS, 'listening').forEach((q) => {
+      j004Batch.set(
+        adminDb.collection('examPapers').doc('j-004').collection('listeningQuestions').doc(q.id),
+        q,
+      )
+    })
+    withIds(SAMPLE_WRITING_TASKS, 'writing').forEach((q) => {
+      j004Batch.set(
+        adminDb.collection('examPapers').doc('j-004').collection('writingTasks').doc(q.id),
+        q,
+      )
+    })
+    withIds(SAMPLE_SPEAKING_PROMPTS, 'speaking').forEach((q) => {
+      j004Batch.set(
+        adminDb.collection('examPapers').doc('j-004').collection('speakingPrompts').doc(q.id),
+        q,
+      )
+    })
+    await j004Batch.commit()
+
+    const j005Batch = adminDb.batch()
+    withIds(SAMPLE_READING_QUESTIONS, 'reading').forEach((q) => {
+      j005Batch.set(
+        adminDb.collection('examPapers').doc('j-005').collection('readingQuestions').doc(q.id),
+        q,
+      )
+    })
+    withIds(SAMPLE_LISTENING_QUESTIONS, 'listening').forEach((q) => {
+      j005Batch.set(
+        adminDb.collection('examPapers').doc('j-005').collection('listeningQuestions').doc(q.id),
+        q,
+      )
+    })
+    withIds(SAMPLE_WRITING_TASKS, 'writing').forEach((q) => {
+      j005Batch.set(
+        adminDb.collection('examPapers').doc('j-005').collection('writingTasks').doc(q.id),
+        q,
+      )
+    })
+    withIds(SAMPLE_SPEAKING_PROMPTS, 'speaking').forEach((q) => {
+      j005Batch.set(
+        adminDb.collection('examPapers').doc('j-005').collection('speakingPrompts').doc(q.id),
+        q,
+      )
+    })
+    await j005Batch.commit()
+
+    const j006Batch = adminDb.batch()
+    withIds(SAMPLE_READING_QUESTIONS, 'reading').forEach((q) => {
+      j006Batch.set(
+        adminDb.collection('examPapers').doc('j-006').collection('readingQuestions').doc(q.id),
+        q,
+      )
+    })
+    withIds(SAMPLE_LISTENING_QUESTIONS, 'listening').forEach((q) => {
+      j006Batch.set(
+        adminDb.collection('examPapers').doc('j-006').collection('listeningQuestions').doc(q.id),
+        q,
+      )
+    })
+    withIds(SAMPLE_WRITING_TASKS, 'writing').forEach((q) => {
+      j006Batch.set(
+        adminDb.collection('examPapers').doc('j-006').collection('writingTasks').doc(q.id),
+        q,
+      )
+    })
+    withIds(SAMPLE_SPEAKING_PROMPTS, 'speaking').forEach((q) => {
+      j006Batch.set(
+        adminDb.collection('examPapers').doc('j-006').collection('speakingPrompts').doc(q.id),
+        q,
+      )
+    })
+    await j006Batch.commit()
+
     return NextResponse.json({
       seeded: true,
       count: EXAM_PAPERS.length,
-      message: `Seeded ${EXAM_PAPERS.length} exam papers with J-001 sample questions`,
+      message: `Seeded ${EXAM_PAPERS.length} exam papers with questions for all papers`,
     })
   } catch (err) {
     console.error('seed-papers error:', err)

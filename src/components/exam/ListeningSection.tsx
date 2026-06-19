@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import ExamAudioPlayer from '@/components/exam/ExamAudioPlayer'
 import ExamTopbar from '@/components/exam/ExamTopbar'
 import { getAttempt, loadAnswers, markSection, saveAnswer } from '@/lib/exam/helpers'
 import type { ListeningQuestion } from '@/types'
@@ -23,7 +22,6 @@ export default function ListeningSection({
   paperCode = '',
 }: ListeningSectionProps) {
   const router = useRouter()
-  const pauseAudioRef = useRef<(() => void) | null>(null)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [startedAt, setStartedAt] = useState<Date>(new Date())
   const [currentQ, setCurrentQ] = useState(0)
@@ -38,6 +36,8 @@ export default function ListeningSection({
     return key
   }, [questions])
 
+  const pauseAudioRef = useRef<(() => void) | null>(null)
+
   useEffect(() => {
     getAttempt(attemptId).then((a) => {
       if (a?.startedAt) setStartedAt(new Date(a.startedAt))
@@ -45,12 +45,7 @@ export default function ListeningSection({
     loadAnswers(attemptId, 'listening').then(setAnswers)
   }, [attemptId])
 
-  useEffect(() => {
-    pauseAudioRef.current?.()
-  }, [currentQ, active?.id])
-
   const goToQuestion = (index: number) => {
-    pauseAudioRef.current?.()
     setCurrentQ(index)
   }
 
@@ -135,25 +130,31 @@ export default function ListeningSection({
 
           {/* Audio player */}
           {active?.audioUrl ? (
-            <ExamAudioPlayer
-              key={active.id}
+            <audio
+              controls
               src={active.audioUrl}
-              questionNumber={active.questionNumber}
-              playLimit={2}
-              onPauseRef={(fn) => { pauseAudioRef.current = fn }}
+              className="w-full mb-3"
+              preload="metadata"
             />
           ) : (
-            <ExamAudioPlayer
-              key={`no-audio-${active?.id}`}
-              src=""
-              questionNumber={active?.questionNumber}
+            <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
+              <span className="text-amber-600 text-sm">🎧 Audio for this question will be available soon.</span>
+            </div>
+          )}
+
+          {active?.audioUrl && (
+            <audio
+              controls
+              src={active.audioUrl}
+              className="w-full mb-3"
+              preload="metadata"
             />
           )}
 
           {/* Listening play limit warning */}
           <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
             <div className="text-[11px] text-amber-700 leading-relaxed">
-              <span className="font-semibold">⚠ Play limit:</span> Each audio can be played max 2 times.
+              <span className="font-semibold">⚠️ Play limit:</span> Each audio can be played max 2 times.
             </div>
           </div>
 

@@ -41,6 +41,7 @@ interface FieldErrors {
   confirmPassword?: string
   courseInterest?: string
   batch?: string
+  regNumber?: string
 }
 
 function getSubmitError(code: string): string {
@@ -88,6 +89,7 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [courseInterest, setCourseInterest] = useState('')
   const [batch, setBatch] = useState('')
+  const [regNumber, setRegNumber] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
@@ -177,6 +179,7 @@ export default function SignupPage() {
         mobile: mobile.trim(),
         courseId: courseInterest as CourseId,
         batchId: batch.trim(),
+        registrationNumber: regNumber.trim() || null,
         branchId: 'galle-main',
         registrationFee: 0,
         status: 'pending',
@@ -313,6 +316,20 @@ export default function SignupPage() {
             disabled={isLoading}
             error={fieldErrors.batch}
           />
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Registration Number{' '}
+              <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={regNumber}
+              onChange={(e) => setRegNumber(e.target.value)}
+              placeholder="e.g. REG-2024-001"
+              className="w-full border-b border-gray-300 bg-transparent py-2 px-0 text-sm font-medium focus:border-[#E8A020] focus:outline-none"
+            />
+          </div>
 
           <GoldSubmitButton
             loading={loading}

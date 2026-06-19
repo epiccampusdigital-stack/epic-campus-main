@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Stripe from 'stripe'
 import { FieldValue } from 'firebase-admin/firestore'
 import { adminDb } from '@/lib/firebase/admin'
 
 export const dynamic = 'force-dynamic'
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder', {
-  apiVersion: '2026-05-27.dahlia',
-})
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,15 +18,16 @@ export async function POST(req: NextRequest) {
       location,
       batchDuration,
       batchCustomDays,
+      paymentOption,
       paymentAmount,
     } = body
 
-    if (!firstName || !lastName || !email || !phone || !program || !location || !paymentAmount) {
+    if (!firstName || !lastName || !email || !phone || !program || !location || !paymentOption) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const amount = Number(paymentAmount)
-    if (isNaN(amount) || amount < 1000) {
+    const amount = Number(paymentAmount ?? 0)
+    if (paymentOption === 'custom' && (isNaN(amount) || amount < 1000)) {
       return NextResponse.json(
         { error: 'Invalid payment amount — minimum LKR 1,000' },
         { status: 400 },
@@ -40,7 +36,6 @@ export async function POST(req: NextRequest) {
 
     const enrollmentRef = adminDb.collection('enrollmentApplications').doc()
     const enrollmentId = enrollmentRef.id
-    const fullName = `${String(firstName).trim()} ${String(lastName).trim()}`
 
     await enrollmentRef.set({
       firstName: String(firstName).trim(),
@@ -56,6 +51,8 @@ export async function POST(req: NextRequest) {
       registrationFeePaid: false,
       courseFeePaid: false,
       totalPaid: 0,
+      requestedAmount: paymentOption === 'custom' ? amount : paymentOption === 'full' ? 85000 : 25000,
+      paymentOption: String(paymentOption),
       stripeSessionId: null,
       stripePaymentStatus: 'pending',
       status: 'pending',
@@ -63,50 +60,10 @@ export async function POST(req: NextRequest) {
       createdAt: FieldValue.serverTimestamp(),
     })
 
-    const programLabels: Record<string, string> = {
-      'japan-ssw': 'Japan SSW Program',
-      korea: 'Korea Program',
-      china: 'China Program',
-      ielts: 'IELTS Residential',
-      nvq: 'NVQ Skills Program',
-    }
-    const programLabel = programLabels[String(program)] || String(program)
-
-    const origin = req.nextUrl.origin
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'lkr',
-            product_data: {
-              name: `EPIC Campus — ${programLabel}`,
-              description: `Enrollment fee for ${fullName}`,
-            },
-            unit_amount: Math.round(amount * 100),
-          },
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      customer_email: String(email).trim().toLowerCase(),
-      success_url: `${origin}/enroll/success?enrollment_id=${enrollmentId}`,
-      cancel_url: `${origin}/enroll?cancelled=true`,
-      metadata: {
-        enrollmentId,
-        firstName: String(firstName).trim(),
-        lastName: String(lastName).trim(),
-        program: String(program),
-        amount: String(amount),
-      },
-    })
-
-    await enrollmentRef.update({ stripeSessionId: session.id })
-
-    return NextResponse.json({ url: session.url, enrollmentId })
+    return NextResponse.json({ enrollmentId })
   } catch (err) {
     console.error('[enrollment/checkout]', err)
-    const message = err instanceof Error ? err.message : 'Failed to create checkout session'
+    const message = err instanceof Error ? err.message : 'Failed to submit application'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

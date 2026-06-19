@@ -61,6 +61,29 @@ export type PaymentType = 'tuition' | 'registration' | 'exam' | 'visa' | 'other'
 export type PaymentMethod = 'cash' | 'bank-transfer' | 'stripe'
 export type PaymentStatus = 'paid' | 'partial' | 'pending' | 'cancelled'
 
+export type PaymentPlanStatus = 'paid' | 'partial' | 'unpaid' | 'overdue'
+
+export interface PaymentInstallment {
+  id: string
+  label: string
+  amount: number
+  dueDate: string
+  paidAt?: string
+  paidBy?: string
+}
+
+export interface StudentPaymentPlan {
+  id: string
+  studentId: string
+  studentName: string
+  program: string
+  branch: string
+  totalFee: number
+  currency: 'LKR'
+  installments: PaymentInstallment[]
+  createdAt: string
+}
+
 export type BatchDuration = '45days' | '90days' | 'custom'
 export type CourseBatchStatus = 'active' | 'completed' | 'overdue'
 
@@ -690,6 +713,8 @@ export interface EnrollmentApplication {
   registrationFeePaid: boolean
   courseFeePaid: boolean
   totalPaid: number
+  requestedAmount?: number
+  paymentOption?: 'registration' | 'full' | 'custom'
   stripeSessionId?: string
   stripePaymentStatus: EnrollmentPaymentStatus
   status: EnrollmentStatus

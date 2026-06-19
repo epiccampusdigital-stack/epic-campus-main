@@ -34,6 +34,10 @@
   --sidebar-bg:    rgba(11, 61, 107, 0.2);
   --card-bg:       rgba(255, 255, 255, 0.04);
   --page-bg:       #080d18;
+  --text-primary: #e2e8f0;
+  --text-muted:   rgba(255,255,255,0.5);
+  --border:       rgba(255,255,255,0.08);
+  --bg:           #080d18;
 }
 
 * {

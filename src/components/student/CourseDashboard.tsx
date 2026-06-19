@@ -17,11 +17,11 @@ import type { AttendanceRecord, Payment, Student } from '@/types'
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-[#DDE3EC] bg-white p-4">
-      <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+    <div className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-4">
+      <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">
         {label}
       </p>
-      <p className="mt-1 font-jakarta text-xl font-bold text-[#0B3D6B]">{value}</p>
+      <p className="mt-1 font-jakarta text-xl font-bold text-[#0B3D6B] dark:text-[#E8A020]">{value}</p>
     </div>
   )
 }
@@ -34,7 +34,7 @@ function ProgressSteps({
   current: number
 }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-[#DDE3EC] bg-white p-4">
+    <div className="overflow-x-auto rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-4">
       <div className="flex min-w-[640px] items-center gap-2">
         {steps.map((step, i) => (
           <div key={step} className="flex flex-1 items-center gap-2">
@@ -76,10 +76,10 @@ function QuickLinks() {
         <Link
           key={l.href}
           href={l.href}
-          className="flex items-center gap-3 rounded-xl border border-[#DDE3EC] bg-white p-4 transition-colors hover:border-[#E8A020]"
+          className="flex items-center gap-3 rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-4 transition-colors hover:border-[#E8A020]"
         >
-          <span className={`ti ${l.icon} text-2xl text-[#0B3D6B]`} aria-hidden="true" />
-          <span className="font-jakarta text-sm font-semibold text-[#0D1B2A]">{l.label}</span>
+          <span className={`ti ${l.icon} text-2xl text-[#0B3D6B] dark:text-[#E8A020]`} aria-hidden="true" />
+          <span className="font-jakarta text-sm font-semibold text-[#0D1B2A] dark:text-white">{l.label}</span>
         </Link>
       ))}
     </div>
@@ -93,10 +93,10 @@ function RecentAttendance({ records }: { records: AttendanceRecord[] }) {
     )
   }
   return (
-    <ul className="divide-y divide-[#DDE3EC] rounded-xl border border-[#DDE3EC] bg-white">
+    <ul className="divide-y divide-[#DDE3EC] dark:divide-white/[0.06] rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04]">
       {records.map((r) => (
         <li key={r.id} className="flex items-center justify-between px-4 py-3 text-sm">
-          <span className="text-[#0D1B2A]">{formatAttendanceDate(r.date)}</span>
+          <span className="text-[#0D1B2A] dark:text-white">{formatAttendanceDate(r.date)}</span>
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
               r.status === 'present'

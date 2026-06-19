@@ -16,14 +16,13 @@ import {
 import { useManagement } from '@/components/layout/ManagementContext'
 import type { EnrollmentApplication, EnrollmentProgram, StudentLocation } from '@/types'
 
-type StatusTab = 'pending' | 'confirmed' | 'rejected'
+type StatusTab = 'pending' | 'confirmed'
 type ProgramFilter = 'all' | EnrollmentProgram
 type LocationFilter = 'all' | StudentLocation
 
 const STATUS_TABS: { id: StatusTab; label: string }[] = [
   { id: 'pending', label: 'Pending' },
   { id: 'confirmed', label: 'Approved' },
-  { id: 'rejected', label: 'Rejected' },
 ]
 
 function StatCard({
@@ -122,7 +121,7 @@ export default function EnrollmentsPage() {
     setSubmitting(true)
     try {
       const token = await auth.currentUser.getIdToken()
-      const res = await fetch('/api/students/create-account', {
+      const res = await fetch('/api/enrollment/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -134,7 +133,7 @@ export default function EnrollmentsPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setActionError(data.error || 'Failed to create account')
+        setActionError(data.error || 'Failed to approve enrollment')
         return
       }
       setActionSuccess(`Account created for ${approveTarget.firstName} ${approveTarget.lastName}`)

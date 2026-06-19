@@ -16,7 +16,7 @@ const ResultsChart = dynamic(
   () => import('@/components/student/ResultsChart'),
   {
     ssr: false,
-    loading: () => <div className="h-64 animate-pulse rounded-lg bg-[#DDE3EC]" />,
+    loading: () => <div className="h-64 animate-pulse rounded-lg bg-[#DDE3EC] dark:bg-white/10" />,
   },
 )
 
@@ -90,38 +90,55 @@ export default function MyResultsPage() {
 
   if (!student) return null
 
+  function getGradeDarkClasses(grade: string): string {
+    switch (grade) {
+      case 'S':
+        return 'dark:bg-emerald-900/40 dark:text-emerald-300'
+      case 'A':
+        return 'dark:bg-blue-900/40 dark:text-blue-300'
+      case 'B':
+        return 'dark:bg-amber-900/40 dark:text-amber-300'
+      case 'C':
+        return 'dark:bg-orange-900/40 dark:text-orange-300'
+      case 'D':
+        return 'dark:bg-red-900/40 dark:text-red-300'
+      default:
+        return ''
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A]">My Exam Results</h2>
-        <p className="text-sm text-[#5A6A7A]">Track your progress across attempts</p>
+        <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white">My Exam Results</h2>
+        <p className="text-sm text-[#5A6A7A] dark:text-white/50">Track your progress across attempts</p>
       </div>
 
       <CompletionCertificate student={student} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-[#DDE3EC] bg-white p-5">
-          <p className="text-xs uppercase text-[#5A6A7A]">Average Score</p>
-          <p className="mt-1 font-jakarta text-2xl font-bold text-[#0B3D6B]">
+        <div className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+          <p className="text-xs uppercase text-[#5A6A7A] dark:text-white/50">Average Score</p>
+          <p className="mt-1 font-jakarta text-2xl font-bold text-[#0B3D6B] dark:text-[#E8A020]">
             {loading ? '…' : summary.avg || '—'}
           </p>
         </div>
-        <div className="rounded-xl border border-[#DDE3EC] bg-white p-5">
-          <p className="text-xs uppercase text-[#5A6A7A]">Best Score</p>
-          <p className="mt-1 font-jakarta text-2xl font-bold text-[#0B3D6B]">
+        <div className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+          <p className="text-xs uppercase text-[#5A6A7A] dark:text-white/50">Best Score</p>
+          <p className="mt-1 font-jakarta text-2xl font-bold text-[#0B3D6B] dark:text-[#E8A020]">
             {loading ? '…' : summary.best || '—'}
           </p>
         </div>
-        <div className="rounded-xl border border-[#DDE3EC] bg-white p-5">
-          <p className="text-xs uppercase text-[#5A6A7A]">Latest Grade</p>
+        <div className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+          <p className="text-xs uppercase text-[#5A6A7A] dark:text-white/50">Latest Grade</p>
           <p className="mt-1 font-jakarta text-2xl font-bold text-[#E8A020]">
             {loading ? '…' : summary.latest}
           </p>
         </div>
       </div>
 
-      <div className="rounded-xl border border-[#DDE3EC] bg-white p-5">
-        <h3 className="mb-4 font-jakarta font-bold text-[#0B3D6B]">Score Progress</h3>
+      <div className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+        <h3 className="mb-4 font-jakarta font-bold text-[#0B3D6B] dark:text-[#E8A020]">Score Progress</h3>
         <ResultsChart
           data={attempts
             .slice()
@@ -139,14 +156,16 @@ export default function MyResultsPage() {
         {GRADE_LEGEND.map((g) => (
           <span
             key={g.grade}
-            className={`rounded-full px-3 py-1 text-xs font-semibold ${g.color}`}
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${g.color} ${getGradeDarkClasses(
+              g.grade,
+            )}`}
           >
             {g.grade} ({g.range})
           </span>
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white">
+      <div className="overflow-hidden rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04]">
         {loading ? (
           <TableSkeleton rows={5} />
         ) : attempts.length === 0 ? (
@@ -170,7 +189,7 @@ export default function MyResultsPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[960px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB]">
+                <tr className="border-b border-[#DDE3EC] dark:border-white/[0.08] bg-[#F5F7FB] dark:bg-white/[0.03]">
                   {[
                     'Exam',
                     'Date',
@@ -184,25 +203,25 @@ export default function MyResultsPage() {
                   ].map((h) => (
                     <th
                       key={h}
-                      className="px-3 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]"
+                      className="px-3 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50"
                     >
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#DDE3EC]">
+              <tbody className="divide-y divide-[#DDE3EC] dark:divide-white/[0.06]">
                 {attempts.map((a) => (
-                  <tr key={a.id}>
-                    <td className="px-3 py-3 font-medium text-[#0D1B2A]">{a.exam}</td>
-                    <td className="px-3 py-3 text-[#5A6A7A]">{a.date || '—'}</td>
-                    <td className="px-3 py-3">{a.reading ?? '—'}</td>
-                    <td className="px-3 py-3">{a.listening ?? '—'}</td>
-                    <td className="px-3 py-3">{a.writing ?? '—'}</td>
-                    <td className="px-3 py-3">{a.speaking ?? '—'}</td>
-                    <td className="px-3 py-3 font-semibold">{a.total || '—'}</td>
+                  <tr key={a.id} className="hover:bg-[#F5F7FB]/40 dark:hover:bg-white/[0.03]">
+                    <td className="px-3 py-3 font-medium text-[#0D1B2A] dark:text-white">{a.exam}</td>
+                    <td className="px-3 py-3 text-[#5A6A7A] dark:text-white/50">{a.date || '—'}</td>
+                    <td className="px-3 py-3 dark:text-white">{a.reading ?? '—'}</td>
+                    <td className="px-3 py-3 dark:text-white">{a.listening ?? '—'}</td>
+                    <td className="px-3 py-3 dark:text-white">{a.writing ?? '—'}</td>
+                    <td className="px-3 py-3 dark:text-white">{a.speaking ?? '—'}</td>
+                    <td className="px-3 py-3 font-semibold dark:text-white">{a.total || '—'}</td>
                     <td className="px-3 py-3 font-bold text-[#E8A020]">{a.grade}</td>
-                    <td className="px-3 py-3 capitalize">{a.status}</td>
+                    <td className="px-3 py-3 capitalize dark:text-white">{a.status}</td>
                   </tr>
                 ))}
               </tbody>
