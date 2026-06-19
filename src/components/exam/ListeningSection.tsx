@@ -27,6 +27,7 @@ export default function ListeningSection({
   const [currentQ, setCurrentQ] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
+  const [playCounts, setPlayCounts] = useState<Record<string, number>>({})
 
   const active = questions[currentQ]
 
@@ -130,33 +131,65 @@ export default function ListeningSection({
 
           {/* Audio player */}
           {active?.audioUrl ? (
-            <audio
-              controls
-              src={active.audioUrl}
-              className="w-full mb-3"
-              preload="metadata"
-            />
+            <div className="mb-4">
+              <audio
+                controls
+                src={active.audioUrl}
+                className="w-full rounded-lg"
+                preload="metadata"
+                onPlay={() => {
+                  const key = active.id
+                  const count = (playCounts[key] ?? 0) + 1
+                  setPlayCounts(prev => ({
+                    ...prev,
+                    [key]: count
+                  }))
+                }}
+                ref={(el) => {
+                  if (el) {
+                    const key = active.id
+                    const played = playCounts[key] ?? 0
+                    if (played >= 2) {
+                      el.onplay = (e) => {
+                        e.preventDefault()
+                        el.pause()
+                        el.currentTime = 0
+                      }
+                      el.style.opacity = '0.5'
+                      el.style.pointerEvents = 'none'
+                    } else {
+                      el.style.opacity = '1'
+                      el.style.pointerEvents = 'auto'
+                      el.onplay = null
+                    }
+                  }
+                }}
+              />
+              {(playCounts[active.id] ?? 0) >= 2 && (
+                <p className="mt-1 text-xs text-red-600 font-medium">
+                  Maximum plays reached for this question.
+                </p>
+              )}
+              {(playCounts[active.id] ?? 0) === 1 && (
+                <p className="mt-1 text-xs text-amber-600 font-medium">
+                  1 play remaining.
+                </p>
+              )}
+            </div>
           ) : (
             <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
               <span className="text-amber-600 text-sm">🎧 Audio for this question will be available soon.</span>
             </div>
           )}
 
-          {active?.audioUrl && (
-            <audio
-              controls
-              src={active.audioUrl}
-              className="w-full mb-3"
-              preload="metadata"
-            />
-          )}
-
           {/* Listening play limit warning */}
-          <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
-            <div className="text-[11px] text-amber-700 leading-relaxed">
-              <span className="font-semibold">⚠️ Play limit:</span> Each audio can be played max 2 times.
+          {active?.audioUrl && (
+            <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
+              <div className="text-[11px] text-amber-700 leading-relaxed">
+                <span className="font-semibold">⚠️ Play limit:</span> Each audio can be played max 2 times.
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Question text */}
           {active && (

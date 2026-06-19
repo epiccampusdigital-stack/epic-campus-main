@@ -9,6 +9,8 @@ import CourseDashboard from '@/components/student/CourseDashboard'
 import StudentSessionsWidget from '@/components/sessions/StudentSessionsWidget'
 import CompletionCertificate from '@/components/student/CompletionCertificate'
 import StudyStatsWidget from '@/components/student/StudyStatsWidget'
+import DashboardHero from '@/components/student/DashboardHero'
+import QuickActions from '@/components/student/QuickActions'
 import { useStudentPortal } from '@/components/student/StudentContext'
 import type { AttendanceRecord, Payment } from '@/types'
 
@@ -185,6 +187,13 @@ export default function MyDashboardPage() {
 
   return (
     <div className="space-y-4">
+      <DashboardHero
+        student={activeStudent}
+        attendance={attendance}
+        payments={payments}
+        examCount={examCount}
+      />
+      <QuickActions />
       <CompletionCertificate student={activeStudent} />
       <StudyStatsWidget studentId={activeStudent.id} />
       <StudentSessionsWidget studentId={activeStudent.id} />
