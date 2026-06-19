@@ -72,40 +72,28 @@ export default function MyDashboardPage() {
         )
         setExamCount(examSnap.docs.length)
 
-        const activeId = student?.id ?? fallbackStudent?.id
-
-        if (activeId) {
+        const activeStudentId = student?.id ?? fallbackStudent?.id
+        if (activeStudentId) {
           const studSnap = await getDoc(
-            doc(db, 'students', activeId),
+            doc(db, 'students', activeStudentId)
           ).catch(() => null)
-
           if (studSnap?.exists()) {
             const houseId = studSnap.data()?.houseId
-            const houseName = studSnap.data()?.houseName
-
             if (houseId) {
               const houseSnap = await getDoc(
-                doc(db, 'accommodation', houseId),
+                doc(db, 'accommodation', houseId)
               ).catch(() => null)
-
-              if (houseSnap?.exists()) {
+              if (houseSnap?.exists() && !cancelled) {
+                const h = houseSnap.data()
                 setHouseInfo({
-                  name: houseSnap.data()?.name ?? houseName,
-                  address: houseSnap.data()?.address ?? '',
-                  landlordPhone:
-                    houseSnap.data()?.landlordPhone ?? '',
+                  name: String(h?.name ?? ''),
+                  address: String(h?.address ?? ''),
+                  landlordPhone: String(
+                    h?.landlordPhone ?? ''),
                 })
-              } else {
-                setHouseInfo(null)
               }
-            } else {
-              setHouseInfo(null)
             }
-          } else {
-            setHouseInfo(null)
           }
-        } else {
-          setHouseInfo(null)
         }
       } catch (err) {
         if (!cancelled) {
@@ -209,25 +197,27 @@ export default function MyDashboardPage() {
       {houseInfo && (
         <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
           <div className="flex items-center gap-2 mb-3">
-            <span className="ti ti-home text-lg text-[#0B3D6B] dark:text-[#E8A020]" />
+            <span className="ti ti-home text-lg text-[#0B3D6B] dark:text-[#E8A020]" aria-hidden="true" />
             <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">
               My Accommodation
             </h3>
           </div>
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2 text-[#0D1B2A] dark:text-white">
-              <span className="ti ti-building text-[#5A6A7A]" />
+              <span className="ti ti-building text-[#5A6A7A] dark:text-white/40" aria-hidden="true" />
               <span className="font-medium">
                 {houseInfo.name}
               </span>
             </div>
-            <div className="flex items-center gap-2 text-[#5A6A7A] dark:text-white/50">
-              <span className="ti ti-map-pin" />
-              {houseInfo.address}
-            </div>
+            {houseInfo.address && (
+              <div className="flex items-center gap-2 text-[#5A6A7A] dark:text-white/50">
+                <span className="ti ti-map-pin" aria-hidden="true" />
+                {houseInfo.address}
+              </div>
+            )}
             {houseInfo.landlordPhone && (
               <div className="flex items-center gap-2 text-[#5A6A7A] dark:text-white/50">
-                <span className="ti ti-phone" />
+                <span className="ti ti-phone" aria-hidden="true" />
                 <a href={`tel:${houseInfo.landlordPhone}`}
                   className="hover:text-[#0B3D6B] dark:hover:text-[#E8A020] hover:underline">
                   {houseInfo.landlordPhone}
@@ -235,8 +225,8 @@ export default function MyDashboardPage() {
               </div>
             )}
             <p className="text-xs text-[#5A6A7A] dark:text-white/40 mt-2">
-              Contact Epic Campus for any accommodation
-              issues: 076 254 8383
+              For accommodation issues contact
+              Epic Campus: 076 254 8383
             </p>
           </div>
         </div>

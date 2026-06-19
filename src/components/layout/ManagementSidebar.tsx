@@ -61,14 +61,17 @@ export default function ManagementSidebar() {
   useEffect(() => setMounted(true), [])
 
   useEffect(() => {
-    const q = query(collection(db, 'conversations'), orderBy('lastMessageAt', 'desc'))
+    const q = query(
+      collection(db, 'messages'),
+      orderBy('lastAt', 'desc')
+    )
     const unsub = onSnapshot(q, (snap) => {
       const total = snap.docs.reduce(
-        (sum, d) => sum + (Number(d.data().unreadCount) || 0),
+        (sum, d) => sum + (Number(d.data().unreadByAdmin) || 0),
         0,
       )
       setUnreadMessages(total)
-    })
+    }, () => setUnreadMessages(0))
     return () => unsub()
   }, [])
 

@@ -350,7 +350,7 @@ export default function MessagesPage() {
                     <p className="text-xs text-[#5A6A7A] dark:text-white/50">{selected.studentEmail}</p>
                   </div>
                   <Link
-                    href={`/admin/students/${selected.studentId}`}
+                    href={`/students/${selected.studentId}`}
                     className="rounded-lg bg-[#0B3D6B] dark:bg-[#0B3D6B] px-3 py-1.5 text-xs font-semibold text-white dark:text-white hover:bg-[#0A2A4F] dark:hover:bg-[#0A2A4F]"
                   >
                     View Profile

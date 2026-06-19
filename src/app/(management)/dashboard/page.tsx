@@ -17,6 +17,7 @@ import {
   getMonthPickerOptions,
 } from '@/lib/dashboard/helpers'
 import TeacherDashboard from '@/components/dashboard/TeacherDashboard'
+import ReceptionDashboard from '@/components/dashboard/ReceptionDashboard'
 import StudentRiskAlertsWidget from '@/components/risk/StudentRiskAlertsWidget'
 import LocationFilterSelect from '@/components/ui/LocationFilterSelect'
 import { useManagement } from '@/components/layout/ManagementContext'
@@ -291,6 +292,10 @@ export default function DashboardPage() {
 
   if (user?.role === 'teacher') {
     return <TeacherDashboard />
+  }
+
+  if (user?.role === 'reception') {
+    return <ReceptionDashboard />
   }
 
   const statCards = [

@@ -139,7 +139,7 @@ export default function AdminExamsPage() {
   const [markingFilter, setMarkingFilter] = useState('')
   const [formOpen, setFormOpen] = useState(false)
   const [editPaper, setEditPaper] = useState<ExamPaper | null>(null)
-  const [audioPaper, setAudioPaper] = useState<ExamPaper | null>(null)
+  const [listeningEditorPaper, setListeningEditorPaper] = useState<ExamPaper | null>(null)
   const [questionEditorPaper, setQuestionEditorPaper] = useState<ExamPaper | null>(null)
   const [selectedAttempt, setSelectedAttempt] = useState<ExamAttempt | null>(null)
 
@@ -401,9 +401,13 @@ export default function AdminExamsPage() {
                           className="rounded-[6px] border border-gray-200 px-3 py-1.5 text-xs font-semibold text-[#0B3D6B] hover:bg-gray-50">
                           Edit Questions
                         </button>
-                        <button type="button" onClick={() => setAudioPaper(p)}
-                          className="rounded-[6px] border border-gray-200 px-3 py-1.5 text-xs font-semibold text-[#0B3D6B] hover:bg-gray-50">
-                          Listening Audio
+                        <button
+                          type="button"
+                          onClick={() => setListeningEditorPaper(p)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-[#DDE3EC] dark:border-white/[0.08] px-3 py-1.5 text-xs font-semibold text-[#0B3D6B] dark:text-white hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06]"
+                        >
+                          <span className="ti ti-headphones" />
+                          Audio
                         </button>
                         <div className="relative z-50">
                           <button
@@ -764,13 +768,11 @@ export default function AdminExamsPage() {
         onSaved={loadData}
       />
 
-      {audioPaper && (
-        <ListeningQuestionsEditor
-          paper={audioPaper}
-          open={!!audioPaper}
-          onClose={() => setAudioPaper(null)}
-        />
-      )}
+      <ListeningQuestionsEditor
+        paper={listeningEditorPaper ?? ({ id: '', title: '' } as any)}
+        open={listeningEditorPaper !== null}
+        onClose={() => setListeningEditorPaper(null)}
+      />
 
       {questionEditorPaper && (
         <QuestionEditor
