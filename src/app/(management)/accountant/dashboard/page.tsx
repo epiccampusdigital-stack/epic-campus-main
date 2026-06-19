@@ -40,6 +40,9 @@ export default function AccountantKitchenDashboard() {
   const [agentCommPaidMonth, setAgentCommPaidMonth] = useState(0)
   const [staffReferralMonth, setStaffReferralMonth] = useState(0)
   const [registrationRevenueMonth, setRegistrationRevenueMonth] = useState(0)
+  const [accommodationMonthTotal, setAccommodationMonthTotal] = useState(0)
+  const [accommodationHouseCount, setAccommodationHouseCount] = useState(0)
+  const [accommodationUnpaidCount, setAccommodationUnpaidCount] = useState(0)
 
   useEffect(() => {
     async function load() {
@@ -56,6 +59,46 @@ export default function AccountantKitchenDashboard() {
           getDocs(query(collection(db, 'staffReferrals'), where('includedInPayroll', '==', true))),
           getDocs(query(collection(db, 'payments'), where('type', '==', 'registration'))),
         ])
+
+        // Accommodation - monthly rent total
+        // TODO: Add to Firestore rules:
+        // match /accommodation/{houseId} {
+        //   allow read: if request.auth != null &&
+        //     request.auth.token.role in
+        //     ['admin','owner','accountant','reception'];
+        //   allow write: if request.auth != null &&
+        //     request.auth.token.role in
+        //     ['admin','owner','accountant'];
+        //   match /bills/{billId} {
+        //     allow read, write: if request.auth != null &&
+        //       request.auth.token.role in
+        //       ['admin','owner','accountant'];
+        //   }
+        // }
+        const housesSnap = await getDocs(
+          collection(db, 'accommodation'),
+        ).catch(() => ({ docs: [] as Array<{ id: string; data: () => Record<string, unknown> }> }))
+
+        setAccommodationHouseCount(housesSnap.docs.length)
+
+        let accomTotal = 0
+        let unpaidCount = 0
+        for (const houseDoc of housesSnap.docs) {
+          const billsSnap = await getDocs(
+            query(
+              collection(db, 'accommodation', houseDoc.id, 'bills'),
+              where('month', '==', curMonth),
+            ),
+          ).catch(() => ({ docs: [] as Array<{ data: () => Record<string, unknown> }> }))
+
+          for (const b of billsSnap.docs) {
+            const d = b.data()
+            accomTotal += Number(d.amount ?? 0)
+            if (d.status !== 'paid') unpaidCount += 1
+          }
+        }
+        setAccommodationMonthTotal(accomTotal)
+        setAccommodationUnpaidCount(unpaidCount)
 
         const allMeals = mealSnap.docs.map((d) => d.data())
 
@@ -228,6 +271,36 @@ export default function AccountantKitchenDashboard() {
             <Bar dataKey="utility" fill="#0B3D6B" name="Approved Orders" radius={[3, 3, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
+      </div>
+
+      <div className="rounded-xl border border-white/90 bg-white/65 p-5 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05]">
+        <h2 className="mb-4 text-sm font-bold text-[#0D1B2A] dark:text-white">
+          Accommodation
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="rounded-lg border border-[#DDE3EC] bg-[#F5F7FB] p-4 dark:border-gray-600 dark:bg-gray-800/50">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Houses Managed</p>
+            <p className="mt-2 text-lg font-bold text-[#0B3D6B] dark:text-[#E8A020]">{String(accommodationHouseCount)}</p>
+          </div>
+          <div className="rounded-lg border border-[#DDE3EC] bg-[#F5F7FB] p-4 dark:border-gray-600 dark:bg-gray-800/50">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">This Month Total</p>
+            <p className="mt-2 text-lg font-bold text-[#0B3D6B] dark:text-[#E8A020]">{formatLKR(accommodationMonthTotal)}</p>
+          </div>
+          <div className="rounded-lg border border-[#DDE3EC] bg-[#F5F7FB] p-4 dark:border-gray-600 dark:bg-gray-800/50">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Unpaid Bills</p>
+            <p className={`mt-2 text-lg font-bold ${accommodationUnpaidCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-[#0B3D6B] dark:text-[#E8A020]'}`}>
+              {String(accommodationUnpaidCount)}
+            </p>
+          </div>
+        </div>
+        <div className="mt-3">
+          <Link
+            href="/accommodation"
+            className="text-sm font-medium text-[#0B3D6B] dark:text-[#E8A020] hover:underline"
+          >
+            View all houses -&gt;
+          </Link>
+        </div>
       </div>
     </div>
   )

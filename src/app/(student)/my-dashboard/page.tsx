@@ -18,6 +18,11 @@ export default function MyDashboardPage() {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [examCount, setExamCount] = useState(0)
+  const [houseInfo, setHouseInfo] = useState<{
+    name: string
+    address: string
+    landlordPhone: string
+  } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -66,6 +71,42 @@ export default function MyDashboardPage() {
           ),
         )
         setExamCount(examSnap.docs.length)
+
+        const activeId = student?.id ?? fallbackStudent?.id
+
+        if (activeId) {
+          const studSnap = await getDoc(
+            doc(db, 'students', activeId),
+          ).catch(() => null)
+
+          if (studSnap?.exists()) {
+            const houseId = studSnap.data()?.houseId
+            const houseName = studSnap.data()?.houseName
+
+            if (houseId) {
+              const houseSnap = await getDoc(
+                doc(db, 'accommodation', houseId),
+              ).catch(() => null)
+
+              if (houseSnap?.exists()) {
+                setHouseInfo({
+                  name: houseSnap.data()?.name ?? houseName,
+                  address: houseSnap.data()?.address ?? '',
+                  landlordPhone:
+                    houseSnap.data()?.landlordPhone ?? '',
+                })
+              } else {
+                setHouseInfo(null)
+              }
+            } else {
+              setHouseInfo(null)
+            }
+          } else {
+            setHouseInfo(null)
+          }
+        } else {
+          setHouseInfo(null)
+        }
       } catch (err) {
         if (!cancelled) {
           console.error('[MyDashboard]', err)
@@ -165,6 +206,41 @@ export default function MyDashboardPage() {
         examCount={examCount}
         payments={payments}
       />
+      {houseInfo && (
+        <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="ti ti-home text-lg text-[#0B3D6B] dark:text-[#E8A020]" />
+            <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">
+              My Accommodation
+            </h3>
+          </div>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center gap-2 text-[#0D1B2A] dark:text-white">
+              <span className="ti ti-building text-[#5A6A7A]" />
+              <span className="font-medium">
+                {houseInfo.name}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-[#5A6A7A] dark:text-white/50">
+              <span className="ti ti-map-pin" />
+              {houseInfo.address}
+            </div>
+            {houseInfo.landlordPhone && (
+              <div className="flex items-center gap-2 text-[#5A6A7A] dark:text-white/50">
+                <span className="ti ti-phone" />
+                <a href={`tel:${houseInfo.landlordPhone}`}
+                  className="hover:text-[#0B3D6B] dark:hover:text-[#E8A020] hover:underline">
+                  {houseInfo.landlordPhone}
+                </a>
+              </div>
+            )}
+            <p className="text-xs text-[#5A6A7A] dark:text-white/40 mt-2">
+              Contact Epic Campus for any accommodation
+              issues: 076 254 8383
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
