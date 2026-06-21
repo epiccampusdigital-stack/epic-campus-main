@@ -114,6 +114,7 @@ const EMPTY_FORM: InventoryFormValues = {
   unitCost: '',
   expiryDate: '',
   expiryAlertDays: '3',
+  notes: '',
 }
 
 export default function InventoryPage() {
@@ -129,6 +130,13 @@ export default function InventoryPage() {
   const [saving, setSaving] = useState(false)
   const [restockItem, setRestockItem] = useState<InventoryItem | null>(null)
   const [restockQty, setRestockQty] = useState('')
+  const [restockBrand, setRestockBrand] = useState('')
+  const [restockSupplier, setRestockSupplier] = useState('')
+  const [restockInvoice, setRestockInvoice] = useState('')
+  const [restockNotes, setRestockNotes] = useState('')
+  const [removeItem, setRemoveItem] = useState<InventoryItem | null>(null)
+  const [removeQty, setRemoveQty] = useState('')
+  const [removeReason, setRemoveReason] = useState('')
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [history, setHistory] = useState<StockHistoryEntry[]>([])
   const menuRef = useRef<HTMLDivElement>(null)
@@ -272,12 +280,21 @@ export default function InventoryPage() {
       unitCost: String(item.unitCost),
       expiryDate: item.expiryDate ?? '',
       expiryAlertDays: String(item.expiryAlertDays ?? 3),
+      notes: item.notes ?? '',
     })
     setSlideMode('edit')
     setMenuOpen(null)
   }
 
-  async function handleSave(values: InventoryFormValues) {
+  async function handleSave(
+    values: InventoryFormValues,
+    brands: {
+      brandName: string
+      supplierName: string
+      pricePerUnit: string
+      isPreferred: boolean
+    }[],
+  ) {
     if (!values.itemName || !values.currentStock || !values.minStockLevel || !values.unitCost) return
     setSaving(true)
     try {
@@ -292,6 +309,7 @@ export default function InventoryPage() {
         lastUpdated: serverTimestamp(),
         updatedBy: user?.uid ?? '',
         updatedByName: user?.displayName ?? '',
+        notes: values.notes.trim(),
       }
       if (values.expiryDate) {
         payload.expiryDate = values.expiryDate
@@ -300,10 +318,13 @@ export default function InventoryPage() {
         payload.expiryDate = null
         payload.expiryAlertDays = null
       }
+      let savedItemId: string | null = null
       if (slideMode === 'add') {
-        await addDoc(collection(db, 'inventory'), payload)
+        const savedRef = await addDoc(collection(db, 'inventory'), payload)
+        savedItemId = savedRef.id
       } else if (editItem) {
         await updateDoc(doc(db, 'inventory', editItem.id), payload)
+        savedItemId = editItem.id
         await addDoc(collection(db, 'inventory', editItem.id, 'history'), {
           action: 'updated',
           qty: Number(values.currentStock),
@@ -314,6 +335,20 @@ export default function InventoryPage() {
           createdAt: serverTimestamp(),
         })
       }
+
+      if (savedItemId && brands.length > 0) {
+        for (const brand of brands) {
+          if (!brand.brandName.trim()) continue
+          await addDoc(collection(db, 'inventory', savedItemId, 'brands'), {
+            brandName: brand.brandName.trim(),
+            supplierName: brand.supplierName.trim(),
+            pricePerUnit: Number(brand.pricePerUnit) || 0,
+            isPreferred: brand.isPreferred,
+            createdAt: serverTimestamp(),
+          })
+        }
+      }
+
       setSlideMode(null)
       await loadItems()
     } catch (err) {
@@ -328,8 +363,10 @@ export default function InventoryPage() {
     setSaving(true)
     try {
       const newStock = restockItem.currentStock + Number(restockQty)
+      const lastRestockedDate = new Date().toISOString().slice(0, 10)
       await updateDoc(doc(db, 'inventory', restockItem.id), {
         currentStock: newStock,
+        lastRestockedDate,
         lastUpdated: serverTimestamp(),
         updatedBy: user?.uid ?? '',
         updatedByName: user?.displayName ?? '',
@@ -338,6 +375,11 @@ export default function InventoryPage() {
         action: 'restocked',
         qty: Number(restockQty),
         reason: 'manual-restock',
+        brand: restockBrand.trim(),
+        supplier: restockSupplier.trim(),
+        invoiceNumber: restockInvoice.trim(),
+        notes: restockNotes.trim(),
+        lastRestockedDate,
         date: new Date().toISOString().slice(0, 10),
         by: user?.uid ?? '',
         byName: user?.displayName ?? '',
@@ -345,11 +387,46 @@ export default function InventoryPage() {
       })
       setRestockItem(null)
       setRestockQty('')
+      setRestockBrand('')
+      setRestockSupplier('')
+      setRestockInvoice('')
+      setRestockNotes('')
       await loadItems()
     } catch (err) {
       console.error('[Restock]', err)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleRemove() {
+    if (!removeItem || !removeQty || Number(removeQty) <= 0) return
+    try {
+      const qty = Number(removeQty)
+      const newStock = Math.max(0, removeItem.currentStock - qty)
+      await updateDoc(doc(db, 'inventory', removeItem.id), {
+        currentStock: newStock,
+        lastUpdated: serverTimestamp(),
+        updatedBy: user?.uid ?? '',
+        updatedByName: user?.displayName ?? '',
+      })
+      await addDoc(collection(db, 'inventory', removeItem.id, 'history'), {
+        action: 'removed',
+        qty,
+        reason: removeReason.trim() || 'manual-remove',
+        date: new Date().toISOString().slice(0, 10),
+        by: user?.uid ?? '',
+        byName: user?.displayName ?? '',
+        createdAt: serverTimestamp(),
+      })
+      setItems((prev) =>
+        prev.map((i) => (i.id === removeItem.id ? { ...i, currentStock: newStock } : i)),
+      )
+      setRemoveItem(null)
+      setRemoveQty('')
+      setRemoveReason('')
+    } catch (err) {
+      console.error('[Remove]', err)
     }
   }
 
@@ -446,6 +523,7 @@ export default function InventoryPage() {
                 item={item}
                 onEdit={() => openEdit(item)}
                 onRestock={() => setRestockItem(item)}
+                onRemove={() => setRemoveItem(item)}
               />
             ))}
           </div>
@@ -636,7 +714,17 @@ export default function InventoryPage() {
 
       {restockItem && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setRestockItem(null)} />
+          <div
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+            onClick={() => {
+              setRestockItem(null)
+              setRestockQty('')
+              setRestockBrand('')
+              setRestockSupplier('')
+              setRestockInvoice('')
+              setRestockNotes('')
+            }}
+          />
           <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/80 bg-white/90 p-6 shadow-2xl backdrop-blur-2xl dark:border-white/[0.08] dark:bg-[#0d1a2e]/90">
             <div className="flex justify-center">
               <FoodEmoji itemName={restockItem.itemName} size="lg" showName />
@@ -670,10 +758,45 @@ export default function InventoryPage() {
                 +
               </button>
             </div>
+            <input
+              type="text"
+              value={restockBrand}
+              onChange={(e) => setRestockBrand(e.target.value)}
+              placeholder="Brand (e.g. Saumya, CIC...)"
+              className="mb-3 mt-4 w-full min-h-[44px] rounded-xl border border-[#DDE3EC] px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            />
+            <input
+              type="text"
+              value={restockSupplier}
+              onChange={(e) => setRestockSupplier(e.target.value)}
+              placeholder="Supplier name"
+              className="mb-3 w-full min-h-[44px] rounded-xl border border-[#DDE3EC] px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            />
+            <input
+              type="text"
+              value={restockInvoice}
+              onChange={(e) => setRestockInvoice(e.target.value)}
+              placeholder="Invoice number (optional)"
+              className="mb-3 w-full min-h-[44px] rounded-xl border border-[#DDE3EC] px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            />
+            <input
+              type="text"
+              value={restockNotes}
+              onChange={(e) => setRestockNotes(e.target.value)}
+              placeholder="Notes (optional)"
+              className="mb-4 w-full min-h-[44px] rounded-xl border border-[#DDE3EC] px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            />
             <div className="mt-4 flex gap-3">
               <button
                 type="button"
-                onClick={() => setRestockItem(null)}
+                onClick={() => {
+                  setRestockItem(null)
+                  setRestockQty('')
+                  setRestockBrand('')
+                  setRestockSupplier('')
+                  setRestockInvoice('')
+                  setRestockNotes('')
+                }}
                 className="flex-1 rounded-xl border border-[#DDE3EC] py-3 text-sm font-medium text-[#5A6A7A]"
               >
                 Cancel
@@ -685,6 +808,99 @@ export default function InventoryPage() {
                 className="flex-1 rounded-xl bg-[#0B3D6B] py-3 text-sm font-bold text-white hover:bg-[#0a3460] disabled:opacity-50"
               >
                 {saving ? 'Adding…' : 'Add Stock'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {removeItem && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+            onClick={() => setRemoveItem(null)}
+          />
+          <div className="fixed bottom-0 left-0 right-0 z-50 mx-auto max-w-lg rounded-t-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
+            <div className="mb-4 flex items-center gap-3">
+              <FoodEmoji itemName={removeItem.itemName} size="lg" showName />
+              <div>
+                <p className="text-xs text-[#5A6A7A]">
+                  Current: {removeItem.currentStock} {removeItem.unit}
+                </p>
+              </div>
+            </div>
+
+            <p className="mb-3 text-sm font-semibold text-[#0D1B2A] dark:text-white">
+              How much to remove?
+            </p>
+
+            <div className="mb-3 grid grid-cols-4 gap-2">
+              {[1, 5, 10, 25].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setRemoveQty(String(n))}
+                  className={`min-h-[44px] rounded-xl border-2 text-sm font-bold transition-all ${
+                    removeQty === String(n)
+                      ? 'border-red-500 bg-red-500 text-white'
+                      : 'border-[#DDE3EC] text-[#0D1B2A] dark:border-gray-600 dark:text-white'
+                  }`}
+                >
+                  -{n}
+                </button>
+              ))}
+            </div>
+
+            <div className="mb-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setRemoveQty(String(Math.max(0, (parseFloat(removeQty) || 0) - 1)))
+                }
+                className="flex h-[44px] w-[44px] items-center justify-center rounded-xl border-2 border-[#DDE3EC] text-xl font-bold dark:border-gray-600 dark:text-white"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                min="0"
+                value={removeQty}
+                onChange={(e) => setRemoveQty(e.target.value)}
+                placeholder="Custom amount"
+                className="min-h-[44px] flex-1 rounded-xl border border-[#DDE3EC] px-3 text-center text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+              />
+              <button
+                type="button"
+                onClick={() => setRemoveQty(String((parseFloat(removeQty) || 0) + 1))}
+                className="flex h-[44px] w-[44px] items-center justify-center rounded-xl border-2 border-[#DDE3EC] text-xl font-bold dark:border-gray-600 dark:text-white"
+              >
+                +
+              </button>
+            </div>
+
+            <input
+              type="text"
+              value={removeReason}
+              onChange={(e) => setRemoveReason(e.target.value)}
+              placeholder="Reason (e.g. used in cooking, spoiled...)"
+              className="mb-4 w-full min-h-[44px] rounded-xl border border-[#DDE3EC] px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            />
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setRemoveItem(null)}
+                className="flex-1 min-h-[52px] rounded-xl border-2 border-[#DDE3EC] text-sm font-semibold text-[#5A6A7A]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRemove}
+                disabled={!removeQty || Number(removeQty) <= 0}
+                className="flex-1 min-h-[52px] rounded-xl bg-red-600 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                Remove {removeQty || '0'} {removeItem.unit}
               </button>
             </div>
           </div>

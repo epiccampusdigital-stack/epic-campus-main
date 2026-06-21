@@ -29,13 +29,22 @@ export interface InventoryFormValues {
   unitCost: string
   expiryDate: string
   expiryAlertDays: string
+  notes: string
 }
 
 interface InventoryItemSlideOverProps {
   mode: 'add' | 'edit'
   initial: InventoryFormValues
   onClose: () => void
-  onSave: (values: InventoryFormValues) => void
+  onSave: (
+    values: InventoryFormValues,
+    brands: {
+      brandName: string
+      supplierName: string
+      pricePerUnit: string
+      isPreferred: boolean
+    }[],
+  ) => void
   saving: boolean
 }
 
@@ -51,9 +60,16 @@ export default function InventoryItemSlideOver({
   const [pickerSearch, setPickerSearch] = useState('')
   const [selectedFood, setSelectedFood] = useState<string | null>(null)
   const [customMode, setCustomMode] = useState(false)
+  const [brands, setBrands] = useState<{
+    brandName: string
+    supplierName: string
+    pricePerUnit: string
+    isPreferred: boolean
+  }[]>([])
 
   useEffect(() => {
     setForm(initial)
+    setBrands([])
     const match = findFoodItem(initial.itemName)
     setSelectedFood(match?.name ?? null)
     setCustomMode(!match && !!initial.itemName)
@@ -87,7 +103,7 @@ export default function InventoryItemSlideOver({
   const footer = (
     <button
       type="button"
-      onClick={() => onSave(form)}
+      onClick={() => onSave(form, brands)}
       disabled={
         saving || !form.itemName || !form.currentStock || !form.minStockLevel || !form.unitCost
       }
@@ -305,6 +321,149 @@ export default function InventoryItemSlideOver({
                 onChange={(e) => setForm((f) => ({ ...f, expiryAlertDays: e.target.value }))}
                 className="w-full min-h-[48px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-3 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
               />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
+                Notes
+              </label>
+              <textarea
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                rows={3}
+                placeholder="e.g. Store in cool dry place, check expiry monthly..."
+                className="w-full resize-none rounded-xl border border-[#DDE3EC] bg-white px-3 py-3 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+              />
+            </div>
+
+            <div className="border-t border-[#DDE3EC] pt-5 dark:border-white/[0.06]">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-base font-bold text-[#0D1B2A] dark:text-white">3. Brands & Suppliers</p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setBrands((b) => [
+                      ...b,
+                      {
+                        brandName: '',
+                        supplierName: '',
+                        pricePerUnit: '',
+                        isPreferred: false,
+                      },
+                    ])
+                  }
+                  className="rounded-xl bg-[#0B3D6B] px-3 py-1.5 text-xs font-semibold text-white"
+                >
+                  + Add Brand
+                </button>
+              </div>
+
+              {brands.length === 0 && (
+                <p className="text-sm text-[#5A6A7A] dark:text-white/40">
+                  No brands added yet. Add brands you buy for this item.
+                </p>
+              )}
+
+              <div className="space-y-4">
+                {brands.map((brand, idx) => (
+                  <div
+                    key={idx}
+                    className="space-y-3 rounded-xl border border-[#DDE3EC] p-4 dark:border-white/[0.08]"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-[#0B3D6B] dark:text-white">
+                        Brand {idx + 1}
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <label className="flex cursor-pointer items-center gap-1.5 text-xs text-[#5A6A7A] dark:text-white/50">
+                          <input
+                            type="checkbox"
+                            checked={brand.isPreferred}
+                            onChange={(e) =>
+                              setBrands((b) =>
+                                b.map((br, i) =>
+                                  i === idx ? { ...br, isPreferred: e.target.checked } : br,
+                                ),
+                              )
+                            }
+                            className="rounded"
+                          />
+                          Preferred
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setBrands((b) => b.filter((_, i) => i !== idx))}
+                          className="text-xs font-medium text-red-500 hover:text-red-700"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">
+                        Brand Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={brand.brandName}
+                        onChange={(e) =>
+                          setBrands((b) =>
+                            b.map((br, i) => (i === idx ? { ...br, brandName: e.target.value } : br)),
+                          )
+                        }
+                        placeholder="e.g. Saumya, Nippon, CIC"
+                        className="w-full min-h-[44px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">
+                        Supplier Name
+                      </label>
+                      <input
+                        type="text"
+                        value={brand.supplierName}
+                        onChange={(e) =>
+                          setBrands((b) =>
+                            b.map((br, i) =>
+                              i === idx ? { ...br, supplierName: e.target.value } : br,
+                            ),
+                          )
+                        }
+                        placeholder="e.g. Galle Wholesale Market"
+                        className="w-full min-h-[44px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">
+                        Price per unit (LKR)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={brand.pricePerUnit}
+                        onChange={(e) =>
+                          setBrands((b) =>
+                            b.map((br, i) =>
+                              i === idx ? { ...br, pricePerUnit: e.target.value } : br,
+                            ),
+                          )
+                        }
+                        placeholder="0"
+                        className="w-full min-h-[44px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                      />
+                    </div>
+
+                    {brand.isPreferred && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#E8A020]/15 px-2.5 py-0.5 text-xs font-semibold text-[#E8A020]">
+                        ★ Preferred brand
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

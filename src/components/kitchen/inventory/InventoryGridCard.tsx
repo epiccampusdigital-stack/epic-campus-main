@@ -14,6 +14,7 @@ interface InventoryGridCardProps {
   item: InventoryItem
   onEdit: () => void
   onRestock: () => void
+  onRemove: () => void
 }
 
 function stockBarColor(item: InventoryItem): string {
@@ -52,7 +53,12 @@ function ExpiryBadge({ item }: { item: InventoryItem }) {
   return <p className="mt-1 text-center text-[10px] text-gray-400">Exp: {label}</p>
 }
 
-export default function InventoryGridCard({ item, onEdit, onRestock }: InventoryGridCardProps) {
+export default function InventoryGridCard({
+  item,
+  onEdit,
+  onRestock,
+  onRemove,
+}: InventoryGridCardProps) {
   const { sinhala } = useKitchenSinhala()
   const food = findFoodItem(item.itemName)
   const maxBar = Math.max(item.minStockLevel * 2, item.currentStock, 1)
@@ -103,6 +109,11 @@ export default function InventoryGridCard({ item, onEdit, onRestock }: Inventory
       {sinhala && food?.sinhalaName && (
         <p className="text-center text-xs text-gray-500 dark:text-gray-400">{food.sinhalaName}</p>
       )}
+      {item.notes && (
+        <p className="mt-0.5 truncate px-1 text-center text-[10px] text-[#5A6A7A] dark:text-white/40">
+          {item.notes}
+        </p>
+      )}
 
       <div className="mt-2 md:mt-3">
         <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700 md:h-2.5">
@@ -119,16 +130,28 @@ export default function InventoryGridCard({ item, onEdit, onRestock }: Inventory
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          onRestock()
-        }}
-        className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-1 rounded-xl bg-[#0B3D6B] py-2.5 text-sm font-semibold text-white hover:bg-[#0a3460] md:mt-3"
-      >
-        <span className="text-lg">+</span> Restock
-      </button>
+      <div className="mt-2 grid grid-cols-2 gap-2 md:mt-3">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onRemove()
+          }}
+          className="flex min-h-[44px] w-full items-center justify-center gap-1 rounded-xl border-2 border-red-200 bg-red-50 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-100 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400"
+        >
+          <span className="text-lg">−</span> Remove
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onRestock()
+          }}
+          className="flex min-h-[44px] w-full items-center justify-center gap-1 rounded-xl bg-[#0B3D6B] py-2.5 text-sm font-semibold text-white hover:bg-[#0a3460]"
+        >
+          <span className="text-lg">+</span> Restock
+        </button>
+      </div>
     </div>
   )
 }

@@ -20,6 +20,17 @@ export interface InventoryItem {
   isActive: boolean
   expiryDate?: string
   expiryAlertDays?: number
+  notes?: string
+  lastRestockedDate?: string
+}
+
+export interface ItemBrand {
+  id: string
+  brandName: string
+  supplierName: string
+  pricePerUnit: number
+  isPreferred: boolean
+  createdAt: Timestamp
 }
 
 export interface KitchenBudget {
