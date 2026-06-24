@@ -35,6 +35,8 @@ interface PaperDoc {
   order: number
   createdAt?: unknown
   createdBy?: string
+  hasAudioCheck?: boolean
+  scoringScale?: 250 | 100
 }
 
 interface SectionDoc {
@@ -55,6 +57,10 @@ interface QuestionDoc {
   questionAudioUrl?: string
   options: { index: number; text: string; imageUrl?: string }[]
   correctIndex: number
+  languageMode?: 'en' | 'jp' | 'both'
+  questionTextJP?: string
+  questionTextEN?: string
+  audioPlayLimit?: number
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -118,6 +124,7 @@ export default function AdminExamsPage() {
   const [paperForm, setPaperForm] = useState({
     title: '', description: '', categoryId: 'japan-ssw',
     totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1,
+    hasAudioCheck: true, scoringScale: 250 as 250 | 100,
   })
   const [editingPaper, setEditingPaper] = useState<PaperDoc | null>(null)
   const [savingPaper, setSavingPaper] = useState(false)
@@ -128,6 +135,10 @@ export default function AdminExamsPage() {
     questionText: '',
     options: ['', '', '', ''],
     correctIndex: 1,
+    languageMode: 'both' as 'en' | 'jp' | 'both',
+    questionTextJP: '',
+    questionTextEN: '',
+    audioPlayLimit: 2,
   })
   const [qImageFile, setQImageFile] = useState<File | null>(null)
   const [qAudioFile, setQAudioFile] = useState<File | null>(null)
@@ -191,7 +202,7 @@ export default function AdminExamsPage() {
       }
       await loadPapers()
       setEditingPaper(null)
-      setPaperForm({ title: '', description: '', categoryId: 'japan-ssw', totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1 })
+      setPaperForm({ title: '', description: '', categoryId: 'japan-ssw', totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1, hasAudioCheck: true, scoringScale: 250 as 250 | 100 })
     } finally {
       setSavingPaper(false)
     }
@@ -264,6 +275,10 @@ export default function AdminExamsPage() {
         questionText: qForm.questionText.trim(),
         options: qForm.options.map((text, i) => ({ index: i + 1, text: text.trim() })).filter(o => o.text),
         correctIndex: qForm.correctIndex,
+        languageMode: qForm.languageMode ?? 'both',
+        ...(qForm.questionTextJP ? { questionTextJP: qForm.questionTextJP } : {}),
+        ...(qForm.questionTextEN ? { questionTextEN: qForm.questionTextEN } : {}),
+        audioPlayLimit: qForm.audioPlayLimit ?? 2,
         ...(questionImageUrl ? { questionImageUrl } : {}),
         ...(questionAudioUrl ? { questionAudioUrl } : {}),
       }
@@ -281,7 +296,7 @@ export default function AdminExamsPage() {
       }
 
       setEditingQ(null)
-      setQForm(f => ({ ...f, questionText: '', options: ['', '', '', ''], correctIndex: 1 }))
+      setQForm(f => ({ ...f, questionText: '', options: ['', '', '', ''], correctIndex: 1, languageMode: 'both', questionTextJP: '', questionTextEN: '', audioPlayLimit: 2 }))
       setQImageFile(null)
       setQAudioFile(null)
       await loadSectionsAndQuestions(paperId)
@@ -425,9 +440,36 @@ export default function AdminExamsPage() {
                   onChange={e => setPaperForm(f => ({ ...f, passMark: Number(e.target.value) }))} className={inputClass} />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">
+                  Scoring Scale
+                </label>
+                <select
+                  value={paperForm.scoringScale ?? 250}
+                  onChange={e => setPaperForm(f => ({ ...f, scoringScale: Number(e.target.value) as 250 | 100 }))}
+                  className={inputClass}
+                >
+                  <option value={250}>Out of 250 (JFT-Basic standard)</option>
+                  <option value={100}>Out of 100</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2 pt-5">
+                <input
+                  type="checkbox"
+                  id="hasAudioCheck"
+                  checked={paperForm.hasAudioCheck ?? true}
+                  onChange={e => setPaperForm(f => ({ ...f, hasAudioCheck: e.target.checked }))}
+                  className="h-4 w-4 accent-[#E8A020]"
+                />
+                <label htmlFor="hasAudioCheck" className="text-xs font-medium text-[#5A6A7A] dark:text-white/50">
+                  Audio check before exam
+                </label>
+              </div>
+            </div>
             <div className="flex gap-3">
               {editingPaper && (
-                <button type="button" onClick={() => { setEditingPaper(null); setPaperForm({ title: '', description: '', categoryId: 'japan-ssw', totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1 }) }}
+                <button type="button" onClick={() => { setEditingPaper(null); setPaperForm({ title: '', description: '', categoryId: 'japan-ssw', totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1, hasAudioCheck: true, scoringScale: 250 as 250 | 100 }) }}
                   className="flex-1 rounded-xl border border-[#DDE3EC] dark:border-white/20 py-2.5 text-sm font-semibold text-[#5A6A7A] dark:text-white/60">
                   Cancel
                 </button>
@@ -478,7 +520,7 @@ export default function AdminExamsPage() {
                         }`}>
                         {paper.isPublished ? 'Unpublish' : 'Publish'}
                       </button>
-                      <button type="button" onClick={() => { setEditingPaper(paper); setPaperForm({ title: paper.title, description: paper.description ?? '', categoryId: paper.categoryId, totalQuestions: paper.totalQuestions, timeLimitSeconds: paper.timeLimitSeconds, passMark: paper.passMark, order: paper.order }) }}
+                      <button type="button" onClick={() => { setEditingPaper(paper); setPaperForm({ title: paper.title, description: paper.description ?? '', categoryId: paper.categoryId, totalQuestions: paper.totalQuestions, timeLimitSeconds: paper.timeLimitSeconds, passMark: paper.passMark, order: paper.order, hasAudioCheck: paper.hasAudioCheck ?? true, scoringScale: (paper.scoringScale ?? 250) as 250 | 100 }) }}
                         className="rounded-lg border border-[#DDE3EC] dark:border-white/20 px-2 py-1 text-xs text-[#5A6A7A] dark:text-white/60">
                         Edit
                       </button>
@@ -541,6 +583,85 @@ export default function AdminExamsPage() {
                       style={{ fontFamily: "'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" }} />
                   </div>
 
+                  {/* Language mode selector */}
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">
+                      Language Display *
+                    </label>
+                    <div className="flex gap-2">
+                      {([
+                        { value: 'both', label: 'EN + JP', icon: 'ti-language' },
+                        { value: 'en', label: 'English Only', icon: 'ti-letter-e' },
+                        { value: 'jp', label: 'Japanese Only', icon: 'ti-letter-j' },
+                      ] as const).map(opt => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setQForm(f => ({ ...f, languageMode: opt.value }))}
+                          className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition-all ${
+                            qForm.languageMode === opt.value
+                              ? 'bg-[#0B3D6B] text-white'
+                              : 'border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/60'
+                          }`}
+                        >
+                          <span className={`ti ${opt.icon}`} />
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Japanese question text */}
+                  {(qForm.languageMode === 'jp' || qForm.languageMode === 'both') && (
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">
+                        Question Text (Japanese)
+                      </label>
+                      <textarea
+                        value={qForm.questionTextJP ?? ''}
+                        onChange={e => setQForm(f => ({ ...f, questionTextJP: e.target.value }))}
+                        rows={2}
+                        placeholder="日本語で質問を入力してください..."
+                        className={`${inputClass} resize-none`}
+                        style={{ fontFamily: "'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" }}
+                      />
+                    </div>
+                  )}
+
+                  {/* English question text */}
+                  {(qForm.languageMode === 'en' || qForm.languageMode === 'both') && (
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">
+                        Question Text (English)
+                      </label>
+                      <textarea
+                        value={qForm.questionTextEN ?? ''}
+                        onChange={e => setQForm(f => ({ ...f, questionTextEN: e.target.value }))}
+                        rows={2}
+                        placeholder="Enter question in English..."
+                        className={`${inputClass} resize-none`}
+                      />
+                    </div>
+                  )}
+
+                  {/* Audio play limit - only show if listening section */}
+                  {(qForm.sectionId && sections.find(s => s.id === qForm.sectionId)?.name?.toLowerCase().includes('listen')) && (
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">
+                        Audio Play Limit
+                      </label>
+                      <select
+                        value={qForm.audioPlayLimit ?? 2}
+                        onChange={e => setQForm(f => ({ ...f, audioPlayLimit: Number(e.target.value) }))}
+                        className={inputClass}
+                      >
+                        <option value={1}>1 play only</option>
+                        <option value={2}>2 plays (JFT standard)</option>
+                        <option value={3}>3 plays</option>
+                      </select>
+                    </div>
+                  )}
+
                   <div>
                     <label className="mb-2 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Answer Options</label>
                     <div className="space-y-2">
@@ -590,7 +711,7 @@ export default function AdminExamsPage() {
                     {editingQ && (
                       <button type="button" onClick={() => {
                         setEditingQ(null)
-                        setQForm(f => ({ ...f, questionText: '', options: ['','','',''], correctIndex: 1 }))
+                        setQForm(f => ({ ...f, questionText: '', options: ['','','',''], correctIndex: 1, languageMode: 'both', questionTextJP: '', questionTextEN: '', audioPlayLimit: 2 }))
                         setQImageFile(null)
                         setQAudioFile(null)
                       }}
@@ -717,6 +838,10 @@ export default function AdminExamsPage() {
                                   questionText: q.questionText,
                                   options: q.options.map(o => o.text).concat(['','','','']).slice(0,4),
                                   correctIndex: q.correctIndex,
+                                  languageMode: q.languageMode ?? 'both',
+                                  questionTextJP: q.questionTextJP ?? '',
+                                  questionTextEN: q.questionTextEN ?? '',
+                                  audioPlayLimit: q.audioPlayLimit ?? 2,
                                 })
                                 setQImageFile(null)
                                 setQAudioFile(null)

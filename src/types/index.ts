@@ -459,6 +459,9 @@ export interface ExamPaper {
   courseIds?: string[]
   isPublished?: boolean
   order?: number
+  hasAudioCheck?: boolean
+  scoringScale?: 250 | 100
+  sections?: string[]
 }
 
 export interface ReadingQuestion {
@@ -677,7 +680,7 @@ export interface BroadcastRecipient {
 export type StudyMode =
   | 'general'
   | 'japanese-grammar'
-  | 'japanese-vocab'
+  | 'japanese-vocabulary'
   | 'jlpt-practice'
   | 'ielts-writing'
   | 'ielts-speaking'
@@ -822,6 +825,21 @@ export interface ExamQuestion {
     imageUrl?: string
   }[]
   correctIndex: number
+  languageMode?: 'en' | 'jp' | 'both'
+  audioPlayLimit?: number
+  questionTextJP?: string
+  questionTextEN?: string
+}
+
+export interface ExamSectionDoc {
+  id: string
+  paperId: string
+  name: string
+  order: number
+  questionCount: number
+  sectionType?: 'script-vocab' | 'conversation' | 'listening' | 'reading' | 'general'
+  allowNavigation?: boolean
+  orderLocked?: boolean
 }
 
 export interface ExamAttemptAnswer {

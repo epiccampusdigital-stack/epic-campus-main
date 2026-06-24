@@ -25,6 +25,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Students', href: '/students', icon: 'ti-users', roles: ['admin', 'owner', 'reception', 'teacher'] },
   { label: 'CRM', href: '/crm', icon: 'ti-address-book', roles: ['admin', 'owner', 'reception'] },
   { label: 'Payments', href: '/payments', icon: 'ti-credit-card', roles: ['admin', 'owner', 'reception', 'accountant'] },
+  { label: 'Payment Tracker', href: '/payments/tracker', icon: 'ti-checkbox', roles: ['admin', 'owner', 'reception', 'accountant'] },
   { label: 'Utility Bills', href: '/utility-bills', icon: 'ti-receipt', roles: ['admin', 'owner', 'accountant'] },
   { label: 'Accommodation', href: '/accommodation', icon: 'ti-home', roles: ['admin', 'owner', 'accountant'] },
   {
@@ -54,6 +55,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Exam Manager', href: '/admin-exams', icon: 'ti-writing', roles: ['admin', 'owner', 'examCoordinator', 'teacher'] },
   { label: 'Materials', href: '/materials', icon: 'ti-book', roles: ['admin', 'owner', 'teacher'] },
   { label: 'Chat Logs', href: '/chat-logs', icon: 'ti-message-dots', roles: ['admin', 'owner'] },
+  { label: 'AI Importer', href: '/admin/import', icon: 'ti-sparkles', roles: ['admin', 'owner'] },
 ]
 
 export default function ManagementSidebar() {
