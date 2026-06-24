@@ -1,13 +1,6 @@
 {
   "indexes": [
     {
-      "collectionGroup": "epicWallPosts",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "epicWallComments",
       "queryScope": "COLLECTION",
       "fields": [
@@ -21,13 +14,6 @@
       "fields": [
         { "fieldPath": "userId", "order": "ASCENDING" },
         { "fieldPath": "postId", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "epicWallStories",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
@@ -100,13 +86,6 @@
       "fields": [
         { "fieldPath": "studentId", "order": "ASCENDING" },
         { "fieldPath": "paymentDate", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "studentPaymentPlans",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "studentId", "order": "ASCENDING" }
       ]
     },
     {
