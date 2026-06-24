@@ -46,6 +46,7 @@ export default function StudentPaymentsPage() {
   const [loading, setLoading] = useState(true)
   const [receiptPayment, setReceiptPayment] = useState<Payment | null>(null)
   const [payLoading, setPayLoading] = useState(false)
+  const [selectedFee, setSelectedFee] = useState<FeeOption | null>(null)
 
   // Build fee options from student's feeSchedule or fall back to defaults
   const feeOptions: FeeOption[] = (() => {
@@ -86,6 +87,10 @@ export default function StudentPaymentsPage() {
 
     load()
   }, [student])
+
+  async function handlePay(option: FeeOption) {
+    await handleStripePayment(option.amount, option.desc)
+  }
 
   async function handleStripePayment(amount: number, description: string) {
     if (!user || !student) return
@@ -139,21 +144,55 @@ export default function StudentPaymentsPage() {
           Pay your program fees securely via Stripe. Payments are processed in LKR.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {feeOptions.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              onClick={() => handleStripePayment(item.amount, item.desc)}
-              disabled={payLoading}
-              className="rounded-xl border border-gray-200 p-4 text-left transition-all hover:border-[#E8A020] hover:shadow-sm disabled:opacity-60"
-            >
-              <div className="font-semibold text-[#0B3D6B]">{item.label}</div>
-              <div className="mt-1 text-2xl font-black text-[#E8A020]">LKR {item.amount.toLocaleString()}</div>
-              <div className="mt-1 text-xs text-gray-400">{item.desc}</div>
-            </button>
-          ))}
+          {feeOptions.map((item) => {
+            const isSelected = selectedFee?.label === item.label
+            return (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => setSelectedFee(isSelected ? null : item)}
+                disabled={payLoading}
+                className={`w-full rounded-2xl border-2 p-5 text-left transition-all disabled:opacity-60 ${
+                  isSelected
+                    ? 'border-[#E8A020] bg-[#E8A020]/5 shadow-md'
+                    : 'border-[#DDE3EC] bg-white hover:border-[#E8A020] hover:shadow-md dark:border-white/20 dark:bg-white/[0.04]'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="font-semibold text-[#0B3D6B] dark:text-white">{item.label}</div>
+                  {isSelected && (
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#E8A020]">
+                      <span className="ti ti-check text-[10px] text-white" />
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 text-2xl font-black text-[#E8A020]">LKR {item.amount.toLocaleString()}</div>
+                <div className="mt-1 text-xs text-gray-400 dark:text-white/40">{item.desc}</div>
+              </button>
+            )
+          })}
         </div>
-        {payLoading && (
+        {selectedFee && (
+          <div className="mt-4 flex items-center gap-4 rounded-2xl border border-[#E8A020] bg-[#E8A020]/5 p-4">
+            <div className="flex-1">
+              <p className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">{selectedFee.label}</p>
+              <p className="text-sm text-[#5A6A7A] dark:text-white/50">LKR {selectedFee.amount.toLocaleString()} · {selectedFee.desc}</p>
+            </div>
+            <button
+              type="button"
+              disabled={payLoading}
+              onClick={() => void handlePay(selectedFee)}
+              className="flex items-center gap-2 rounded-xl bg-[#E8A020] px-6 py-3 font-jakarta font-bold text-[#0B3D6B] shadow-lg transition-all hover:bg-[#d4911c] disabled:opacity-50"
+            >
+              {payLoading ? (
+                <><span className="ti ti-loader-2 animate-spin" /> Processing…</>
+              ) : (
+                <><span className="ti ti-credit-card" /> Pay Now</>
+              )}
+            </button>
+          </div>
+        )}
+        {payLoading && !selectedFee && (
           <p className="mt-4 text-center text-sm text-gray-500">Redirecting to payment...</p>
         )}
       </div>

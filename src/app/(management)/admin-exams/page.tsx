@@ -1,0 +1,754 @@
+'use client'
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+  writeBatch,
+} from 'firebase/firestore'
+import {
+  getDownloadURL,
+  ref as storageRef,
+  uploadBytesResumable,
+} from 'firebase/storage'
+import { db, storage } from '@/lib/firebase/client'
+import { useManagement } from '@/components/layout/ManagementContext'
+
+// ── Local types ──────────────────────────────────────────────────────────────
+interface PaperDoc {
+  id: string
+  title: string
+  description?: string
+  categoryId: string
+  totalQuestions: number
+  timeLimitSeconds: number
+  passMark: number
+  isPublished: boolean
+  order: number
+  createdAt?: unknown
+  createdBy?: string
+}
+
+interface SectionDoc {
+  id: string
+  paperId: string
+  name: string
+  order: number
+  questionCount: number
+}
+
+interface QuestionDoc {
+  id: string
+  paperId: string
+  sectionId: string
+  order: number
+  questionText: string
+  questionImageUrl?: string
+  questionAudioUrl?: string
+  options: { index: number; text: string; imageUrl?: string }[]
+  correctIndex: number
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const DEFAULT_SECTIONS = ['語彙・文法 (Vocab & Grammar)', '読解 (Reading)', '聴解 (Listening)']
+
+// ── CSV parser ───────────────────────────────────────────────────────────────
+// Expected columns: section,question_text,option_1,option_2,option_3,option_4,correct_index
+// correct_index is 1-based (1,2,3, or 4)
+function parseCSV(text: string): Omit<QuestionDoc, 'id' | 'paperId' | 'sectionId'>[] {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+  if (lines.length < 2) return []
+  const rows = lines.slice(1) // skip header
+  return rows.map((line, i) => {
+    const cols: string[] = []
+    let cur = ''
+    let inQ = false
+    for (const ch of line) {
+      if (ch === '"') { inQ = !inQ; continue }
+      if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; continue }
+      cur += ch
+    }
+    cols.push(cur.trim())
+    const [, questionText = '', o1 = '', o2 = '', o3 = '', o4 = '', correctRaw = '1'] = cols
+    const correctIndex = Math.max(1, Math.min(4, parseInt(correctRaw, 10) || 1))
+    return {
+      order: i + 1,
+      questionText,
+      options: [
+        { index: 1, text: o1 },
+        { index: 2, text: o2 },
+        { index: 3, text: o3 },
+        { index: 4, text: o4 },
+      ].filter(o => o.text),
+      correctIndex,
+    }
+  }).filter(q => q.questionText)
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function Toast({ msg, onDone }: { msg: string; onDone: () => void }) {
+  useEffect(() => { const t = setTimeout(onDone, 3000); return () => clearTimeout(t) }, [onDone])
+  return (
+    <div className="fixed bottom-6 right-4 z-50 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-xl">
+      {msg}
+    </div>
+  )
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+export default function AdminExamsPage() {
+  const { user } = useManagement()
+  const [papers, setPapers] = useState<PaperDoc[]>([])
+  const [sections, setSections] = useState<SectionDoc[]>([])
+  const [questions, setQuestions] = useState<QuestionDoc[]>([])
+  const [loading, setLoading] = useState(true)
+  const [toast, setToast] = useState('')
+  const [activeTab, setActiveTab] = useState<'papers' | 'questions'>('papers')
+  const [selectedPaper, setSelectedPaper] = useState<PaperDoc | null>(null)
+
+  // Paper form
+  const [paperForm, setPaperForm] = useState({
+    title: '', description: '', categoryId: 'japan-ssw',
+    totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1,
+  })
+  const [editingPaper, setEditingPaper] = useState<PaperDoc | null>(null)
+  const [savingPaper, setSavingPaper] = useState(false)
+
+  // Question form
+  const [qForm, setQForm] = useState({
+    sectionId: '',
+    questionText: '',
+    options: ['', '', '', ''],
+    correctIndex: 1,
+  })
+  const [qImageFile, setQImageFile] = useState<File | null>(null)
+  const [qAudioFile, setQAudioFile] = useState<File | null>(null)
+  const [savingQ, setSavingQ] = useState(false)
+  const [editingQ, setEditingQ] = useState<QuestionDoc | null>(null)
+
+  // CSV upload
+  const [csvFile, setCsvFile] = useState<File | null>(null)
+  const [csvSectionId, setCsvSectionId] = useState('')
+  const [uploadingCsv, setUploadingCsv] = useState(false)
+  const [csvPreview, setCsvPreview] = useState<ReturnType<typeof parseCSV>>([])
+  const csvRef = useRef<HTMLInputElement>(null)
+
+  // ── Load ────────────────────────────────────────────────────────────────────
+  const loadPapers = useCallback(async () => {
+    const snap = await getDocs(query(collection(db, 'examPapers'), orderBy('order', 'asc')))
+    setPapers(snap.docs.map(d => ({ id: d.id, ...d.data() } as PaperDoc)))
+  }, [])
+
+  const loadSectionsAndQuestions = useCallback(async (paperId: string) => {
+    const [secSnap, qSnap] = await Promise.all([
+      getDocs(query(collection(db, 'examSections'), where('paperId', '==', paperId), orderBy('order', 'asc'))),
+      getDocs(query(collection(db, 'examQuestions'), where('paperId', '==', paperId), orderBy('order', 'asc'))),
+    ])
+    const secs = secSnap.docs.map(d => ({ id: d.id, ...d.data() } as SectionDoc))
+    setSections(secs)
+    setQuestions(qSnap.docs.map(d => ({ id: d.id, ...d.data() } as QuestionDoc)))
+    // Only set the section if none is selected yet
+    if (secs.length > 0) setQForm(f => ({ ...f, sectionId: f.sectionId || secs[0].id }))
+  }, [])
+
+  useEffect(() => {
+    void loadPapers().finally(() => setLoading(false))
+  }, [loadPapers])
+
+  useEffect(() => {
+    if (selectedPaper) void loadSectionsAndQuestions(selectedPaper.id)
+  }, [selectedPaper, loadSectionsAndQuestions])
+
+  // ── Paper CRUD ──────────────────────────────────────────────────────────────
+  async function handleSavePaper() {
+    if (!user || !paperForm.title.trim()) return
+    setSavingPaper(true)
+    try {
+      const payload = {
+        ...paperForm,
+        isPublished: editingPaper?.isPublished ?? false,
+        createdBy: user.uid,
+        updatedAt: serverTimestamp(),
+      }
+      if (editingPaper) {
+        await updateDoc(doc(db, 'examPapers', editingPaper.id), payload)
+        setToast('Paper updated')
+      } else {
+        await addDoc(collection(db, 'examPapers'), {
+          ...payload,
+          isPublished: false,
+          createdAt: serverTimestamp(),
+        })
+        setToast('Paper created')
+      }
+      await loadPapers()
+      setEditingPaper(null)
+      setPaperForm({ title: '', description: '', categoryId: 'japan-ssw', totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1 })
+    } finally {
+      setSavingPaper(false)
+    }
+  }
+
+  async function handleTogglePublish(paper: PaperDoc) {
+    await updateDoc(doc(db, 'examPapers', paper.id), { isPublished: !paper.isPublished })
+    setToast(paper.isPublished ? 'Paper unpublished' : 'Paper published — students can now see it')
+    await loadPapers()
+  }
+
+  async function handleDeletePaper(paper: PaperDoc) {
+    if (!confirm(`Delete "${paper.title}" and all its questions? This cannot be undone.`)) return
+    const [secSnap, qSnap] = await Promise.all([
+      getDocs(query(collection(db, 'examSections'), where('paperId', '==', paper.id))),
+      getDocs(query(collection(db, 'examQuestions'), where('paperId', '==', paper.id))),
+    ])
+    const batch = writeBatch(db)
+    secSnap.docs.forEach(d => batch.delete(d.ref))
+    qSnap.docs.forEach(d => batch.delete(d.ref))
+    batch.delete(doc(db, 'examPapers', paper.id))
+    await batch.commit()
+    if (selectedPaper?.id === paper.id) setSelectedPaper(null)
+    setToast('Paper deleted')
+    await loadPapers()
+  }
+
+  // ── Auto-create default sections ────────────────────────────────────────────
+  async function ensureDefaultSections(paperId: string) {
+    const snap = await getDocs(query(collection(db, 'examSections'), where('paperId', '==', paperId)))
+    if (snap.empty) {
+      const batch = writeBatch(db)
+      DEFAULT_SECTIONS.forEach((name, i) => {
+        const ref = doc(collection(db, 'examSections'))
+        batch.set(ref, { paperId, name, order: i + 1, questionCount: 0 })
+      })
+      await batch.commit()
+      await loadSectionsAndQuestions(paperId)
+    }
+  }
+
+  // ── Question CRUD ───────────────────────────────────────────────────────────
+  async function uploadFile(file: File, path: string) {
+    const r = storageRef(storage, path)
+    const task = uploadBytesResumable(r, file)
+    await new Promise<void>((res, rej) => task.on('state_changed', null, rej, res))
+    return getDownloadURL(r)
+  }
+
+  async function handleSaveQuestion() {
+    if (!user || !selectedPaper || !qForm.questionText.trim() || !qForm.sectionId) return
+    if (qForm.options.filter(Boolean).length < 2) { setToast('Add at least 2 options'); return }
+    setSavingQ(true)
+    const paper = selectedPaper
+    try {
+      const paperId = paper.id
+      const qId = editingQ?.id ?? doc(collection(db, 'examQuestions')).id
+      const ext = (f: File) => f.name.split('.').pop() ?? 'bin'
+      const questionImageUrl = qImageFile
+        ? await uploadFile(qImageFile, `examQuestions/${paperId}/${qId}/question.${ext(qImageFile)}`)
+        : editingQ?.questionImageUrl
+      const questionAudioUrl = qAudioFile
+        ? await uploadFile(qAudioFile, `examQuestions/${paperId}/${qId}/audio.${ext(qAudioFile)}`)
+        : editingQ?.questionAudioUrl
+
+      const payload: Omit<QuestionDoc, 'id'> = {
+        paperId,
+        sectionId: qForm.sectionId,
+        order: editingQ?.order ?? questions.length + 1,
+        questionText: qForm.questionText.trim(),
+        options: qForm.options.map((text, i) => ({ index: i + 1, text: text.trim() })).filter(o => o.text),
+        correctIndex: qForm.correctIndex,
+        ...(questionImageUrl ? { questionImageUrl } : {}),
+        ...(questionAudioUrl ? { questionAudioUrl } : {}),
+      }
+
+      if (editingQ) {
+        await updateDoc(doc(db, 'examQuestions', editingQ.id), payload)
+        setToast('Question updated')
+      } else {
+        await addDoc(collection(db, 'examQuestions'), payload)
+        const secRef = doc(db, 'examSections', qForm.sectionId)
+        const secQs = questions.filter(q => q.sectionId === qForm.sectionId)
+        await updateDoc(secRef, { questionCount: secQs.length + 1 })
+        await updateDoc(doc(db, 'examPapers', paperId), { totalQuestions: questions.length + 1 })
+        setToast('Question added')
+      }
+
+      setEditingQ(null)
+      setQForm(f => ({ ...f, questionText: '', options: ['', '', '', ''], correctIndex: 1 }))
+      setQImageFile(null)
+      setQAudioFile(null)
+      await loadSectionsAndQuestions(paperId)
+    } finally {
+      setSavingQ(false)
+    }
+  }
+
+  async function handleDeleteQuestion(q: QuestionDoc) {
+    const paper = selectedPaper
+    if (!paper) return
+    await deleteDoc(doc(db, 'examQuestions', q.id))
+    await updateDoc(doc(db, 'examPapers', paper.id), { totalQuestions: Math.max(0, questions.length - 1) })
+    setToast('Question deleted')
+    await loadSectionsAndQuestions(paper.id)
+  }
+
+  // ── CSV bulk upload ──────────────────────────────────────────────────────────
+  function handleCsvChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCsvFile(file)
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const text = ev.target?.result as string
+      setCsvPreview(parseCSV(text))
+    }
+    reader.readAsText(file)
+  }
+
+  async function handleCsvUpload() {
+    const paper = selectedPaper
+    if (!csvFile || !paper || !csvSectionId || csvPreview.length === 0) return
+    setUploadingCsv(true)
+    try {
+      const batch = writeBatch(db)
+      const startOrder = questions.length
+      csvPreview.forEach((q, i) => {
+        const ref = doc(collection(db, 'examQuestions'))
+        batch.set(ref, {
+          paperId: paper.id,
+          sectionId: csvSectionId,
+          order: startOrder + i + 1,
+          questionText: q.questionText,
+          options: q.options,
+          correctIndex: q.correctIndex,
+        })
+      })
+      await batch.commit()
+      await updateDoc(doc(db, 'examPapers', paper.id), {
+        totalQuestions: questions.length + csvPreview.length,
+      })
+      const secQs = questions.filter(q => q.sectionId === csvSectionId)
+      await updateDoc(doc(db, 'examSections', csvSectionId), {
+        questionCount: secQs.length + csvPreview.length,
+      })
+      setCsvFile(null)
+      setCsvPreview([])
+      setCsvSectionId('')
+      if (csvRef.current) csvRef.current.value = ''
+      setToast(`${csvPreview.length} questions imported!`)
+      await loadSectionsAndQuestions(paper.id)
+    } finally {
+      setUploadingCsv(false)
+    }
+  }
+
+  const inputClass = 'w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] px-3 py-2.5 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020]'
+
+  return (
+    <div className="space-y-6">
+      {toast && <Toast msg={toast} onDone={() => setToast('')} />}
+
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white">Exam Manager</h1>
+          <p className="text-sm text-[#5A6A7A] dark:text-white/50">Build SSW / JFT exam papers for students</p>
+        </div>
+        <div className="flex gap-2">
+          {(['papers', 'questions'] as const).map(tab => (
+            <button key={tab} type="button" onClick={() => setActiveTab(tab)}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold capitalize transition-all ${
+                activeTab === tab ? 'bg-[#E8A020] text-white' : 'border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/60'
+              }`}>
+              {tab}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── PAPERS TAB ──────────────────────────────────────────────────────── */}
+      {activeTab === 'papers' && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Form */}
+          <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-6 space-y-4">
+            <h2 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">
+              {editingPaper ? 'Edit Paper' : 'Create New Paper'}
+            </h2>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Paper Title *</label>
+              <input value={paperForm.title} onChange={e => setPaperForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="e.g. JFT-Basic Paper 1" className={inputClass} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Description</label>
+              <textarea value={paperForm.description} onChange={e => setPaperForm(f => ({ ...f, description: e.target.value }))}
+                rows={2} className={`${inputClass} resize-none`} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Category ID</label>
+                <select value={paperForm.categoryId} onChange={e => setPaperForm(f => ({ ...f, categoryId: e.target.value }))} className={inputClass}>
+                  <option value="japan-ssw">Japan SSW</option>
+                  <option value="jft-basic">JFT Basic</option>
+                  <option value="korea">Korea TOPIK</option>
+                  <option value="ielts">IELTS</option>
+                  <option value="general">General</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Display Order</label>
+                <input type="number" min={1} value={paperForm.order}
+                  onChange={e => setPaperForm(f => ({ ...f, order: Number(e.target.value) }))} className={inputClass} />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Questions</label>
+                <input type="number" min={1} value={paperForm.totalQuestions}
+                  onChange={e => setPaperForm(f => ({ ...f, totalQuestions: Number(e.target.value) }))} className={inputClass} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Time (min)</label>
+                <input type="number" min={10} value={Math.round(paperForm.timeLimitSeconds / 60)}
+                  onChange={e => setPaperForm(f => ({ ...f, timeLimitSeconds: Number(e.target.value) * 60 }))} className={inputClass} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Pass %</label>
+                <input type="number" min={1} max={100} value={paperForm.passMark}
+                  onChange={e => setPaperForm(f => ({ ...f, passMark: Number(e.target.value) }))} className={inputClass} />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              {editingPaper && (
+                <button type="button" onClick={() => { setEditingPaper(null); setPaperForm({ title: '', description: '', categoryId: 'japan-ssw', totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1 }) }}
+                  className="flex-1 rounded-xl border border-[#DDE3EC] dark:border-white/20 py-2.5 text-sm font-semibold text-[#5A6A7A] dark:text-white/60">
+                  Cancel
+                </button>
+              )}
+              <button type="button" disabled={savingPaper || !paperForm.title.trim()} onClick={() => void handleSavePaper()}
+                className="flex-1 rounded-xl bg-[#E8A020] py-2.5 text-sm font-bold text-[#0B3D6B] hover:bg-[#d4911c] disabled:opacity-50">
+                {savingPaper ? 'Saving…' : editingPaper ? 'Update Paper' : 'Create Paper'}
+              </button>
+            </div>
+          </div>
+
+          {/* Papers list */}
+          <div className="space-y-3">
+            <h2 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">
+              Papers ({papers.length})
+            </h2>
+            {loading ? (
+              [1,2].map(i => <div key={i} className="h-20 animate-pulse rounded-xl bg-[#DDE3EC] dark:bg-white/10" />)
+            ) : papers.length === 0 ? (
+              <div className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] py-10 text-center text-sm text-[#5A6A7A]">
+                No papers yet — create the first one
+              </div>
+            ) : (
+              papers.map(paper => (
+                <div key={paper.id} className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-jakarta font-bold text-[#0D1B2A] dark:text-white truncate">{paper.title}</p>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          paper.isPublished ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-[#DDE3EC] dark:bg-white/20 text-[#5A6A7A] dark:text-white/40'
+                        }`}>
+                          {paper.isPublished ? 'Published' : 'Draft'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#5A6A7A] dark:text-white/40 mt-0.5">
+                        {paper.totalQuestions}Q · {Math.round((paper.timeLimitSeconds ?? 3600)/60)}min · Pass {paper.passMark}% · Order #{paper.order}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 gap-1 flex-wrap justify-end">
+                      <button type="button" onClick={() => { setSelectedPaper(paper); setActiveTab('questions'); void ensureDefaultSections(paper.id) }}
+                        className="rounded-lg border border-[#DDE3EC] dark:border-white/20 px-2 py-1 text-xs font-semibold text-[#0B3D6B] dark:text-white/70">
+                        Questions
+                      </button>
+                      <button type="button" onClick={() => void handleTogglePublish(paper)}
+                        className={`rounded-lg px-2 py-1 text-xs font-semibold ${
+                          paper.isPublished ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                        }`}>
+                        {paper.isPublished ? 'Unpublish' : 'Publish'}
+                      </button>
+                      <button type="button" onClick={() => { setEditingPaper(paper); setPaperForm({ title: paper.title, description: paper.description ?? '', categoryId: paper.categoryId, totalQuestions: paper.totalQuestions, timeLimitSeconds: paper.timeLimitSeconds, passMark: paper.passMark, order: paper.order }) }}
+                        className="rounded-lg border border-[#DDE3EC] dark:border-white/20 px-2 py-1 text-xs text-[#5A6A7A] dark:text-white/60">
+                        Edit
+                      </button>
+                      <button type="button" onClick={() => void handleDeletePaper(paper)}
+                        className="rounded-lg border border-red-200 dark:border-red-800 px-2 py-1 text-xs text-red-600 dark:text-red-400">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── QUESTIONS TAB ───────────────────────────────────────────────────── */}
+      {activeTab === 'questions' && (
+        <div className="space-y-5">
+          {/* Paper selector */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="text-xs font-medium text-[#5A6A7A] dark:text-white/50">Paper:</label>
+            <select value={selectedPaper?.id ?? ''} onChange={e => {
+              const p = papers.find(x => x.id === e.target.value) ?? null
+              setSelectedPaper(p)
+              if (p) void ensureDefaultSections(p.id)
+            }} className="rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] px-3 py-2 text-sm dark:text-white outline-none focus:border-[#E8A020]">
+              <option value="">— Select a paper —</option>
+              {papers.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+            </select>
+            {selectedPaper && (
+              <span className="text-xs text-[#5A6A7A] dark:text-white/40">
+                {questions.length} question{questions.length !== 1 ? 's' : ''} total
+              </span>
+            )}
+          </div>
+
+          {selectedPaper && (
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* Left: Add / Edit question form */}
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5 space-y-4">
+                  <h2 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">
+                    {editingQ ? 'Edit Question' : 'Add Question'}
+                  </h2>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Section *</label>
+                    <select value={qForm.sectionId} onChange={e => setQForm(f => ({ ...f, sectionId: e.target.value }))} className={inputClass}>
+                      <option value="">— Select section —</option>
+                      {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Question Text * (supports Japanese)</label>
+                    <textarea value={qForm.questionText} onChange={e => setQForm(f => ({ ...f, questionText: e.target.value }))}
+                      rows={3} placeholder="Enter question text in Japanese or English..."
+                      className={`${inputClass} resize-none`}
+                      style={{ fontFamily: "'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" }} />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Answer Options</label>
+                    <div className="space-y-2">
+                      {qForm.options.map((opt, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold border-2 ${
+                            qForm.correctIndex === i + 1 ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-[#DDE3EC] dark:border-white/30 text-[#5A6A7A]'
+                          }`}>
+                            {['A','B','C','D'][i]}
+                          </div>
+                          <input value={opt} onChange={e => setQForm(f => ({ ...f, options: f.options.map((o, j) => j === i ? e.target.value : o) }))}
+                            placeholder={`Option ${['A','B','C','D'][i]}`}
+                            className={inputClass}
+                            style={{ fontFamily: "'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" }} />
+                          <button type="button" onClick={() => setQForm(f => ({ ...f, correctIndex: i + 1 }))}
+                            className={`shrink-0 rounded-lg px-2 py-1.5 text-[10px] font-bold transition-all ${
+                              qForm.correctIndex === i + 1 ? 'bg-emerald-500 text-white' : 'border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/50'
+                            }`}>
+                            {qForm.correctIndex === i + 1 ? '✓ Correct' : 'Set correct'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-1.5 text-xs text-[#5A6A7A] dark:text-white/40">Click &ldquo;Set correct&rdquo; to mark the right answer</p>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Question Image (optional)</label>
+                    <input type="file" accept="image/*" onChange={e => setQImageFile(e.target.files?.[0] ?? null)}
+                      className="text-xs text-[#5A6A7A] dark:text-white/50" />
+                    {(qImageFile ?? editingQ?.questionImageUrl) && (
+                      <img src={qImageFile ? URL.createObjectURL(qImageFile) : editingQ?.questionImageUrl}
+                        alt="" className="mt-2 h-24 rounded-xl object-contain border border-[#DDE3EC]" />
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Question Audio (optional · max 3 plays for students)</label>
+                    <input type="file" accept="audio/*" onChange={e => setQAudioFile(e.target.files?.[0] ?? null)}
+                      className="text-xs text-[#5A6A7A] dark:text-white/50" />
+                    {editingQ?.questionAudioUrl && !qAudioFile && (
+                      <audio src={editingQ.questionAudioUrl} controls className="mt-2 h-8 w-full" />
+                    )}
+                  </div>
+
+                  <div className="flex gap-3">
+                    {editingQ && (
+                      <button type="button" onClick={() => {
+                        setEditingQ(null)
+                        setQForm(f => ({ ...f, questionText: '', options: ['','','',''], correctIndex: 1 }))
+                        setQImageFile(null)
+                        setQAudioFile(null)
+                      }}
+                        className="flex-1 rounded-xl border border-[#DDE3EC] dark:border-white/20 py-2.5 text-sm font-semibold text-[#5A6A7A] dark:text-white/60">
+                        Cancel
+                      </button>
+                    )}
+                    <button type="button" disabled={savingQ || !qForm.questionText.trim() || !qForm.sectionId}
+                      onClick={() => void handleSaveQuestion()}
+                      className="flex-1 rounded-xl bg-[#E8A020] py-2.5 text-sm font-bold text-[#0B3D6B] hover:bg-[#d4911c] disabled:opacity-50">
+                      {savingQ ? 'Saving…' : editingQ ? 'Update Question' : 'Add Question'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* CSV bulk upload */}
+                <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="ti ti-table-import text-[#E8A020] text-lg" />
+                    <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">Bulk CSV Upload</h3>
+                  </div>
+                  <p className="text-xs text-[#5A6A7A] dark:text-white/50">
+                    CSV format: <code className="rounded bg-[#F5F7FB] dark:bg-white/[0.06] px-1 py-0.5">section,question_text,option_1,option_2,option_3,option_4,correct_index</code>
+                  </p>
+                  <a href="data:text/csv;charset=utf-8,section%2Cquestion_text%2Coption_1%2Coption_2%2Coption_3%2Coption_4%2Ccorrect_index%0A%E8%AA%9E%E5%BD%99%2C%E4%BE%8B%E6%96%87%E3%81%A7%E3%81%99%2C%E9%81%B8%E6%8A%9E%E8%82%A21%2C%E9%81%B8%E6%8A%9E%E8%82%A22%2C%E9%81%B8%E6%8A%9E%E8%82%A23%2C%E9%81%B8%E6%8A%9E%E8%82%A24%2C1"
+                    download="epic_exam_template.csv"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#F5F7FB] dark:bg-white/[0.06] px-3 py-1.5 text-xs font-semibold text-[#0B3D6B] dark:text-white/70">
+                    <span className="ti ti-download" />
+                    Download Template
+                  </a>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Target Section</label>
+                    <select value={csvSectionId} onChange={e => setCsvSectionId(e.target.value)} className={inputClass}>
+                      <option value="">— Select section —</option>
+                      {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <input ref={csvRef} type="file" accept=".csv,text/csv" onChange={handleCsvChange}
+                    className="text-xs text-[#5A6A7A] dark:text-white/50" />
+                  {csvPreview.length > 0 && (
+                    <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-4 py-2.5">
+                      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                        {csvPreview.length} questions detected — preview first 3:
+                      </p>
+                      {csvPreview.slice(0,3).map((q,i) => (
+                        <p key={i} className="mt-1 text-xs text-emerald-600 dark:text-emerald-500 truncate">
+                          {i+1}. {q.questionText}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  <button type="button"
+                    disabled={uploadingCsv || csvPreview.length === 0 || !csvSectionId}
+                    onClick={() => void handleCsvUpload()}
+                    className="w-full rounded-xl bg-[#0B3D6B] py-2.5 text-sm font-bold text-white hover:bg-[#1A6BAD] disabled:opacity-50">
+                    {uploadingCsv ? 'Importing…' : `Import ${csvPreview.length} Questions`}
+                  </button>
+                </div>
+              </div>
+
+              {/* Right: Questions list */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h2 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">
+                    Questions ({questions.length})
+                  </h2>
+                  <div className="flex gap-1.5 overflow-x-auto">
+                    {sections.map(s => (
+                      <button key={s.id} type="button"
+                        onClick={() => setQForm(f => ({ ...f, sectionId: s.id }))}
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold transition-all ${
+                          qForm.sectionId === s.id ? 'bg-[#0B3D6B] text-white' : 'border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/50'
+                        }`}>
+                        {s.name.split(' ')[0]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {questions.length === 0 ? (
+                  <div className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] py-10 text-center text-sm text-[#5A6A7A] dark:text-white/40">
+                    No questions yet — add one above or import CSV
+                  </div>
+                ) : (
+                  questions
+                    .filter(q => !qForm.sectionId || q.sectionId === qForm.sectionId)
+                    .map((q, idx) => {
+                      const section = sections.find(s => s.id === q.sectionId)
+                      return (
+                        <div key={q.id} className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#0B3D6B] text-[9px] font-bold text-white">
+                                  {idx + 1}
+                                </span>
+                                <span className="rounded-full bg-[#F5F7FB] dark:bg-white/[0.06] px-2 py-0.5 text-[10px] text-[#5A6A7A] dark:text-white/40">
+                                  {section?.name ?? 'Unknown'}
+                                </span>
+                                {q.questionAudioUrl && <span className="ti ti-volume text-[#E8A020] text-xs" />}
+                                {q.questionImageUrl && <span className="ti ti-photo text-[#1A6BAD] text-xs" />}
+                              </div>
+                              <p className="text-sm text-[#0D1B2A] dark:text-white line-clamp-2"
+                                style={{ fontFamily: "'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" }}>
+                                {q.questionText}
+                              </p>
+                              <div className="mt-1.5 flex gap-2 flex-wrap">
+                                {q.options.map(o => (
+                                  <span key={o.index} className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                                    o.index === q.correctIndex
+                                      ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                                      : 'bg-[#F5F7FB] dark:bg-white/[0.06] text-[#5A6A7A] dark:text-white/40'
+                                  }`}>
+                                    {['A','B','C','D'][o.index-1]}: {o.text.slice(0, 20)}{o.text.length > 20 ? '…' : ''}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 gap-1">
+                              <button type="button" onClick={() => {
+                                setEditingQ(q)
+                                setQForm({
+                                  sectionId: q.sectionId,
+                                  questionText: q.questionText,
+                                  options: q.options.map(o => o.text).concat(['','','','']).slice(0,4),
+                                  correctIndex: q.correctIndex,
+                                })
+                                setQImageFile(null)
+                                setQAudioFile(null)
+                              }} className="rounded-lg border border-[#DDE3EC] dark:border-white/20 px-2 py-1 text-xs text-[#5A6A7A] dark:text-white/60">
+                                Edit
+                              </button>
+                              <button type="button" onClick={() => void handleDeleteQuestion(q)}
+                                className="rounded-lg border border-red-200 dark:border-red-800 px-2 py-1 text-xs text-red-600 dark:text-red-400">
+                                Del
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })
+                )}
+              </div>
+            </div>
+          )}
+
+          {!selectedPaper && (
+            <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] py-16 text-center">
+              <span className="ti ti-file-text text-4xl text-[#DDE3EC]" />
+              <p className="mt-3 text-sm text-[#5A6A7A] dark:text-white/50">Select a paper above to manage its questions</p>
+              <button type="button" onClick={() => setActiveTab('papers')}
+                className="mt-3 text-xs text-[#E8A020] font-semibold">
+                Go to Papers tab →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}

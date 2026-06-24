@@ -1,44 +1,52 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    match /students/{studentId}/photo.{ext} {
+    match /students/{studentId}/{allPaths=**} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null &&
-        request.auth.uid == studentId;
+      allow write: if request.auth != null && request.auth.uid == studentId;
     }
-    match /visaDocs/{studentId}/{fileName} {
+    match /staff/{staffId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (
+        request.auth.uid == staffId ||
+        request.auth.token.role in ['admin','owner']
+      );
+    }
+    match /visaDocs/{studentId}/{allPaths=**} {
       allow read: if request.auth != null && (
         request.auth.uid == studentId ||
-        request.auth.token.role in ['admin', 'owner', 'reception', 'accountant']
+        request.auth.token.role in ['admin','owner','reception','accountant']
       );
-      allow write: if request.auth != null &&
-        request.auth.uid == studentId;
+      allow write: if request.auth != null && request.auth.uid == studentId;
       allow delete: if request.auth != null && (
         request.auth.uid == studentId ||
-        request.auth.token.role in ['admin', 'owner', 'reception']
+        request.auth.token.role in ['admin','owner','reception']
       );
     }
-    match /epicWall/{userId}/{fileName} {
+    match /epicWall/{allPaths=**} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null &&
-        request.auth.uid == userId;
+      allow write: if request.auth != null;
       allow delete: if request.auth != null && (
-        request.auth.uid == userId ||
-        request.auth.token.role in ['admin', 'owner']
+        request.auth.token.role in ['admin','owner'] ||
+        resource.name.matches('.*/' + request.auth.uid + '/.*')
       );
     }
-    match /epicStories/{userId}/{fileName} {
+    match /epicStories/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+      allow delete: if request.auth != null && (
+        request.auth.token.role in ['admin','owner'] ||
+        resource.name.matches('.*/' + request.auth.uid + '/.*')
+      );
+    }
+    match /examQuestions/{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null &&
-        request.auth.uid == userId;
-      allow delete: if request.auth != null && (
-        request.auth.uid == userId ||
-        request.auth.token.role in ['admin', 'owner']
-      );
+        request.auth.token.role in ['admin','owner','teacher','examCoordinator'];
     }
     match /kitchen/{allPaths=**} {
       allow read, write: if request.auth != null &&
-        request.auth.token.role in ['admin', 'owner', 'kitchen'];
+        request.auth.token.role in ['admin','owner','kitchen'];
     }
   }
 }

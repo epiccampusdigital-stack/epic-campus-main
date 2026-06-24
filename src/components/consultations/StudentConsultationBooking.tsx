@@ -91,34 +91,47 @@ export default function StudentConsultationBooking() {
   const loadData = useCallback(async () => {
     if (!student) return
     setLoading(true)
+    setError('')
     try {
       const today = new Date().toISOString().slice(0, 10)
 
-      const [slotsSnap, bookingsSnap] = await Promise.all([
-        getDocs(
+      // Try date-filtered query first (needs composite index); fall back to full
+      // collection fetch; fall back to empty array — never surface a red error
+      // banner for an index / permission issue.
+      let allSlots: RoomSlot[] = []
+      try {
+        const snap = await getDocs(
           query(
             collection(db, 'roomSlots'),
             where('date', '>=', today),
             orderBy('date', 'asc'),
           ),
-        ).catch(() => getDocs(collection(db, 'roomSlots'))),
-        getDocs(
+        )
+        allSlots = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RoomSlot, 'id'>) }))
+      } catch {
+        try {
+          const snap = await getDocs(collection(db, 'roomSlots'))
+          allSlots = snap.docs
+            .map((d) => ({ id: d.id, ...(d.data() as Omit<RoomSlot, 'id'>) }))
+            .filter((s) => s.date >= today)
+            .sort((a, b) => a.date.localeCompare(b.date))
+        } catch {
+          allSlots = []
+        }
+      }
+
+      let myBookings: RoomBooking[] = []
+      try {
+        const snap = await getDocs(
           query(
             collection(db, 'roomBookings'),
             where('studentId', '==', student.id),
           ),
-        ),
-      ])
-
-      const allSlots = slotsSnap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<RoomSlot, 'id'>),
-      }))
-
-      const myBookings = bookingsSnap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<RoomBooking, 'id'>),
-      }))
+        )
+        myBookings = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<RoomBooking, 'id'>) }))
+      } catch {
+        myBookings = []
+      }
 
       const bookedSlotIds = new Set(
         myBookings
@@ -130,7 +143,9 @@ export default function StudentConsultationBooking() {
       setBookings(myBookings.sort((a, b) => b.date.localeCompare(a.date)))
     } catch (err) {
       console.error('[RoomBooking]', err)
-      setError('Failed to load booking data.')
+      // Non-fatal: show empty-state UI rather than a red error banner
+      setSlots([])
+      setBookings([])
     } finally {
       setLoading(false)
     }

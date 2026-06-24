@@ -47,7 +47,7 @@ const EMPTY: StaffFormValues = {
   email: '',
   address: '',
   role: 'teacher',
-  status: 'pending',
+  status: 'active',
   startDate: new Date().toISOString().slice(0, 10),
   salaryType: 'fixed',
   baseSalary: '',
@@ -437,12 +437,24 @@ export default function StaffForm({
                     disabled={isView}
                     className={inputClass}
                   >
-                    <option value="active">Active</option>
-                    <option value="pending">Pending</option>
+                    <option value="active">Active — creates login account immediately</option>
+                    <option value="pending">Pending — no login until approved</option>
                     <option value="suspended">Suspended</option>
                   </select>
                 </div>
               </div>
+              {form.status === 'active' && !isEdit && (
+                <p className="mt-1.5 text-xs text-emerald-600 flex items-center gap-1">
+                  <span className="ti ti-info-circle" />
+                  A login account will be created and credentials emailed automatically.
+                </p>
+              )}
+              {form.status === 'pending' && !isEdit && (
+                <p className="mt-1.5 text-xs text-amber-600 flex items-center gap-1">
+                  <span className="ti ti-info-circle" />
+                  Staff will be saved without a login. Use Approve on the staff list to activate later.
+                </p>
+              )}
 
               <div>
                 <FieldLabel>Start Date</FieldLabel>

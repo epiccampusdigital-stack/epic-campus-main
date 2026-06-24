@@ -38,6 +38,46 @@ interface PracticeQuestion {
 }
 
 const MODEL = 'claude-haiku-4-5-20251001'
+
+function renderMarkdown(text: string): string {
+  return text
+    // Code blocks (must come before inline code)
+    .replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre class="mt-2 mb-2 rounded-xl bg-[#0B3D6B]/10 dark:bg-white/[0.06] p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap">$1</pre>')
+    // Headers
+    .replace(/^### (.+)$/gm, '<h3 class="text-sm font-bold text-[#0B3D6B] dark:text-[#E8A020] mt-3 mb-1">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 class="text-sm font-bold text-[#0B3D6B] dark:text-[#E8A020] mt-4 mb-1">$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1 class="text-base font-bold text-[#0B3D6B] dark:text-[#E8A020] mt-4 mb-2">$1</h1>')
+    // Bold
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold">$1</strong>')
+    // Italic
+    .replace(/\*(.+?)\*/g, '<em class="italic">$1</em>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code class="rounded bg-[#0B3D6B]/10 dark:bg-white/10 px-1.5 py-0.5 text-xs font-mono text-[#0B3D6B] dark:text-[#E8A020]">$1</code>')
+    // Horizontal rule
+    .replace(/^---$/gm, '<hr class="my-3 border-[#DDE3EC] dark:border-white/20" />')
+    // Tables
+    .replace(/\|(.+)\|\n\|[-| :]+\|\n((?:\|.+\|\n?)*)/g, (_: string, header: string, body: string) => {
+      const heads = header.split('|').map((h: string) => h.trim()).filter(Boolean)
+      const rows = body.trim().split('\n').map((r: string) =>
+        r.split('|').map((c: string) => c.trim()).filter(Boolean)
+      )
+      const headHtml = heads.map((h: string) => `<th class="px-3 py-2 text-left text-xs font-bold text-[#0B3D6B] dark:text-[#E8A020] border-b border-[#DDE3EC] dark:border-white/20">${h}</th>`).join('')
+      const rowHtml = rows.map((cells: string[]) =>
+        `<tr class="border-b border-[#DDE3EC]/50 dark:border-white/10">${cells.map((c: string) => `<td class="px-3 py-2 text-xs">${c}</td>`).join('')}</tr>`
+      ).join('')
+      return `<div class="overflow-x-auto my-2"><table class="w-full text-left rounded-xl overflow-hidden border border-[#DDE3EC] dark:border-white/20"><thead><tr>${headHtml}</tr></thead><tbody>${rowHtml}</tbody></table></div>`
+    })
+    // Unordered lists
+    .replace(/^[-•] (.+)$/gm, '<li class="ml-4 list-disc text-sm leading-relaxed">$1</li>')
+    .replace(/(<li[\s\S]*?<\/li>)+/g, '<ul class="my-1.5 space-y-0.5">$&</ul>')
+    // Ordered lists
+    .replace(/^\d+\. (.+)$/gm, '<li class="ml-4 list-decimal text-sm leading-relaxed">$1</li>')
+    // Spoiler tags
+    .replace(/>!(.+?)!</g, '<span class="rounded bg-[#5A6A7A]/20 px-1 text-[#5A6A7A] dark:text-white/50 cursor-pointer hover:bg-transparent hover:text-inherit">$1</span>')
+    // Newlines
+    .replace(/\n\n/g, '</p><p class="mt-2">')
+    .replace(/\n/g, '<br/>')
+}
 const MAX_HISTORY = 30
 
 async function chatRequest(
@@ -493,13 +533,18 @@ For each question: state if correct/incorrect, give the right answer, and a brie
                   >
                     <div className="relative max-w-[85%]">
                       <div
-                        className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+                        className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                           m.role === 'user'
-                            ? 'rounded-br-sm bg-[#0B3D6B] text-white'
+                            ? 'rounded-br-sm bg-[#0B3D6B] text-white whitespace-pre-wrap'
                             : 'rounded-bl-sm border border-gray-100 bg-white text-gray-800 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100'
                         }`}
                       >
-                        {m.content}
+                        {m.role === 'user' ? m.content : (
+                          <div
+                            className="prose-sm max-w-none text-sm leading-relaxed"
+                            dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }}
+                          />
+                        )}
                       </div>
                       {m.role === 'assistant' && (
                         <button
@@ -521,7 +566,10 @@ For each question: state if correct/incorrect, give the right answer, and a brie
                 {loading && streamingText && (
                   <div className="flex justify-start">
                     <div className="max-w-[85%] rounded-2xl rounded-bl-sm border border-gray-100 bg-white px-4 py-2.5 text-sm leading-relaxed text-gray-800 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
-                      <span className="whitespace-pre-wrap">{streamingText}</span>
+                      <div
+                        className="prose-sm max-w-none text-sm leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(streamingText) }}
+                      />
                       <span className="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-[#E8A020]" />
                     </div>
                   </div>

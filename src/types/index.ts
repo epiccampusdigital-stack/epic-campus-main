@@ -807,3 +807,27 @@ export interface EpicWallReaction {
   type: EpicWallReactionType
   createdAt: import('firebase/firestore').Timestamp
 }
+
+export interface ExamQuestion {
+  id: string
+  paperId: string
+  sectionId: string
+  order: number
+  questionText: string
+  questionImageUrl?: string
+  questionAudioUrl?: string
+  options: {
+    index: number
+    text: string
+    imageUrl?: string
+  }[]
+  correctIndex: number
+}
+
+export interface ExamAttemptAnswer {
+  id: string
+  attemptId: string
+  questionId: string
+  selectedIndex: number | null
+  isCorrect: boolean
+}
