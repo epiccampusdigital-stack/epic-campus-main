@@ -7,7 +7,6 @@ import { parseAttendance } from '@/lib/attendance/helpers'
 import { parsePayment } from '@/lib/payments/helpers'
 import CourseDashboard from '@/components/student/CourseDashboard'
 import StudentSessionsWidget from '@/components/sessions/StudentSessionsWidget'
-import CompletionCertificate from '@/components/student/CompletionCertificate'
 import StudyStatsWidget from '@/components/student/StudyStatsWidget'
 import DashboardHero from '@/components/student/DashboardHero'
 import QuickActions from '@/components/student/QuickActions'
@@ -194,7 +193,6 @@ export default function MyDashboardPage() {
         examCount={examCount}
       />
       <QuickActions />
-      <CompletionCertificate student={activeStudent} />
       <StudyStatsWidget studentId={activeStudent.id} />
       <StudentSessionsWidget studentId={activeStudent.id} />
       <CourseDashboard

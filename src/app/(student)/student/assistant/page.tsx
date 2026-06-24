@@ -37,7 +37,7 @@ interface PracticeQuestion {
   feedback?: string
 }
 
-const MODEL = 'claude-sonnet-4-20250514'
+const MODEL = 'claude-haiku-4-5-20251001'
 const MAX_HISTORY = 30
 
 async function chatRequest(
