@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const NAV = [
+  { label: 'Wall', href: '/epic-wall', icon: 'ti-home' },
   { label: 'Dashboard', href: '/my-dashboard', icon: 'ti-layout-dashboard' },
   { label: 'Exams', href: '/exams', icon: 'ti-writing' },
   { label: 'Results', href: '/my-results', icon: 'ti-certificate' },

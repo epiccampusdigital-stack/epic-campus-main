@@ -743,3 +743,67 @@ export interface CommissionRecord {
   location?: string
   createdAt: string
 }
+
+export type EpicWallPostType =
+  | 'announcement'
+  | 'achievement'
+  | 'visa_approved'
+  | 'departure'
+  | 'class_photo'
+  | 'tip'
+  | 'job_opportunity'
+  | 'event'
+  | 'poll'
+  | 'general'
+
+export type EpicWallReactionType = 'like' | 'celebrate' | 'save'
+
+export interface EpicWallPost {
+  id: string
+  authorId: string
+  authorName: string
+  authorPhotoUrl?: string
+  authorRole: string
+  type: EpicWallPostType
+  content: string
+  photoUrls?: string[]
+  videoUrl?: string
+  pollOptions?: string[]
+  pollVotes?: Record<string, string>
+  achievementBadge?: string
+  likeCount: number
+  celebrateCount: number
+  commentCount: number
+  saveCount: number
+  createdAt: import('firebase/firestore').Timestamp
+  updatedAt?: import('firebase/firestore').Timestamp
+}
+
+export interface EpicWallComment {
+  id: string
+  postId: string
+  authorId: string
+  authorName: string
+  authorPhotoUrl?: string
+  content: string
+  createdAt: import('firebase/firestore').Timestamp
+}
+
+export interface EpicWallStory {
+  id: string
+  authorId: string
+  authorName: string
+  authorPhotoUrl?: string
+  authorRole: string
+  photoUrl: string
+  caption?: string
+  createdAt: import('firebase/firestore').Timestamp
+}
+
+export interface EpicWallReaction {
+  id: string
+  postId: string
+  userId: string
+  type: EpicWallReactionType
+  createdAt: import('firebase/firestore').Timestamp
+}

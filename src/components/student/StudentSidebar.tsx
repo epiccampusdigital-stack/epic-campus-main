@@ -14,6 +14,7 @@ import DarkModeToggle from '@/components/ui/DarkModeToggle'
 import { isNavActive, navLinkClasses } from '@/lib/utils/nav'
 
 const BASE_NAV_ITEMS = [
+  { label: 'Epic Wall', href: '/epic-wall', icon: 'ti-home' },
   { label: 'My Dashboard', href: '/my-dashboard', icon: 'ti-layout-dashboard' },
   { label: 'My ID Card', href: '/my-id', icon: 'ti-id-badge-2' },
   { label: 'My Payments', href: '/my-payments', icon: 'ti-credit-card' },

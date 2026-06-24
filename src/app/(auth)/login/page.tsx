@@ -25,7 +25,7 @@ import Link from 'next/link'
 function getRedirectPath(role: string): string {
   switch (role) {
     case 'student':
-      return '/my-dashboard'
+      return '/epic-wall'
     case 'examCoordinator':
       return '/exams'
     case 'admin':

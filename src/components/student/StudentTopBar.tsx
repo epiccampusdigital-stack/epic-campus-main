@@ -10,6 +10,7 @@ import { getInitials } from '@/lib/students/helpers'
 import DarkModeToggle from '@/components/ui/DarkModeToggle'
 
 const PAGE_TITLES: Record<string, string> = {
+  '/epic-wall': 'Epic Wall',
   '/my-dashboard': 'My Dashboard',
   '/my-id': 'My ID Card',
   '/my-payments': 'My Payments',
