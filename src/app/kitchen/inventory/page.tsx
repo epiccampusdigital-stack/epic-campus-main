@@ -6,6 +6,7 @@ import {
   collectionGroup,
   addDoc,
   updateDoc,
+  deleteDoc,
   doc,
   getDocs,
   query,
@@ -17,6 +18,7 @@ import {
 import { db } from '@/lib/firebase/client'
 import { useKitchen } from '@/app/kitchen/context'
 import InventoryGridCard from '@/components/kitchen/inventory/InventoryGridCard'
+import StockIntakePanel from '@/components/kitchen/inventory/StockIntakePanel'
 import InventoryItemSlideOver, {
   type InventoryFormValues,
 } from '@/components/kitchen/inventory/InventoryItemSlideOver'
@@ -24,6 +26,11 @@ import FoodEmoji from '@/components/kitchen/FoodEmoji'
 import { CATEGORY_PILLS, getFoodEmoji } from '@/lib/kitchen/foodImages'
 import { formatLKR } from '@/lib/utils/formatCurrency'
 import type { InventoryCategory, InventoryItem } from '@/types/kitchen'
+
+function formatQty(n: number): string {
+  if (Number.isInteger(n)) return n.toString()
+  return parseFloat(n.toFixed(3)).toString()
+}
 
 const CATEGORY_LABELS: Record<InventoryCategory, string> = {
   grains: 'Grains & Rice',
@@ -115,10 +122,12 @@ const EMPTY_FORM: InventoryFormValues = {
   expiryDate: '',
   expiryAlertDays: '3',
   notes: '',
+  emoji: '',
 }
 
 export default function InventoryPage() {
   const { user } = useKitchen()
+  const [activeTab, setActiveTab] = useState<'inventory' | 'intake'>('inventory')
   const [items, setItems] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -139,6 +148,7 @@ export default function InventoryPage() {
   const [removeReason, setRemoveReason] = useState('')
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [history, setHistory] = useState<StockHistoryEntry[]>([])
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<InventoryItem | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   async function loadItems() {
@@ -281,6 +291,7 @@ export default function InventoryPage() {
       expiryDate: item.expiryDate ?? '',
       expiryAlertDays: String(item.expiryAlertDays ?? 3),
       notes: item.notes ?? '',
+      emoji: item.emoji ?? '',
     })
     setSlideMode('edit')
     setMenuOpen(null)
@@ -310,6 +321,7 @@ export default function InventoryPage() {
         updatedBy: user?.uid ?? '',
         updatedByName: user?.displayName ?? '',
         notes: values.notes.trim(),
+        emoji: values.emoji.trim(),
       }
       if (values.expiryDate) {
         payload.expiryDate = values.expiryDate
@@ -436,6 +448,17 @@ export default function InventoryPage() {
     await loadItems()
   }
 
+  async function handleDeleteItem() {
+    if (!deleteConfirmItem) return
+    try {
+      await deleteDoc(doc(db, 'inventory', deleteConfirmItem.id))
+      setItems((prev) => prev.filter((i) => i.id !== deleteConfirmItem.id))
+      setDeleteConfirmItem(null)
+    } catch (err) {
+      console.error('[Delete item]', err)
+    }
+  }
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -465,6 +488,28 @@ export default function InventoryPage() {
           </button>
         </div>
       </div>
+
+      <div className="flex gap-2 mb-6">
+        {[
+          { key: 'inventory', label: '📦 Inventory' },
+          { key: 'intake', label: '🧾 Stock Intake' },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key as 'inventory' | 'intake')}
+            className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all ${
+              activeTab === key
+                ? 'bg-[#E8A020] text-white shadow-lg'
+                : 'bg-white/10 text-white/60 hover:bg-white/20'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'inventory' && (
+        <div className="space-y-4 md:space-y-6">
 
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
         {CATEGORY_PILLS.map((pill) => (
@@ -524,6 +569,7 @@ export default function InventoryPage() {
                 onEdit={() => openEdit(item)}
                 onRestock={() => setRestockItem(item)}
                 onRemove={() => setRemoveItem(item)}
+                onDelete={(it) => setDeleteConfirmItem(it)}
               />
             ))}
           </div>
@@ -555,7 +601,7 @@ export default function InventoryPage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-bold text-[#0B3D6B] dark:text-white">{item.itemName}</p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {item.currentStock} {item.unit} · {formatLKR(item.unitCost)}
+                      {formatQty(item.currentStock)} {item.unit} · {formatLKR(item.unitCost)}
                     </p>
                   </div>
                   <span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${status.cls}`}>
@@ -619,10 +665,10 @@ export default function InventoryPage() {
                         </td>
                         <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">{item.unit}</td>
                         <td className="px-4 py-3 font-medium text-[#0D1B2A] dark:text-white">
-                          {item.currentStock} {item.unit}
+                          {formatQty(item.currentStock)} {item.unit}
                         </td>
                         <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">
-                          {item.minStockLevel} {item.unit}
+                          {formatQty(item.minStockLevel)} {item.unit}
                         </td>
                         <td className="px-4 py-3 text-[#0B3D6B] dark:text-[#E8A020]">
                           {formatLKR(item.unitCost)}
@@ -730,7 +776,7 @@ export default function InventoryPage() {
               <FoodEmoji itemName={restockItem.itemName} size="lg" showName />
             </div>
             <p className="mt-3 text-center text-sm text-[#5A6A7A] dark:text-white/50">
-              Current: {restockItem.currentStock} {restockItem.unit}
+              Current: {formatQty(restockItem.currentStock)} {restockItem.unit}
             </p>
             <div className="mt-4 flex items-center gap-2">
               <button
@@ -745,6 +791,8 @@ export default function InventoryPage() {
               </button>
               <input
                 type="number"
+                step="any"
+                min="0"
                 value={restockQty}
                 onChange={(e) => setRestockQty(e.target.value)}
                 placeholder="Quantity to add"
@@ -825,7 +873,7 @@ export default function InventoryPage() {
               <FoodEmoji itemName={removeItem.itemName} size="lg" showName />
               <div>
                 <p className="text-xs text-[#5A6A7A]">
-                  Current: {removeItem.currentStock} {removeItem.unit}
+                  Current: {formatQty(removeItem.currentStock)} {removeItem.unit}
                 </p>
               </div>
             </div>
@@ -863,6 +911,7 @@ export default function InventoryPage() {
               </button>
               <input
                 type="number"
+                step="any"
                 min="0"
                 value={removeQty}
                 onChange={(e) => setRemoveQty(e.target.value)}
@@ -901,6 +950,46 @@ export default function InventoryPage() {
                 className="flex-1 min-h-[52px] rounded-xl bg-red-600 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
               >
                 Remove {removeQty || '0'} {removeItem.unit}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+        </div>
+      )}
+
+      {activeTab === 'intake' && (
+        <StockIntakePanel
+          inventoryItems={items}
+          kitchenUser={{ uid: user?.uid ?? '', displayName: user?.displayName ?? 'Kitchen Staff' }}
+          onIntakeSaved={() => {/* StockIntakePanel handles its own refresh internally */}}
+        />
+      )}
+
+      {deleteConfirmItem && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+            onClick={() => setDeleteConfirmItem(null)}
+          />
+          <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/80 bg-white/95 p-6 shadow-2xl dark:border-white/[0.08] dark:bg-[#0d1a2e]/95">
+            <p className="mb-4 text-sm font-semibold text-[#0D1B2A] dark:text-white">
+              Delete {deleteConfirmItem.itemName} from inventory? This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmItem(null)}
+                className="flex-1 rounded-xl border border-[#DDE3EC] py-2.5 text-sm font-medium text-[#5A6A7A] dark:border-gray-600 dark:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteItem}
+                className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700"
+              >
+                Delete
               </button>
             </div>
           </div>

@@ -1,3 +1,5 @@
+import { getEmojiForItem } from './emojiSearch'
+
 export interface FoodItem {
   name: string
   emoji: string
@@ -54,12 +56,15 @@ export const CATEGORY_PILLS: {
 ]
 
 export function getFoodEmoji(itemName: string): string {
+  // First check the curated FOOD_LIBRARY for exact/partial match
   const found = FOOD_LIBRARY.find(
     (f) =>
       f.name.toLowerCase() === itemName.toLowerCase() ||
       itemName.toLowerCase().includes(f.name.toLowerCase()),
   )
-  return found?.emoji ?? '📦'
+  if (found?.emoji) return found.emoji
+  // Fall back to emoji-mart search + SL fallbacks
+  return getEmojiForItem(itemName)
 }
 
 export function findFoodItem(itemName: string): FoodItem | undefined {

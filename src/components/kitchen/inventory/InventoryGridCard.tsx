@@ -15,6 +15,12 @@ interface InventoryGridCardProps {
   onEdit: () => void
   onRestock: () => void
   onRemove: () => void
+  onDelete?: (item: InventoryItem) => void
+}
+
+function formatQty(n: number): string {
+  if (Number.isInteger(n)) return n.toString()
+  return parseFloat(n.toFixed(3)).toString()
 }
 
 function stockBarColor(item: InventoryItem): string {
@@ -58,6 +64,7 @@ export default function InventoryGridCard({
   onEdit,
   onRestock,
   onRemove,
+  onDelete,
 }: InventoryGridCardProps) {
   const { sinhala } = useKitchenSinhala()
   const food = findFoodItem(item.itemName)
@@ -123,7 +130,7 @@ export default function InventoryGridCard({
           />
         </div>
         <p className="mt-1 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">
-          {item.currentStock} {item.unit}
+          {formatQty(item.currentStock)} {item.unit}
         </p>
         <div className="text-center">
           <ExpiryBadge item={item} />
@@ -150,6 +157,30 @@ export default function InventoryGridCard({
           className="flex min-h-[44px] w-full items-center justify-center gap-1 rounded-xl bg-[#0B3D6B] py-2.5 text-sm font-semibold text-white hover:bg-[#0a3460]"
         >
           <span className="text-lg">+</span> Restock
+        </button>
+      </div>
+
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onEdit()
+          }}
+          className="flex min-h-[40px] w-full items-center justify-center gap-1 rounded-xl border-2 border-gray-200 bg-gray-50 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/40 dark:text-gray-200"
+        >
+          ✏️ Edit
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onDelete?.(item)
+          }}
+          className="flex min-h-[40px] w-full items-center justify-center gap-1 rounded-xl border-2 border-red-200 bg-red-50 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400"
+          aria-label="Delete item"
+        >
+          🗑️ Delete
         </button>
       </div>
     </div>

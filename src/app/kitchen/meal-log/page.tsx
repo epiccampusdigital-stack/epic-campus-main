@@ -9,6 +9,7 @@ import {
   orderBy,
   limit,
   doc,
+  deleteDoc,
   updateDoc,
   increment,
   serverTimestamp,
@@ -118,6 +119,8 @@ export default function MealLogPage() {
   const [typeFilter, setTypeFilter] = useState<MealType | 'all'>('all')
   const [showSlide, setShowSlide] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [deleteLogId, setDeleteLogId] = useState<string | null>(null)
+  const [deletingLog, setDeletingLog] = useState(false)
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
@@ -171,6 +174,22 @@ export default function MealLogPage() {
       console.error('[MealLog]', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleDeleteLog(id: string) {
+    setDeletingLog(true)
+    try {
+      await deleteDoc(doc(db, 'mealLogs', id))
+      setLogs((prev) => prev.filter((l) => l.id !== id))
+      setDeleteLogId(null)
+      setExpandedId(null)
+      showToast('Meal log deleted')
+    } catch (err) {
+      console.error('[MealLog delete]', err)
+      showToast('Failed to delete log', 'warning')
+    } finally {
+      setDeletingLog(false)
     }
   }
 
@@ -526,6 +545,43 @@ export default function MealLogPage() {
                       <p className="mt-2 text-gray-500 dark:text-gray-500">Notes: {log.notes}</p>
                     )}
                     <p className="mt-2 text-xs text-gray-400">By {log.loggedByName}</p>
+                    <div className="mt-3 flex items-center gap-2">
+                      {deleteLogId === log.id ? (
+                        <div className="flex w-full flex-col gap-2 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
+                          <p className="text-xs font-semibold text-red-700 dark:text-red-400">
+                            ⚠️ Delete this meal log? This cannot be undone.
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteLog(log.id)}
+                              disabled={deletingLog}
+                              className="flex-1 rounded-lg bg-red-600 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                            >
+                              {deletingLog ? 'Deleting…' : 'Confirm Delete'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteLogId(null)}
+                              className="flex-1 rounded-lg border border-gray-200 py-1.5 text-xs font-medium text-gray-600 dark:border-gray-600 dark:text-gray-300"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setDeleteLogId(log.id)
+                          }}
+                          className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
+                        >
+                          🗑️ Delete Log
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

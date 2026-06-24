@@ -8,8 +8,10 @@ import {
   FOOD_LIBRARY,
   findFoodItem,
   getFoodByCategory,
+  getFoodEmoji,
   type FoodItem,
 } from '@/lib/kitchen/foodImages'
+import { searchEmoji, getEmojiForItem } from '@/lib/kitchen/emojiSearch'
 import { useKitchenSinhala } from '@/lib/kitchen/useKitchenSinhala'
 import type { InventoryCategory, StockUnit } from '@/types/kitchen'
 
@@ -30,6 +32,7 @@ export interface InventoryFormValues {
   expiryDate: string
   expiryAlertDays: string
   notes: string
+  emoji: string
 }
 
 interface InventoryItemSlideOverProps {
@@ -57,6 +60,7 @@ export default function InventoryItemSlideOver({
 }: InventoryItemSlideOverProps) {
   const { sinhala } = useKitchenSinhala()
   const [form, setForm] = useState<InventoryFormValues>(initial)
+  const [emojiSuggestions, setEmojiSuggestions] = useState<string[]>([])
   const [pickerSearch, setPickerSearch] = useState('')
   const [selectedFood, setSelectedFood] = useState<string | null>(null)
   const [customMode, setCustomMode] = useState(false)
@@ -215,6 +219,69 @@ export default function InventoryItemSlideOver({
                 }}
                 className="w-full min-h-[48px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-3 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
               />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
+                Emoji
+              </label>
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-4xl">
+                  {form.emoji || getFoodEmoji(form.itemName) || '📦'}
+                </span>
+                <input
+                  type="text"
+                  value={form.emoji}
+                  onChange={(e) => setForm((f) => ({ ...f, emoji: e.target.value }))}
+                  placeholder="Paste emoji e.g. 🍚"
+                  maxLength={8}
+                  className="w-28 min-h-[48px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-3 text-2xl dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const suggestions = searchEmoji(form.itemName, 8)
+                    setEmojiSuggestions(suggestions)
+                  }}
+                  className="rounded-xl bg-[#0B3D6B] px-3 py-2 text-xs font-semibold text-white"
+                >
+                  Search
+                </button>
+              </div>
+
+              {emojiSuggestions.length > 0 && (
+                <div>
+                  <p className="mb-1 text-xs text-[#5A6A7A] dark:text-white/40">
+                    Tap to pick:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {emojiSuggestions.map((emoji, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          setForm((f) => ({ ...f, emoji }))
+                          setEmojiSuggestions([])
+                        }}
+                        className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-[#DDE3EC] bg-white text-2xl hover:border-[#E8A020] dark:border-gray-600 dark:bg-gray-900"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setEmojiSuggestions([])}
+                      className="rounded-xl border border-[#DDE3EC] px-2 py-1 text-xs text-[#5A6A7A]"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <p className="mt-1 text-xs text-[#5A6A7A] dark:text-white/40">
+                Click Search to find emojis by item name, or paste one directly
+              </p>
             </div>
 
             <div>

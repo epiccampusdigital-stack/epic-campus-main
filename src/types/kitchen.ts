@@ -22,6 +22,7 @@ export interface InventoryItem {
   expiryAlertDays?: number
   notes?: string
   lastRestockedDate?: string
+  emoji?: string
 }
 
 export interface ItemBrand {
@@ -167,4 +168,28 @@ export interface DailyMenu {
   createdAt: Timestamp
   updatedAt: Timestamp
   createdBy: string
+}
+
+export interface IntakeItemRow {
+  inventoryItemId: string
+  itemName: string
+  quantityReceived: number
+  unitCost: number
+  lineTotal: number
+}
+
+export interface KitchenIntake {
+  id: string
+  intakeDate: string
+  supplier: string
+  invoiceNumber: string
+  invoiceTotal: number
+  receiptUrl: string | null
+  receiptFileName: string | null
+  notes: string
+  items: IntakeItemRow[]
+  createdAt: Timestamp
+  createdBy: string
+  createdByName: string
+  location: string
 }

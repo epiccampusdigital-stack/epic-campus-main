@@ -7,7 +7,7 @@ const nextConfig = {
     workerThreads: false,
     cpus: 1,
     optimizePackageImports: ['recharts'],
-    serverComponentsExternalPackages: ['firebase-admin'],
+    serverComponentsExternalPackages: ['firebase-admin', '@emoji-mart/data'],
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
@@ -16,6 +16,7 @@ const nextConfig = {
         '@grpc/grpc-js',
         '@grpc/proto-loader',
         'protobufjs',
+        '@emoji-mart/data',
       ]
     }
     return config

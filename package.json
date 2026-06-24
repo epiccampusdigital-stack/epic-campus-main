@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
+    "@emoji-mart/data": "^1.2.1",
     "@react-pdf/renderer": "^4.5.1",
     "@stripe/stripe-js": "^9.7.0",
     "firebase": "^12.13.0",
