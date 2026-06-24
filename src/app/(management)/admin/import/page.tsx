@@ -246,20 +246,15 @@ Return ONLY the JSON array, no explanation, no markdown, no backticks.`,
 
 type TargetId = typeof IMPORT_TARGETS[number]['id']
 
-// ── AI parse via Anthropic API ────────────────────────────────────────────────
+// ── AI parse via server route (keeps API key server-side) ─────────────────────
 async function parseWithAI(
   rawText: string,
-  systemPrompt: string,
+  systemPrompt: string
 ): Promise<Record<string, unknown>[]> {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch('/api/import-ai', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: rawText }],
-    }),
+    body: JSON.stringify({ rawText, systemPrompt }),
   })
 
   if (!response.ok) {
@@ -267,9 +262,10 @@ async function parseWithAI(
     throw new Error(`AI API error: ${err}`)
   }
 
-  const data = await response.json() as { content?: { text?: string }[] }
-  const text = data.content?.[0]?.text ?? ''
+  const data = await response.json() as { text?: string; error?: string }
+  if (data.error) throw new Error(data.error)
 
+  const text = data.text ?? ''
   const cleaned = text
     .replace(/```json/g, '')
     .replace(/```/g, '')

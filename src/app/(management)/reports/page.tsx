@@ -1,378 +1,339 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import dynamic from 'next/dynamic'
-import { collection, getDocs } from 'firebase/firestore'
-import { db } from '@/lib/firebase/client'
-import { parseAttendance } from '@/lib/attendance/helpers'
-import { parsePayment } from '@/lib/payments/helpers'
-import { parseStudent } from '@/lib/students/helpers'
-import { parseUtilityBill } from '@/lib/utility-bills/helpers'
+import { useEffect, useState } from 'react'
 import {
-  computeAttendanceSummary,
-  computeCoursePerformance,
-  computeRevenueStats,
-  computeUtilityExpenses,
-  formatLKR,
-  formatUSD,
-  generateExcelReport,
-  isInPeriod,
-  paymentsToChartData,
-  studentsToChartData,
-  type ReportPeriod,
-} from '@/lib/reports/helpers'
-import type { AttendanceRecord, Payment, Student } from '@/types'
-import type { UtilityBill } from '@/lib/utility-bills/helpers'
+  collection,
+  getDocs,
+  orderBy,
+  query,
+} from 'firebase/firestore'
+import { db } from '@/lib/firebase/client'
+import { useManagement } from '@/components/layout/ManagementContext'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  CartesianGrid,
+} from 'recharts'
 
-const RevenueChart = dynamic(() => import('@/components/reports/RevenueChart'), {
-  ssr: false,
-  loading: () => <div className="h-72 animate-pulse rounded-lg bg-[#DDE3EC]" />,
-})
+interface Student {
+  id: string
+  courseId: string
+  location: string
+  status: string
+  createdAt?: unknown
+  visaStatus?: string
+}
 
-const EnrollmentChart = dynamic(() => import('@/components/reports/EnrollmentChart'), {
-  ssr: false,
-  loading: () => <div className="h-72 animate-pulse rounded-lg bg-[#DDE3EC]" />,
-})
+interface Payment {
+  id: string
+  amount: number
+  paymentDate?: string
+  createdAt?: unknown
+  status?: string
+}
 
-const PERIODS: { id: ReportPeriod; label: string }[] = [
-  { id: 'daily', label: 'Daily' },
-  { id: 'weekly', label: 'Weekly' },
-  { id: 'monthly', label: 'Monthly' },
-]
+interface Attempt {
+  id: string
+  marks250: number
+  percentage: number
+  passMark?: number
+}
 
-function StatCard({
-  label,
-  value,
-  loading,
-}: {
-  label: string
-  value: string
-  loading?: boolean
+const COURSE_LABELS: Record<string, string> = {
+  'japan-ssw': 'Japan SSW',
+  'korea': 'Korea',
+  'china': 'China',
+  'ielts': 'IELTS',
+  'nvq': 'NVQ',
+}
+
+const COURSE_COLORS = ['#0B3D6B', '#E8A020', '#1A6BAD', '#10b981', '#8b5cf6']
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+function StatCard({ label, value, icon, color, sub }: {
+  label: string; value: string | number; icon: string; color: string; sub?: string
 }) {
   return (
-    <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
-      <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-gray-400">
-        {label}
-      </p>
-      {loading ? (
-        <div className="mt-2 h-8 w-28 animate-pulse rounded bg-[#DDE3EC]" />
-      ) : (
-        <p className="mt-1 font-jakarta text-2xl font-bold text-[#0B3D6B]">{value}</p>
-      )}
+    <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">{label}</p>
+          <p className={`mt-1 font-jakarta text-3xl font-black ${color}`}>{value}</p>
+          {sub && <p className="mt-0.5 text-xs text-[#5A6A7A] dark:text-white/40">{sub}</p>}
+        </div>
+        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${color.replace('text-', 'bg-').replace('[', '[').replace(']', ']')}/10`}>
+          <span className={`ti ${icon} text-lg ${color}`} />
+        </div>
+      </div>
     </div>
   )
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="font-jakarta text-lg font-bold text-[#0D1B2A] dark:text-white">{children}</h3>
-  )
-}
-
 export default function ReportsPage() {
-  const [period, setPeriod] = useState<ReportPeriod>('monthly')
-  const [payments, setPayments] = useState<Payment[]>([])
+  const { user } = useManagement()
   const [students, setStudents] = useState<Student[]>([])
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
-  const [utilityBills, setUtilityBills] = useState<UtilityBill[]>([])
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [attempts, setAttempts] = useState<Attempt[]>([])
   const [loading, setLoading] = useState(true)
-
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [paymentsSnap, studentsSnap, attendanceSnap, utilitySnap] = await Promise.all([
-        getDocs(collection(db, 'payments')),
-        getDocs(collection(db, 'students')),
-        getDocs(collection(db, 'attendance')),
-        getDocs(collection(db, 'utilityBills')).catch(() => ({ docs: [] })),
-      ])
-      setPayments(
-        paymentsSnap.docs.map((d) =>
-          parsePayment(d.id, d.data() as Record<string, unknown>),
-        ),
-      )
-      setStudents(
-        studentsSnap.docs.map((d) =>
-          parseStudent(d.id, d.data() as Record<string, unknown>),
-        ),
-      )
-      setAttendance(
-        attendanceSnap.docs.map((d) =>
-          parseAttendance(d.id, d.data() as Record<string, unknown>),
-        ),
-      )
-      setUtilityBills(
-        utilitySnap.docs.map((d) =>
-          parseUtilityBill(d.id, d.data() as Record<string, unknown>),
-        ),
-      )
-    } catch (err) {
-      console.error('[ReportsPage]', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const [activeTab, setActiveTab] = useState<'overview' | 'enrollment' | 'finance' | 'exams'>('overview')
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    if (!user) return
+    async function load() {
+      setLoading(true)
+      try {
+        const [studentsSnap, paymentsSnap, attemptsSnap] = await Promise.all([
+          getDocs(collection(db, 'students')),
+          getDocs(collection(db, 'payments')).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] })),
+          getDocs(query(collection(db, 'examAttempts'), orderBy('finishedAt', 'desc'))).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] })),
+        ])
+        setStudents(studentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Student)))
+        setPayments(paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Payment)))
+        setAttempts(attemptsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Attempt)))
+      } catch (err) {
+        console.error('[Reports]', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    void load()
+  }, [user])
 
-  const revenueStats = useMemo(
-    () => computeRevenueStats(payments, students, period),
-    [payments, students, period],
+  // ── Derived stats ────────────────────────────────────────────────────────
+  const activeStudents = students.filter(s => s.status === 'active')
+  const totalRevenue = payments.reduce((sum, p) => sum + (p.amount ?? 0), 0)
+  const passedAttempts = attempts.filter(a => a.marks250 >= (a.passMark ?? 200))
+  const passRate = attempts.length > 0 ? Math.round((passedAttempts.length / attempts.length) * 100) : 0
+
+  // Enrollment by course
+  const byCourse = Object.entries(COURSE_LABELS).map(([id, label], i) => ({
+    name: label,
+    students: students.filter(s => s.courseId === id).length,
+    color: COURSE_COLORS[i],
+  })).filter(c => c.students > 0)
+
+  // Enrollment by location
+  const byLocation = ['Ahangama', 'Galle', 'Waduraba', 'Pinnaduwa'].map(loc => ({
+    name: loc,
+    students: students.filter(s => s.location === loc).length,
+  })).filter(l => l.students > 0)
+
+  // Monthly enrollments (last 6 months)
+  const monthlyData = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - (5 - i))
+    const month = MONTHS[d.getMonth()]
+    const year = d.getFullYear()
+    const count = students.filter(s => {
+      if (!s.createdAt) return false
+      try {
+        const created = typeof s.createdAt === 'object' && s.createdAt !== null && 'toDate' in s.createdAt
+          ? (s.createdAt as { toDate: () => Date }).toDate()
+          : new Date(String(s.createdAt))
+        return created.getMonth() === d.getMonth() && created.getFullYear() === year
+      } catch { return false }
+    }).length
+    return { month, count }
+  })
+
+  // Exam score distribution
+  const scoreRanges = [
+    { range: '0-100', count: attempts.filter(a => a.marks250 < 100).length },
+    { range: '100-149', count: attempts.filter(a => a.marks250 >= 100 && a.marks250 < 150).length },
+    { range: '150-199', count: attempts.filter(a => a.marks250 >= 150 && a.marks250 < 200).length },
+    { range: '200-250', count: attempts.filter(a => a.marks250 >= 200).length },
+  ]
+
+  if (loading) return (
+    <div className="animate-pulse space-y-4">
+      <div className="h-10 w-48 rounded-xl bg-[#DDE3EC] dark:bg-white/10" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[1,2,3,4].map(i => <div key={i} className="h-24 rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />)}
+      </div>
+    </div>
   )
-
-  const revenueChartData = useMemo(
-    () => paymentsToChartData(payments, period),
-    [payments, period],
-  )
-
-  const enrollmentChartData = useMemo(() => studentsToChartData(students), [students])
-
-  const attendanceSummary = useMemo(
-    () => computeAttendanceSummary(attendance),
-    [attendance],
-  )
-
-  const coursePerformance = useMemo(
-    () => computeCoursePerformance(students, payments, period),
-    [students, payments, period],
-  )
-
-  const utilityExpenses = useMemo(
-    () => computeUtilityExpenses(utilityBills, period),
-    [utilityBills, period],
-  )
-
-  const utilityTotal = useMemo(
-    () => utilityExpenses.reduce((sum, row) => sum + row.amount, 0),
-    [utilityExpenses],
-  )
-
-  function handleExportPdf() {
-    window.print()
-  }
-
-  function handleExportExcel() {
-    const periodPayments = payments.filter(
-      (p) => p.status !== 'cancelled' && isInPeriod(p.paymentDate, period),
-    )
-    generateExcelReport({
-      revenue: periodPayments.map((p) => ({
-        date: p.paymentDate.slice(0, 10),
-        amount: p.amount,
-        currency: p.currency,
-        student: p.studentName,
-      })),
-      enrollments: enrollmentChartData
-        .filter((e) => e.count > 0)
-        .map((e) => ({ course: e.fullName, count: e.count })),
-      attendance: attendanceSummary,
-    })
-  }
 
   return (
-    <div id="reports-print" className="space-y-8">
-      <div className="no-print flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A]">Reports</h2>
-          <p className="font-inter text-sm text-[#5A6A7A]">Business intelligence</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={handleExportPdf}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#DDE3EC] bg-white px-4 py-2 font-jakarta text-sm font-semibold text-[#0B3D6B] hover:bg-[#F5F7FB]"
-          >
-            <span className="ti ti-file-type-pdf" aria-hidden="true" />
-            Export PDF
-          </button>
-          <button
-            type="button"
-            onClick={handleExportExcel}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#E8A020] px-4 py-2 font-jakarta text-sm font-bold text-[#0B3D6B] hover:bg-[#F5B942]"
-          >
-            <span className="ti ti-file-spreadsheet" aria-hidden="true" />
-            Export Excel
-          </button>
-        </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white">Reports</h1>
+        <p className="text-sm text-[#5A6A7A] dark:text-white/50">Enrollment, finance and exam analytics</p>
       </div>
 
-      <div className="no-print flex gap-1 rounded-lg border border-[#DDE3EC] bg-white p-1">
-        {PERIODS.map((p) => (
+      {/* Tab navigation */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {(['overview', 'enrollment', 'finance', 'exams'] as const).map(tab => (
           <button
-            key={p.id}
+            key={tab}
             type="button"
-            onClick={() => setPeriod(p.id)}
-            className={`flex-1 rounded-md px-4 py-2 font-jakarta text-sm font-semibold transition-colors ${
-              period === p.id
+            onClick={() => setActiveTab(tab)}
+            className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold capitalize transition-all ${
+              activeTab === tab
                 ? 'bg-[#0B3D6B] text-white'
-                : 'text-[#5A6A7A] hover:bg-[#F5F7FB]'
+                : 'border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/60 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06]'
             }`}
           >
-            {p.label}
+            {tab}
           </button>
         ))}
       </div>
 
-      <section>
-        <SectionTitle>Revenue Overview</SectionTitle>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard
-            label="Total Revenue (LKR)"
-            value={formatLKR(revenueStats.lkr)}
-            loading={loading}
-          />
-          <StatCard
-            label="Total Revenue (USD)"
-            value={formatUSD(revenueStats.usd)}
-            loading={loading}
-          />
-          <StatCard
-            label="Avg Payment / Student"
-            value={formatLKR(revenueStats.avgPerStudent)}
-            loading={loading}
-          />
-          <StatCard
-            label="Collection Rate"
-            value={revenueStats.collectionRate}
-            loading={loading}
-          />
-        </div>
-      </section>
+      {/* Overview tab */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatCard label="Total Students" value={students.length} icon="ti-users" color="text-[#0B3D6B]" sub={`${activeStudents.length} active`} />
+            <StatCard label="Total Revenue" value={`LKR ${(totalRevenue / 1000).toFixed(0)}K`} icon="ti-coin" color="text-emerald-600" />
+            <StatCard label="Exam Pass Rate" value={`${passRate}%`} icon="ti-trophy" color="text-[#E8A020]" sub={`${passedAttempts.length}/${attempts.length} attempts`} />
+            <StatCard label="Courses Running" value={byCourse.length} icon="ti-book" color="text-purple-600" sub="active programs" />
+          </div>
 
-      <section className="rounded-xl border border-[#DDE3EC] bg-white p-5">
-        <SectionTitle>Revenue Over Time</SectionTitle>
-        <div className="mt-4">
-          <RevenueChart data={revenueChartData} loading={loading} />
-        </div>
-      </section>
+          {/* Enrollment trend */}
+          <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+            <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white mb-4">Enrollment Trend (Last 6 Months)</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#DDE3EC" />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Line type="monotone" dataKey="count" stroke="#0B3D6B" strokeWidth={2} dot={{ fill: '#E8A020', r: 4 }} name="Students" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
 
-      <section className="rounded-xl border border-[#DDE3EC] bg-white p-5">
-        <SectionTitle>Enrollments by Course</SectionTitle>
-        <div className="mt-4">
-          <EnrollmentChart data={enrollmentChartData} loading={loading} />
+          {/* Course breakdown */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+              <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white mb-4">Students by Course</h3>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie data={byCourse} dataKey="students" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, value }) => `${name}: ${value}`}>
+                    {byCourse.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+              <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white mb-4">Students by Location</h3>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={byLocation}>
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="students" fill="#0B3D6B" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
-      </section>
+      )}
 
-      <section className="rounded-xl border border-[#DDE3EC] bg-white p-5">
-        <SectionTitle>Attendance Summary</SectionTitle>
-        <div className="mt-4 overflow-x-auto">
-          {loading ? (
-            <div className="h-32 animate-pulse rounded bg-[#DDE3EC]" />
-          ) : attendanceSummary.length === 0 ? (
-            <p className="text-sm text-[#5A6A7A]">No attendance data available.</p>
-          ) : (
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB]">
-                  {['Course', 'Total Sessions', 'Avg Attendance Rate', 'Best Day', 'Worst Day'].map(
-                    (h) => (
-                      <th
-                        key={h}
-                        className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]"
-                      >
-                        {h}
-                      </th>
-                    ),
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#DDE3EC]">
-                {attendanceSummary.map((row) => (
-                  <tr key={row.course}>
-                    <td className="px-4 py-3 font-medium text-[#0D1B2A]">{row.course}</td>
-                    <td className="px-4 py-3 text-[#5A6A7A]">{row.totalSessions}</td>
-                    <td className="px-4 py-3 text-[#0B3D6B] font-semibold">{row.avgRate}</td>
-                    <td className="px-4 py-3 text-emerald-700">{row.bestDay}</td>
-                    <td className="px-4 py-3 text-red-600">{row.worstDay}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </section>
-
-      <section>
-        <SectionTitle>Expenses — Utilities</SectionTitle>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          {loading ? (
-            Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-24 animate-pulse rounded-xl bg-[#DDE3EC]" />
-            ))
-          ) : (
-            <>
-              {utilityExpenses.map((row) => (
-                <div
-                  key={row.category}
-                  className="rounded-xl border border-[#DDE3EC] bg-white p-5"
-                >
-                  <p className="text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
-                    {row.label}
-                  </p>
-                  <p className="mt-1 font-jakarta text-xl font-bold text-[#0B3D6B]">
-                    {formatLKR(row.amount)}
-                  </p>
+      {/* Enrollment tab */}
+      {activeTab === 'enrollment' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Total Enrolled" value={students.length} icon="ti-users" color="text-[#0B3D6B]" />
+            <StatCard label="Active" value={activeStudents.length} icon="ti-circle-check" color="text-emerald-600" />
+          </div>
+          <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+            <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white mb-4">Enrollment by Course</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={byCourse} layout="vertical">
+                <XAxis type="number" tick={{ fontSize: 11 }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={80} />
+                <Tooltip />
+                <Bar dataKey="students" radius={[0, 4, 4, 0]}>
+                  {byCourse.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#DDE3EC] dark:border-white/[0.08]">
+              <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">Course Breakdown</h3>
+            </div>
+            {byCourse.map((course, i) => (
+              <div key={i} className="flex items-center gap-4 px-5 py-3 border-b border-[#DDE3EC]/50 dark:border-white/[0.04] last:border-0">
+                <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: course.color }} />
+                <p className="flex-1 text-sm font-medium text-[#0D1B2A] dark:text-white">{course.name}</p>
+                <div className="flex-1 h-2 rounded-full bg-[#DDE3EC] dark:bg-white/10 overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${students.length > 0 ? (course.students / students.length) * 100 : 0}%`, backgroundColor: course.color }} />
                 </div>
-              ))}
-              <div className="rounded-xl border border-[#E8A020]/40 bg-[#FFF8EB] p-5">
-                <p className="text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
-                  Utilities Total
-                </p>
-                <p className="mt-1 font-jakarta text-xl font-bold text-[#E8A020]">
-                  {formatLKR(utilityTotal)}
-                </p>
+                <p className="w-16 text-right text-sm font-bold text-[#0D1B2A] dark:text-white">{course.students} students</p>
               </div>
-            </>
-          )}
+            ))}
+          </div>
         </div>
-        {!loading && utilityTotal === 0 && (
-          <p className="mt-3 text-sm text-[#5A6A7A]">
-            No utility bills recorded for this period. Add bills in Utility Bills.
-          </p>
-        )}
-      </section>
+      )}
 
-      <section>
-        <SectionTitle>Course Performance</SectionTitle>
-        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {loading ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-36 animate-pulse rounded-xl bg-[#DDE3EC]" />
-            ))
-          ) : coursePerformance.length === 0 ? (
-            <p className="text-sm text-[#5A6A7A]">No course data for this period.</p>
-          ) : (
-            coursePerformance.map((c) => (
-              <div
-                key={c.courseId}
-                className="rounded-xl border border-[#DDE3EC] bg-white p-5"
-              >
-                <h4 className="font-jakarta font-bold text-[#0B3D6B]">{c.label}</h4>
-                <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-xs uppercase text-[#5A6A7A]">Enrolled</p>
-                    <p className="font-semibold text-[#0D1B2A]">{c.enrolled}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase text-[#5A6A7A]">Active</p>
-                    <p className="font-semibold text-[#0D1B2A]">{c.active}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase text-[#5A6A7A]">Completion</p>
-                    <p className="font-semibold text-[#0D1B2A]">{c.completionRate}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase text-[#5A6A7A]">Revenue</p>
-                    <p className="font-semibold text-[#E8A020]">{formatLKR(c.revenue)}</p>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
+      {/* Finance tab */}
+      {activeTab === 'finance' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Total Revenue" value={`LKR ${totalRevenue.toLocaleString('en-LK')}`} icon="ti-coin" color="text-emerald-600" />
+            <StatCard label="Transactions" value={payments.length} icon="ti-credit-card" color="text-[#0B3D6B]" />
+          </div>
+          <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+            <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white mb-2">Revenue Summary</h3>
+            <p className="text-xs text-[#5A6A7A] dark:text-white/50 mb-4">Connect payment data for detailed breakdown</p>
+            <div className="rounded-xl bg-[#F5F7FB] dark:bg-white/[0.04] p-8 text-center">
+              <span className="ti ti-chart-line text-4xl text-[#DDE3EC] dark:text-white/20" />
+              <p className="mt-3 text-sm text-[#5A6A7A] dark:text-white/50">
+                Revenue charts will appear once payment records are imported via the AI Importer
+              </p>
+            </div>
+          </div>
         </div>
-      </section>
+      )}
+
+      {/* Exams tab */}
+      {activeTab === 'exams' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatCard label="Total Attempts" value={attempts.length} icon="ti-pencil" color="text-[#0B3D6B]" />
+            <StatCard label="Passed" value={passedAttempts.length} icon="ti-circle-check" color="text-emerald-600" />
+            <StatCard label="Pass Rate" value={`${passRate}%`} icon="ti-trophy" color="text-[#E8A020]" />
+            <StatCard label="Avg Score" value={attempts.length > 0 ? Math.round(attempts.reduce((s, a) => s + a.marks250, 0) / attempts.length) : 0} icon="ti-target" color="text-purple-600" sub="out of 250" />
+          </div>
+          <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+            <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white mb-4">Score Distribution</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={scoreRanges}>
+                <XAxis dataKey="range" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Bar dataKey="count" name="Students" radius={[4, 4, 0, 0]}>
+                  {scoreRanges.map((entry, i) => (
+                    <Cell key={i} fill={i === 3 ? '#10b981' : i === 2 ? '#E8A020' : '#0B3D6B'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="mt-3 flex gap-4 justify-center text-xs text-[#5A6A7A] dark:text-white/50">
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" />200+ (Pass)</span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#E8A020]" />150-199</span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#0B3D6B]" />Below 150</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

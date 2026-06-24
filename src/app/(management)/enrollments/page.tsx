@@ -1,353 +1,344 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { collection, getDocs, orderBy, query } from 'firebase/firestore'
-import { db } from '@/lib/firebase/client'
-import { auth } from '@/lib/firebase/client'
+import { useCallback, useEffect, useState } from 'react'
 import {
-  parseEnrollment,
-  PROGRAM_LABEL_MAP,
-  ENROLLMENT_STATUS_STYLES,
-  PAYMENT_STATUS_STYLES,
-  LOCATION_OPTIONS,
-  formatLKR,
-  formatEnrollmentDate,
-} from '@/lib/enrollment/helpers'
+  collection,
+  doc,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+  writeBatch,
+} from 'firebase/firestore'
+import { db } from '@/lib/firebase/client'
 import { useManagement } from '@/components/layout/ManagementContext'
-import type { EnrollmentApplication, EnrollmentProgram, StudentLocation } from '@/types'
 
-type StatusTab = 'pending' | 'confirmed'
-type ProgramFilter = 'all' | EnrollmentProgram
-type LocationFilter = 'all' | StudentLocation
-
-const STATUS_TABS: { id: StatusTab; label: string }[] = [
-  { id: 'pending', label: 'Pending' },
-  { id: 'confirmed', label: 'Approved' },
-]
-
-function StatCard({
-  label,
-  value,
-  color,
-}: {
-  label: string
-  value: number | string
-  color: string
-}) {
-  return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-      <p className="text-sm font-medium text-gray-500">{label}</p>
-      <p className={`mt-1 font-jakarta text-3xl font-bold ${color}`}>{value}</p>
-    </div>
-  )
+interface Enrollment {
+  id: string
+  studentName: string
+  email: string
+  phone: string
+  courseId: string
+  location: string
+  status: 'pending' | 'approved' | 'rejected'
+  createdAt?: unknown
+  notes?: string
+  agentId?: string
+  totalFee?: number
+  paymentPlan?: string
 }
 
-function defaultStudentCode(existingCount: number): string {
-  const year = new Date().getFullYear()
-  return `EC-${year}-${String(existingCount + 1).padStart(3, '0')}`
+interface PaymentPlanForm {
+  totalFee: string
+  installments: { label: string; amount: string; dueDate: string }[]
 }
+
+const COURSE_LABELS: Record<string, string> = {
+  'japan-ssw': '🇯🇵 Japan SSW',
+  'korea': '🇰🇷 Korea',
+  'china': '🇨🇳 China',
+  'ielts': '📝 IELTS',
+  'nvq': '🎓 NVQ',
+}
+
+function formatDate(val: unknown): string {
+  if (!val) return '—'
+  try {
+    if (typeof val === 'object' && val !== null && 'toDate' in val) {
+      return (val as { toDate: () => Date }).toDate().toLocaleDateString('en-GB', {
+        day: 'numeric', month: 'short', year: 'numeric',
+      })
+    }
+    return new Date(String(val)).toLocaleDateString('en-GB', {
+      day: 'numeric', month: 'short', year: 'numeric',
+    })
+  } catch { return '—' }
+}
+
+function getInitials(name: string) {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+}
+
+const inputClass = 'w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-[#F5F7FB] dark:bg-white/[0.04] px-4 py-2.5 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020]'
 
 export default function EnrollmentsPage() {
   const { user } = useManagement()
-  const [enrollments, setEnrollments] = useState<EnrollmentApplication[]>([])
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [loading, setLoading] = useState(true)
-  const [statusTab, setStatusTab] = useState<StatusTab>('pending')
-  const [programFilter, setProgramFilter] = useState<ProgramFilter>('all')
-  const [locationFilter, setLocationFilter] = useState<LocationFilter>('all')
-  const [viewApp, setViewApp] = useState<EnrollmentApplication | null>(null)
-  const [approveTarget, setApproveTarget] = useState<EnrollmentApplication | null>(null)
-  const [rejectTarget, setRejectTarget] = useState<EnrollmentApplication | null>(null)
-  const [studentCode, setStudentCode] = useState('')
-  const [approveLocation, setApproveLocation] = useState<StudentLocation>('ahangama')
-  const [batchIntake, setBatchIntake] = useState(String(new Date().getFullYear()))
-  const [rejectionReason, setRejectionReason] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [actionError, setActionError] = useState('')
-  const [actionSuccess, setActionSuccess] = useState('')
+  const [tab, setTab] = useState<'pending' | 'approved' | 'rejected'>('pending')
+  const [search, setSearch] = useState('')
+  const [approveModal, setApproveModal] = useState<Enrollment | null>(null)
+  const [rejectModal, setRejectModal] = useState<Enrollment | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [toast, setToast] = useState('')
+  const [planForm, setPlanForm] = useState<PaymentPlanForm>({
+    totalFee: '',
+    installments: [
+      { label: 'Registration Fee', amount: '25000', dueDate: '' },
+      { label: 'First Instalment', amount: '', dueDate: '' },
+      { label: 'Second Instalment', amount: '', dueDate: '' },
+    ],
+  })
+
+  function showToast(msg: string) {
+    setToast(msg)
+    setTimeout(() => setToast(''), 3000)
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const snap = await getDocs(
-        query(collection(db, 'enrollmentApplications'), orderBy('createdAt', 'desc')),
-      )
-      setEnrollments(
-        snap.docs.map((d) => parseEnrollment(d.id, d.data() as Record<string, unknown>)),
-      )
+        query(collection(db, 'enrollments'), orderBy('createdAt', 'desc'))
+      ).catch(() => getDocs(collection(db, 'enrollments')))
+      setEnrollments(snap.docs.map(d => ({ id: d.id, ...d.data() } as Enrollment)))
     } catch (err) {
-      console.error(err)
+      console.error('[Enrollments]', err)
+      setEnrollments([])
     } finally {
       setLoading(false)
     }
   }, [])
 
-  useEffect(() => {
-    void load()
-  }, [load])
+  useEffect(() => { void load() }, [load])
 
-  const today = new Date().toISOString().slice(0, 10)
-
-  const stats = useMemo(() => {
-    const total = enrollments.length
-    const pending = enrollments.filter((e) => e.status === 'pending').length
-    const confirmed = enrollments.filter((e) => e.status === 'confirmed').length
-    const paidToday = enrollments.filter(
-      (e) => e.stripePaymentStatus === 'paid' && e.createdAt.slice(0, 10) === today,
-    ).length
-    return { total, pending, confirmed, paidToday }
-  }, [enrollments, today])
-
-  const filtered = useMemo(() => {
-    return enrollments.filter((e) => {
-      if (e.status !== statusTab) return false
-      if (programFilter !== 'all' && e.program !== programFilter) return false
-      if (locationFilter !== 'all' && e.location !== locationFilter) return false
-      return true
-    })
-  }, [enrollments, statusTab, programFilter, locationFilter])
-
-  function openApproveModal(enrollment: EnrollmentApplication) {
-    setActionError('')
-    setActionSuccess('')
-    setApproveTarget(enrollment)
-    setStudentCode(defaultStudentCode(enrollments.length))
-    setApproveLocation(enrollment.location || 'ahangama')
-    setBatchIntake(String(new Date().getFullYear()))
-  }
-
+  // ── Approve enrollment + create payment plan ───────────────────────────────
   async function handleApprove() {
-    if (!auth.currentUser || !approveTarget) return
-    setActionError('')
-    setSubmitting(true)
+    if (!user || !approveModal) return
+    setSaving(true)
     try {
-      const token = await auth.currentUser.getIdToken()
-      const res = await fetch('/api/enrollment/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          enrollmentId: approveTarget.id,
-          studentCode: studentCode.trim(),
-          location: approveLocation,
-          batchIntake: batchIntake.trim(),
-        }),
+      const batch = writeBatch(db)
+
+      // Update enrollment status
+      batch.update(doc(db, 'enrollments', approveModal.id), {
+        status: 'approved',
+        approvedAt: serverTimestamp(),
+        approvedBy: user.uid,
       })
-      const data = await res.json()
-      if (!res.ok) {
-        setActionError(data.error || 'Failed to approve enrollment')
-        return
+
+      // Create student record
+      const studentRef = doc(collection(db, 'students'))
+      batch.set(studentRef, {
+        name: approveModal.studentName,
+        email: approveModal.email,
+        phone: approveModal.phone,
+        courseId: approveModal.courseId,
+        location: approveModal.location,
+        status: 'active',
+        enrollmentId: approveModal.id,
+        createdAt: serverTimestamp(),
+        createdBy: user.uid,
+      })
+
+      // Create payment plan if fee entered
+      if (planForm.totalFee) {
+        const planRef = doc(collection(db, 'studentPaymentPlans'))
+        batch.set(planRef, {
+          studentId: studentRef.id,
+          studentName: approveModal.studentName,
+          courseId: approveModal.courseId,
+          location: approveModal.location,
+          totalFee: Number(planForm.totalFee),
+          currency: 'LKR',
+          installments: planForm.installments
+            .filter(i => i.label && i.amount)
+            .map((i, idx) => ({
+              id: `inst_${idx + 1}`,
+              label: i.label,
+              amount: Number(i.amount),
+              dueDate: i.dueDate,
+            })),
+          createdAt: serverTimestamp(),
+          createdBy: user.uid,
+        })
       }
-      setActionSuccess(`Account created for ${approveTarget.firstName} ${approveTarget.lastName}`)
-      setApproveTarget(null)
-      await load()
-    } catch {
-      setActionError('Network error. Please try again.')
+
+      await batch.commit()
+      setEnrollments(prev => prev.map(e =>
+        e.id === approveModal.id ? { ...e, status: 'approved' } : e
+      ))
+      setApproveModal(null)
+      setPlanForm({ totalFee: '', installments: [
+        { label: 'Registration Fee', amount: '25000', dueDate: '' },
+        { label: 'First Instalment', amount: '', dueDate: '' },
+        { label: 'Second Instalment', amount: '', dueDate: '' },
+      ]})
+      showToast(`✅ ${approveModal.studentName} approved and added to students`)
+    } catch (err) {
+      console.error('[Approve]', err)
+      showToast('Failed to approve — try again')
     } finally {
-      setSubmitting(false)
+      setSaving(false)
     }
   }
 
+  // ── Reject enrollment ──────────────────────────────────────────────────────
   async function handleReject() {
-    if (!auth.currentUser || !rejectTarget) return
-    setActionError('')
-    setSubmitting(true)
+    if (!user || !rejectModal) return
+    setSaving(true)
     try {
-      const token = await auth.currentUser.getIdToken()
-      const res = await fetch('/api/enrollment/reject', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          enrollmentId: rejectTarget.id,
-          rejectionReason: rejectionReason.trim(),
-        }),
+      await updateDoc(doc(db, 'enrollments', rejectModal.id), {
+        status: 'rejected',
+        rejectedAt: serverTimestamp(),
+        rejectedBy: user.uid,
+        rejectionReason: rejectReason,
       })
-      const data = await res.json()
-      if (!res.ok) {
-        setActionError(data.error || 'Failed to reject')
-        return
-      }
-      setActionSuccess(`Enrollment rejected for ${rejectTarget.firstName} ${rejectTarget.lastName}`)
-      setRejectTarget(null)
-      setRejectionReason('')
-      await load()
-    } catch {
-      setActionError('Network error.')
+      setEnrollments(prev => prev.map(e =>
+        e.id === rejectModal.id ? { ...e, status: 'rejected' } : e
+      ))
+      setRejectModal(null)
+      setRejectReason('')
+      showToast(`Enrollment rejected`)
+    } catch (err) {
+      console.error('[Reject]', err)
+      showToast('Failed to reject — try again')
     } finally {
-      setSubmitting(false)
+      setSaving(false)
     }
   }
 
-  const isStaff = user?.role === 'admin' || user?.role === 'owner' || user?.role === 'reception'
-  const selectCls =
-    'rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-700 outline-none focus:border-[#0B3D6B] bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200'
+  const filtered = enrollments.filter(e => {
+    const matchTab = e.status === tab
+    const q = search.trim().toLowerCase()
+    const matchSearch = !q || e.studentName.toLowerCase().includes(q) || e.email.toLowerCase().includes(q)
+    return matchTab && matchSearch
+  })
+
+  const counts = {
+    pending: enrollments.filter(e => e.status === 'pending').length,
+    approved: enrollments.filter(e => e.status === 'approved').length,
+    rejected: enrollments.filter(e => e.status === 'rejected').length,
+  }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6">
+    <div className="space-y-6">
+      {toast && (
+        <div className="fixed bottom-6 right-4 z-50 rounded-xl bg-[#0B3D6B] px-5 py-3 text-sm font-medium text-white shadow-lg">
+          {toast}
+        </div>
+      )}
+
+      {/* Header */}
       <div>
-        <h1 className="font-jakarta text-2xl font-bold text-[#0B3D6B] dark:text-white">
-          Online Enrollments
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Review applications, approve and create student login accounts
-        </p>
+        <h1 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white">Enrollments</h1>
+        <p className="text-sm text-[#5A6A7A] dark:text-white/50">Review and approve student enrollment requests</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total Applications" value={stats.total} color="text-[#0B3D6B]" />
-        <StatCard label="Pending" value={stats.pending} color="text-amber-600" />
-        <StatCard label="Approved" value={stats.confirmed} color="text-emerald-600" />
-        <StatCard label="Paid Today" value={stats.paidToday} color="text-[#E8A020]" />
-      </div>
-
-      <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-1 dark:border-gray-700">
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setStatusTab(tab.id)}
-            className={`rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors ${
-              statusTab === tab.id
-                ? 'border-b-2 border-[#E8A020] text-[#0B3D6B] dark:text-[#E8A020]'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {tab.label}
-          </button>
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Pending', count: counts.pending, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20', border: 'border-amber-200 dark:border-amber-800' },
+          { label: 'Approved', count: counts.approved, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-200 dark:border-emerald-800' },
+          { label: 'Rejected', count: counts.rejected, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20', border: 'border-red-200 dark:border-red-800' },
+        ].map(s => (
+          <div key={s.label} className={`rounded-2xl border ${s.border} ${s.bg} p-4 text-center`}>
+            <p className={`font-jakarta text-2xl font-black ${s.color}`}>{s.count}</p>
+            <p className={`text-xs font-bold ${s.color}`}>{s.label}</p>
+          </div>
         ))}
       </div>
 
+      {/* Tab + search */}
       <div className="flex flex-wrap items-center gap-3">
-        <select
-          className={selectCls}
-          value={programFilter}
-          onChange={(e) => setProgramFilter(e.target.value as ProgramFilter)}
-        >
-          <option value="all">All Programs</option>
-          <option value="japan-ssw">Japan SSW</option>
-          <option value="korea">Korea</option>
-          <option value="china">China</option>
-          <option value="ielts">IELTS</option>
-          <option value="nvq">NVQ</option>
-        </select>
-        <select
-          className={selectCls}
-          value={locationFilter}
-          onChange={(e) => setLocationFilter(e.target.value as LocationFilter)}
-        >
-          <option value="all">All Locations</option>
-          {LOCATION_OPTIONS.map((loc) => (
-            <option key={loc.value} value={loc.value}>
-              {loc.label}
-            </option>
+        <div className="flex gap-1">
+          {(['pending', 'approved', 'rejected'] as const).map(t => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold capitalize transition-all ${
+                tab === t
+                  ? 'bg-[#E8A020] text-white'
+                  : 'border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/60'
+              }`}
+            >
+              {t} ({counts[t]})
+            </button>
           ))}
-        </select>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="ml-auto flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
-        >
-          <span className="ti ti-refresh" />
-          Refresh
-        </button>
+        </div>
+        <div className="relative flex-1 min-w-48">
+          <span className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A7A]" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search name or email..."
+            className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] py-2.5 pl-9 pr-3 text-sm dark:text-white outline-none focus:border-[#E8A020]"
+          />
+        </div>
       </div>
 
-      {actionError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {actionError}
-        </div>
-      )}
-      {actionSuccess && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {actionSuccess}
-        </div>
-      )}
-
+      {/* Enrollment list */}
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <span className="ti ti-loader-2 animate-spin text-2xl text-[#0B3D6B]" />
+        <div className="space-y-3">
+          {[1,2,3].map(i => <div key={i} className="h-24 animate-pulse rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />)}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl border border-gray-100 bg-white py-16 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <span className="ti ti-clipboard-off text-4xl text-gray-300" />
-          <p className="mt-3 text-sm text-gray-500">No {statusTab} enrollments</p>
+        <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] py-16 text-center">
+          <span className="ti ti-inbox text-4xl text-[#DDE3EC] dark:text-white/20" />
+          <p className="mt-3 text-sm text-[#5A6A7A] dark:text-white/50">
+            No {tab} enrollments{search ? ' matching your search' : ''}
+          </p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((e) => (
+        <div className="space-y-3">
+          {filtered.map(enrollment => (
             <div
-              key={e.id}
-              className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+              key={enrollment.id}
+              className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-jakarta text-lg font-bold text-[#0B3D6B] dark:text-white">
-                    {e.firstName} {e.lastName}
-                  </p>
-                  <p className="text-sm text-gray-500">{e.email}</p>
-                  <p className="text-sm text-gray-500">{e.phone}</p>
+              <div className="flex items-start gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0B3D6B]/10 dark:bg-[#0B3D6B]/30 font-bold text-[#0B3D6B] dark:text-blue-300">
+                  {getInitials(enrollment.studentName)}
                 </div>
-                <span
-                  className={`inline-flex shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${ENROLLMENT_STATUS_STYLES[e.status]}`}
-                >
-                  {e.status === 'confirmed' ? 'Approved' : e.status}
-                </span>
-              </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-jakarta font-bold text-[#0D1B2A] dark:text-white">
+                      {enrollment.studentName}
+                    </p>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ${
+                      enrollment.status === 'pending'
+                        ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                        : enrollment.status === 'approved'
+                        ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                    }`}>
+                      {enrollment.status}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[#5A6A7A] dark:text-white/40">
+                    <span className="flex items-center gap-1"><span className="ti ti-mail" />{enrollment.email}</span>
+                    {enrollment.phone && <span className="flex items-center gap-1"><span className="ti ti-phone" />{enrollment.phone}</span>}
+                    <span className="flex items-center gap-1"><span className="ti ti-book" />{COURSE_LABELS[enrollment.courseId] ?? enrollment.courseId}</span>
+                    {enrollment.location && <span className="flex items-center gap-1"><span className="ti ti-map-pin" />{enrollment.location}</span>}
+                    <span className="flex items-center gap-1"><span className="ti ti-calendar" />{formatDate(enrollment.createdAt)}</span>
+                  </div>
+                  {enrollment.notes && (
+                    <p className="mt-1.5 text-xs text-[#5A6A7A] dark:text-white/40 italic">{enrollment.notes}</p>
+                  )}
+                </div>
 
-              <div className="mt-4 space-y-1 text-sm text-gray-600 dark:text-gray-300">
-                <p>
-                  <span className="font-medium">Course:</span> {PROGRAM_LABEL_MAP[e.program]}
-                </p>
-                <p>
-                  <span className="font-medium">Paid:</span>{' '}
-                  {e.totalPaid > 0 ? formatLKR(e.totalPaid) : '—'}
-                </p>
-                <p>
-                  <span className="font-medium">Submitted:</span>{' '}
-                  {formatEnrollmentDate(e.createdAt)}
-                </p>
-                <p>
-                  <span
-                    className={`inline-flex rounded-full border px-2 py-0.5 text-xs capitalize ${PAYMENT_STATUS_STYLES[e.stripePaymentStatus]}`}
-                  >
-                    Payment: {e.stripePaymentStatus}
-                  </span>
-                </p>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setViewApp(e)}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  View
-                </button>
-                {isStaff && e.status === 'pending' && !e.studentId && (
-                  <>
+                {/* Action buttons — only on pending */}
+                {enrollment.status === 'pending' && (
+                  <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
                     <button
                       type="button"
-                      onClick={() => openApproveModal(e)}
-                      className="rounded-lg bg-[#E8A020] px-3 py-1.5 text-xs font-bold text-[#0B3D6B] hover:bg-[#d4911c]"
+                      onClick={() => setApproveModal(enrollment)}
+                      className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
                     >
-                      ✓ Approve & Create Account
+                      <span className="ti ti-check" />
+                      Approve
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        setRejectTarget(e)
-                        setRejectionReason('')
-                        setActionError('')
-                      }}
-                      className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                      onClick={() => setRejectModal(enrollment)}
+                      className="flex items-center gap-1.5 rounded-xl border border-red-200 dark:border-red-800 px-4 py-2 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
                     >
-                      ✗ Reject
+                      <span className="ti ti-x" />
+                      Reject
                     </button>
-                  </>
-                )}
-                {e.studentId && (
-                  <span className="flex items-center gap-1 text-xs text-emerald-600">
-                    <span className="ti ti-circle-check" />
-                    Account active
-                  </span>
+                  </div>
                 )}
               </div>
             </div>
@@ -355,150 +346,159 @@ export default function EnrollmentsPage() {
         </div>
       )}
 
-      {approveTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setApproveTarget(null)} />
-          <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800">
-            <h2 className="font-jakarta text-lg font-bold text-[#0B3D6B] dark:text-white">
-              Approve & Create Account
-            </h2>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-              {approveTarget.firstName} {approveTarget.lastName} · {approveTarget.email}
-            </p>
-            <p className="mt-1 text-xs text-gray-500">
-              This will create a login account and send credentials via WhatsApp
-            </p>
+      {/* ── Approve modal with payment plan ────────────────────────────────── */}
+      {approveModal && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setApproveModal(null)} />
+          <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white dark:bg-[#0d1a2e] shadow-2xl overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#DDE3EC] dark:border-white/[0.08] px-5 py-4">
+              <h2 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">Approve Enrollment</h2>
+              <button type="button" onClick={() => setApproveModal(null)}>
+                <span className="ti ti-x text-lg text-[#5A6A7A]" />
+              </button>
+            </div>
 
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Student ID</label>
-                <input
-                  value={studentCode}
-                  onChange={(ev) => setStudentCode(ev.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                />
+            <div className="flex-1 p-5 space-y-5">
+              {/* Student info */}
+              <div className="rounded-xl bg-[#F5F7FB] dark:bg-white/[0.04] p-4">
+                <p className="font-bold text-[#0B3D6B] dark:text-white">{approveModal.studentName}</p>
+                <p className="text-xs text-[#5A6A7A] dark:text-white/50 mt-0.5">
+                  {approveModal.email} · {COURSE_LABELS[approveModal.courseId] ?? approveModal.courseId}
+                </p>
               </div>
+
+              {/* Payment plan */}
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Location</label>
-                <select
-                  value={approveLocation}
-                  onChange={(ev) => setApproveLocation(ev.target.value as StudentLocation)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                >
-                  {LOCATION_OPTIONS.map((loc) => (
-                    <option key={loc.value} value={loc.value}>
-                      {loc.label}
-                    </option>
+                <h3 className="font-jakarta font-bold text-[#0D1B2A] dark:text-white mb-3">
+                  Set Payment Plan
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">
+                      Total Course Fee (LKR)
+                    </label>
+                    <input
+                      type="number"
+                      value={planForm.totalFee}
+                      onChange={e => setPlanForm(f => ({ ...f, totalFee: e.target.value }))}
+                      placeholder="e.g. 120000"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <p className="text-xs font-bold text-[#5A6A7A] dark:text-white/50 uppercase tracking-wide">
+                    Installments
+                  </p>
+                  {planForm.installments.map((inst, i) => (
+                    <div key={i} className="grid grid-cols-3 gap-2">
+                      <input
+                        type="text"
+                        value={inst.label}
+                        onChange={e => setPlanForm(f => ({
+                          ...f,
+                          installments: f.installments.map((x, j) => j === i ? { ...x, label: e.target.value } : x)
+                        }))}
+                        placeholder="Label"
+                        className={inputClass}
+                      />
+                      <input
+                        type="number"
+                        value={inst.amount}
+                        onChange={e => setPlanForm(f => ({
+                          ...f,
+                          installments: f.installments.map((x, j) => j === i ? { ...x, amount: e.target.value } : x)
+                        }))}
+                        placeholder="Amount"
+                        className={inputClass}
+                      />
+                      <input
+                        type="date"
+                        value={inst.dueDate}
+                        onChange={e => setPlanForm(f => ({
+                          ...f,
+                          installments: f.installments.map((x, j) => j === i ? { ...x, dueDate: e.target.value } : x)
+                        }))}
+                        className={inputClass}
+                      />
+                    </div>
                   ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">
-                  Batch / Intake
-                </label>
-                <input
-                  value={batchIntake}
-                  onChange={(ev) => setBatchIntake(ev.target.value)}
-                  placeholder="e.g. 2026"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
-                />
+
+                  <button
+                    type="button"
+                    onClick={() => setPlanForm(f => ({
+                      ...f,
+                      installments: [...f.installments, { label: '', amount: '', dueDate: '' }]
+                    }))}
+                    className="text-xs font-semibold text-[#0B3D6B] dark:text-blue-300 hover:underline"
+                  >
+                    + Add installment
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className="mt-6 flex gap-3">
+            <div className="border-t border-[#DDE3EC] dark:border-white/[0.08] p-5 space-y-3">
               <button
                 type="button"
-                onClick={() => setApproveTarget(null)}
-                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium"
+                disabled={saving}
+                onClick={() => void handleApprove()}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 font-jakarta font-bold text-white disabled:opacity-50 hover:bg-emerald-700"
+              >
+                {saving ? <span className="ti ti-loader animate-spin" /> : <span className="ti ti-check" />}
+                {saving ? 'Approving...' : 'Approve & Create Student'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setApproveModal(null)}
+                className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 py-3 text-sm font-semibold text-[#5A6A7A] dark:text-white/60"
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                disabled={submitting || !studentCode.trim()}
-                onClick={() => void handleApprove()}
-                className="flex-1 rounded-xl bg-[#E8A020] py-2.5 text-sm font-bold text-[#0B3D6B] disabled:opacity-50"
-              >
-                {submitting ? 'Creating…' : 'Confirm & Create Account'}
-              </button>
             </div>
           </div>
-        </div>
+        </>
       )}
 
-      {rejectTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setRejectTarget(null)} />
-          <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800">
-            <h2 className="font-jakarta text-lg font-bold text-red-600">Reject Enrollment</h2>
-            <p className="mt-2 text-sm text-gray-600">
-              {rejectTarget.firstName} {rejectTarget.lastName}
+      {/* ── Reject modal ───────────────────────────────────────────────────── */}
+      {rejectModal && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setRejectModal(null)} />
+          <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white dark:bg-[#0d1a2e] p-6 shadow-2xl">
+            <h2 className="font-jakarta font-bold text-[#0D1B2A] dark:text-white">Reject Enrollment</h2>
+            <p className="mt-1 text-sm text-[#5A6A7A] dark:text-white/50">
+              Rejecting {rejectModal.studentName}&apos;s enrollment
             </p>
             <div className="mt-4">
-              <label className="mb-1 block text-xs font-medium text-gray-500">
+              <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">
                 Reason (optional)
               </label>
               <textarea
-                value={rejectionReason}
-                onChange={(ev) => setRejectionReason(ev.target.value)}
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
                 rows={3}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                placeholder="e.g. Incomplete documents, wrong course..."
+                className={`${inputClass} resize-none`}
               />
             </div>
-            <div className="mt-6 flex gap-3">
+            <div className="mt-4 flex gap-3">
               <button
                 type="button"
-                onClick={() => setRejectTarget(null)}
-                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium"
+                onClick={() => setRejectModal(null)}
+                className="flex-1 rounded-xl border border-[#DDE3EC] dark:border-white/20 py-2.5 text-sm font-semibold text-[#5A6A7A]"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                disabled={submitting}
+                disabled={saving}
                 onClick={() => void handleReject()}
-                className="flex-1 rounded-xl border-2 border-red-500 py-2.5 text-sm font-bold text-red-600 disabled:opacity-50"
+                className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white disabled:opacity-50 hover:bg-red-700"
               >
-                {submitting ? 'Rejecting…' : 'Confirm Rejection'}
+                {saving ? 'Rejecting...' : 'Reject'}
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {viewApp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setViewApp(null)} />
-          <div className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-jakarta text-lg font-bold text-[#0B3D6B] dark:text-white">
-                Enrollment Application
-              </h2>
-              <button type="button" onClick={() => setViewApp(null)} className="rounded-full p-1.5 hover:bg-gray-100">
-                <span className="ti ti-x text-gray-500" />
-              </button>
-            </div>
-            <div className="space-y-3 text-sm">
-              {[
-                ['Name', `${viewApp.firstName} ${viewApp.lastName}`],
-                ['Email', viewApp.email],
-                ['Phone', viewApp.phone],
-                ['Program', PROGRAM_LABEL_MAP[viewApp.program]],
-                ['Location', viewApp.location],
-                ['Amount Paid', viewApp.totalPaid > 0 ? formatLKR(viewApp.totalPaid) : '—'],
-                ['Payment', viewApp.stripePaymentStatus],
-                ['Status', viewApp.status === 'confirmed' ? 'Approved' : viewApp.status],
-                ['Student ID', viewApp.studentId || '—'],
-                ['Applied On', formatEnrollmentDate(viewApp.createdAt)],
-              ].map(([label, value]) => (
-                <div key={label} className="flex justify-between gap-4 border-b border-gray-50 pb-2">
-                  <span className="font-medium text-gray-500">{label}</span>
-                  <span className="text-right capitalize text-gray-800 dark:text-gray-200">{value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        </>
       )}
     </div>
   )
