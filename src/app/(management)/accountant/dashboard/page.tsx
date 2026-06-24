@@ -61,20 +61,6 @@ export default function AccountantKitchenDashboard() {
         ])
 
         // Accommodation - monthly rent total
-        // TODO: Add to Firestore rules:
-        // match /accommodation/{houseId} {
-        //   allow read: if request.auth != null &&
-        //     request.auth.token.role in
-        //     ['admin','owner','accountant','reception'];
-        //   allow write: if request.auth != null &&
-        //     request.auth.token.role in
-        //     ['admin','owner','accountant'];
-        //   match /bills/{billId} {
-        //     allow read, write: if request.auth != null &&
-        //       request.auth.token.role in
-        //       ['admin','owner','accountant'];
-        //   }
-        // }
         const housesSnap = await getDocs(
           collection(db, 'accommodation'),
         ).catch(() => ({ docs: [] as Array<{ id: string; data: () => Record<string, unknown> }> }))

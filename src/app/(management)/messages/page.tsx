@@ -96,7 +96,7 @@ export default function MessagesPage() {
 
   // Load conversations
   useEffect(() => {
-    const q = query(collection(db, 'messages'), orderBy('studentName', 'asc'))
+    const q = query(collection(db, 'messages'))
     const unsub = onSnapshot(
       q,
       (snap) => {

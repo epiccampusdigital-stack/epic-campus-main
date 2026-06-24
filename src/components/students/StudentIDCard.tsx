@@ -14,12 +14,7 @@ export interface StudentIDCardProps {
 }
 
 function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
+  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
 export default function StudentIDCard({
@@ -33,10 +28,14 @@ export default function StudentIDCard({
   size = 'normal',
 }: StudentIDCardProps) {
   const scale = size === 'large' ? 1.4 : 1
-  const W = Math.round(420 * scale)
-  const H = Math.round(260 * scale)
-
+  const W = Math.round(480 * scale)
+  const H = Math.round(290 * scale)
   const fs = (n: number) => Math.round(n * scale)
+  const split = Math.round(178 * scale)
+  const initials = getInitials(studentName)
+  const shortCourse = course.length > 26 ? course.slice(0, 26) + '…' : course
+  const shortName = studentName.length > 20 ? studentName.slice(0, 20) + '…' : studentName
+  const shortLocation = location.length > 22 ? location.slice(0, 22) + '…' : location
 
   return (
     <div
@@ -44,12 +43,11 @@ export default function StudentIDCard({
       style={{
         width: W,
         height: H,
-        borderRadius: Math.round(16 * scale),
+        borderRadius: fs(16),
         overflow: 'hidden',
-        boxShadow: '0 8px 32px rgba(11,61,107,0.18)',
+        boxShadow: '0 12px 40px rgba(11,61,107,0.22)',
         display: 'block',
         flexShrink: 0,
-        background: '#fff',
       }}
     >
       <svg
@@ -59,247 +57,280 @@ export default function StudentIDCard({
         xmlns="http://www.w3.org/2000/svg"
         style={{ display: 'block' }}
       >
-        {/* Background */}
-        <rect width={W} height={H} fill="#ffffff" />
+        {/* ── LEFT PANEL — navy ── */}
+        <rect width={split} height={H} fill="#0B3D6B" />
 
-        {/* Header bar */}
-        <rect width={W} height={fs(58)} fill="#0B3D6B" />
-
-        {/* Decorative diagonal accent */}
+        {/* Subtle diagonal accent on left */}
         <polygon
-          points={`${W * 0.55},0 ${W},0 ${W},${fs(58)} ${W * 0.70},${fs(58)}`}
+          points={`0,${H * 0.55} ${split},${H * 0.38} ${split},${H * 0.62} 0,${H * 0.80}`}
           fill="#1A6BAD"
-          opacity="0.4"
+          opacity="0.18"
         />
 
-        {/* EPIC Campus text in header */}
+        {/* EPIC wordmark */}
         <text
-          x={fs(18)}
-          y={fs(24)}
-          fontFamily="Arial, sans-serif"
-          fontWeight="800"
-          fontSize={fs(15)}
+          x={fs(22)}
+          y={fs(44)}
+          fontFamily="Arial,sans-serif"
+          fontWeight="900"
+          fontSize={fs(24)}
           fill="#ffffff"
-          letterSpacing="0.5"
+          letterSpacing="1"
         >
           EPIC
         </text>
         <text
-          x={fs(18)}
-          y={fs(41)}
-          fontFamily="Arial, sans-serif"
+          x={fs(22)}
+          y={fs(60)}
+          fontFamily="Arial,sans-serif"
           fontWeight="400"
-          fontSize={fs(10)}
-          fill="rgba(255,255,255,0.75)"
-          letterSpacing="2"
+          fontSize={fs(9)}
+          fill="#E8A020"
+          letterSpacing="3"
         >
           CAMPUS
         </text>
 
-        {/* Vertical gold line separator */}
-        <rect x={fs(70)} y={fs(12)} width={fs(1.5)} height={fs(34)} fill="#E8A020" opacity="0.7" />
+        {/* Gold thin line under wordmark */}
+        <rect x={fs(22)} y={fs(68)} width={fs(108)} height={fs(1)} fill="#E8A020" opacity="0.5" />
 
-        {/* Tagline */}
-        <text
-          x={fs(80)}
-          y={fs(28)}
-          fontFamily="Arial, sans-serif"
-          fontWeight="300"
-          fontSize={fs(8)}
-          fill="rgba(255,255,255,0.6)"
-          letterSpacing="1.5"
-        >
-          WE CREATE YOUR FUTURE
-        </text>
-
-        {/* STUDENT ID badge */}
-        <rect
-          x={W - fs(108)}
-          y={fs(14)}
-          width={fs(92)}
-          height={fs(28)}
-          rx={fs(6)}
-          fill="#E8A020"
-        />
-        <text
-          x={W - fs(62)}
-          y={fs(32)}
-          fontFamily="Arial, sans-serif"
-          fontWeight="800"
-          fontSize={fs(9)}
-          fill="#0B3D6B"
-          textAnchor="middle"
-          letterSpacing="1.5"
-        >
-          STUDENT ID
-        </text>
-
-        {/* Gold accent line under header */}
-        <rect y={fs(58)} width={W} height={fs(3)} fill="#E8A020" />
-
-        {/* Course badge pill */}
-        <rect
-          x={fs(18)}
-          y={fs(75)}
-          width={Math.min(fs(200), course.length * fs(6.5) + fs(20))}
-          height={fs(20)}
-          rx={fs(10)}
-          fill="#E8A020"
-        />
-        <text
-          x={fs(28)}
-          y={fs(89)}
-          fontFamily="Arial, sans-serif"
-          fontWeight="700"
-          fontSize={fs(8.5)}
-          fill="#0B3D6B"
-        >
-          {course.length > 28 ? course.slice(0, 28) + '…' : course}
-        </text>
-
-        {/* Student name */}
-        <text
-          x={fs(18)}
-          y={fs(115)}
-          fontFamily="Arial, sans-serif"
-          fontWeight="800"
-          fontSize={fs(18)}
-          fill="#0B3D6B"
-        >
-          {studentName.length > 22 ? studentName.slice(0, 22) + '…' : studentName}
-        </text>
-
-        {/* ID Number */}
-        <text
-          x={fs(18)}
-          y={fs(135)}
-          fontFamily="Courier New, monospace"
-          fontWeight="700"
-          fontSize={fs(10)}
-          fill="#1A6BAD"
-          letterSpacing="1"
-        >
-          {idNumber}
-        </text>
-
-        {/* Location pin */}
-        <circle cx={fs(22)} cy={fs(152)} r={fs(4)} fill="#0B3D6B" />
-        <polygon
-          points={`${fs(19)},${fs(153)} ${fs(25)},${fs(153)} ${fs(22)},${fs(160)}`}
-          fill="#0B3D6B"
-        />
-        <text
-          x={fs(30)}
-          y={fs(157)}
-          fontFamily="Arial, sans-serif"
-          fontWeight="400"
-          fontSize={fs(9.5)}
-          fill="#5A6A7A"
-        >
-          {location.length > 25 ? location.slice(0, 25) + '…' : location}
-        </text>
-
-        {/* Intake */}
-        <text
-          x={fs(18)}
-          y={fs(175)}
-          fontFamily="Arial, sans-serif"
-          fontWeight="400"
-          fontSize={fs(9)}
-          fill="#94a3b8"
-        >
-          {intake}
-        </text>
-
-        {/* Photo circle */}
+        {/* Photo circle — centered on left panel */}
         {photoUrl ? (
           <>
             <defs>
               <clipPath id="photoClip">
-                <circle cx={W - fs(82)} cy={fs(108)} r={fs(36)} />
+                <circle cx={split / 2} cy={fs(148)} r={fs(44)} />
               </clipPath>
             </defs>
-            <circle cx={W - fs(82)} cy={fs(108)} r={fs(39)} fill="#E8A020" />
+            <circle cx={split / 2} cy={fs(148)} r={fs(47)} fill="#E8A020" opacity="0.3" />
+            <circle cx={split / 2} cy={fs(148)} r={fs(44)} fill="#071F36" />
             <image
               href={photoUrl}
-              x={W - fs(118)}
-              y={fs(72)}
-              width={fs(72)}
-              height={fs(72)}
+              x={split / 2 - fs(44)}
+              y={fs(104)}
+              width={fs(88)}
+              height={fs(88)}
               clipPath="url(#photoClip)"
               preserveAspectRatio="xMidYMid slice"
             />
           </>
         ) : (
           <>
-            <circle cx={W - fs(82)} cy={fs(108)} r={fs(39)} fill="#E8A020" />
-            <circle cx={W - fs(82)} cy={fs(108)} r={fs(36)} fill="#0B3D6B" />
+            <circle cx={split / 2} cy={fs(148)} r={fs(47)} fill="#E8A020" opacity="0.25" />
+            <circle cx={split / 2} cy={fs(148)} r={fs(44)} fill="#071F36" />
             <text
-              x={W - fs(82)}
-              y={fs(116)}
-              fontFamily="Arial, sans-serif"
+              x={split / 2}
+              y={fs(156)}
+              fontFamily="Arial,sans-serif"
               fontWeight="800"
-              fontSize={fs(20)}
-              fill="#ffffff"
+              fontSize={fs(26)}
+              fill="rgba(255,255,255,0.25)"
               textAnchor="middle"
             >
-              {getInitials(studentName)}
+              {initials}
             </text>
           </>
         )}
 
-        {/* QR code via foreignObject */}
-        <foreignObject x={W - fs(78)} y={fs(155)} width={fs(62)} height={fs(62)}>
+        {/* ID number bottom of left panel */}
+        <text
+          x={split / 2}
+          y={fs(220)}
+          fontFamily="Courier New,monospace"
+          fontWeight="700"
+          fontSize={fs(10)}
+          fill="rgba(255,255,255,0.5)"
+          textAnchor="middle"
+          letterSpacing="1"
+        >
+          {idNumber}
+        </text>
+        <text
+          x={split / 2}
+          y={fs(236)}
+          fontFamily="Arial,sans-serif"
+          fontWeight="400"
+          fontSize={fs(8)}
+          fill="rgba(255,255,255,0.25)"
+          textAnchor="middle"
+          letterSpacing="2"
+        >
+          STUDENT ID
+        </text>
+
+        {/* www bottom left */}
+        <text
+          x={split / 2}
+          y={H - fs(12)}
+          fontFamily="Arial,sans-serif"
+          fontWeight="400"
+          fontSize={fs(7.5)}
+          fill="rgba(255,255,255,0.2)"
+          textAnchor="middle"
+        >
+          www.epiccampus.live
+        </text>
+
+        {/* ── RIGHT PANEL — light ── */}
+        <rect x={split} y={0} width={W - split} height={H} fill="#F5F7FB" />
+
+        {/* Gold top accent strip on right */}
+        <rect x={split} y={0} width={W - split} height={fs(4)} fill="#E8A020" />
+
+        {/* STUDENT ID label top right */}
+        <text
+          x={W - fs(18)}
+          y={fs(22)}
+          fontFamily="Arial,sans-serif"
+          fontWeight="700"
+          fontSize={fs(8)}
+          fill="#9AA5B4"
+          textAnchor="end"
+          letterSpacing="2"
+        >
+          STUDENT ID
+        </text>
+
+        {/* Student name */}
+        <text
+          x={split + fs(20)}
+          y={fs(52)}
+          fontFamily="Arial,sans-serif"
+          fontWeight="800"
+          fontSize={fs(20)}
+          fill="#0B3D6B"
+        >
+          {shortName}
+        </text>
+
+        {/* Course badge */}
+        <rect
+          x={split + fs(20)}
+          y={fs(62)}
+          width={fs(Math.min(220, shortCourse.length * 6.8 + 24))}
+          height={fs(19)}
+          rx={fs(4)}
+          fill="#0B3D6B"
+        />
+        <text
+          x={split + fs(30)}
+          y={fs(75)}
+          fontFamily="Arial,sans-serif"
+          fontWeight="700"
+          fontSize={fs(9)}
+          fill="white"
+        >
+          {shortCourse}
+        </text>
+
+        {/* Divider */}
+        <rect x={split + fs(20)} y={fs(92)} width={W - split - fs(40)} height={fs(0.5)} fill="#DDE3EC" />
+
+        {/* Details */}
+        <text
+          x={split + fs(20)}
+          y={fs(112)}
+          fontFamily="Arial,sans-serif"
+          fontWeight="600"
+          fontSize={fs(8.5)}
+          fill="#9AA5B4"
+          letterSpacing="1.5"
+        >
+          CAMPUS
+        </text>
+        <text
+          x={split + fs(20)}
+          y={fs(128)}
+          fontFamily="Arial,sans-serif"
+          fontWeight="600"
+          fontSize={fs(12)}
+          fill="#0B3D6B"
+        >
+          {shortLocation}
+        </text>
+
+        <text
+          x={split + fs(20)}
+          y={fs(152)}
+          fontFamily="Arial,sans-serif"
+          fontWeight="600"
+          fontSize={fs(8.5)}
+          fill="#9AA5B4"
+          letterSpacing="1.5"
+        >
+          INTAKE
+        </text>
+        <text
+          x={split + fs(20)}
+          y={fs(168)}
+          fontFamily="Arial,sans-serif"
+          fontWeight="600"
+          fontSize={fs(12)}
+          fill="#0B3D6B"
+        >
+          {intake}
+        </text>
+
+        <text
+          x={split + fs(20)}
+          y={fs(192)}
+          fontFamily="Arial,sans-serif"
+          fontWeight="600"
+          fontSize={fs(8.5)}
+          fill="#9AA5B4"
+          letterSpacing="1.5"
+        >
+          VALID THROUGH
+        </text>
+        <text
+          x={split + fs(20)}
+          y={fs(208)}
+          fontFamily="Arial,sans-serif"
+          fontWeight="600"
+          fontSize={fs(12)}
+          fill="#E8A020"
+        >
+          December {new Date().getFullYear()}
+        </text>
+
+        {/* Divider before QR */}
+        <rect x={split + fs(20)} y={fs(220)} width={W - split - fs(40)} height={fs(0.5)} fill="#DDE3EC" />
+
+        {/* QR code bottom right */}
+        <foreignObject x={W - fs(88)} y={fs(228)} width={fs(70)} height={fs(50)}>
           <div>
             <QRCodeSVG
               value={`https://www.epiccampus.live/verify/${studentId}`}
-              size={fs(62)}
+              size={fs(50)}
               level="M"
-              bgColor="#ffffff"
+              bgColor="#F5F7FB"
               fgColor="#0B3D6B"
             />
           </div>
         </foreignObject>
 
-        {/* Footer bar */}
-        <rect y={H - fs(32)} width={W} height={fs(32)} fill="#0B3D6B" />
-
+        {/* epiccampus.live bottom right */}
         <text
-          x={fs(16)}
-          y={H - fs(11)}
-          fontFamily="Arial, sans-serif"
+          x={split + fs(20)}
+          y={H - fs(10)}
+          fontFamily="Arial,sans-serif"
           fontWeight="600"
-          fontSize={fs(9)}
-          fill="#E8A020"
+          fontSize={fs(8)}
+          fill="#9AA5B4"
         >
-          www.epiccampus.live
+          epiccampus.live
         </text>
-
         <text
-          x={W - fs(16)}
-          y={H - fs(11)}
-          fontFamily="Arial, sans-serif"
-          fontWeight="600"
-          fontSize={fs(9)}
-          fill="rgba(255,255,255,0.7)"
+          x={W - fs(18)}
+          y={H - fs(10)}
+          fontFamily="Arial,sans-serif"
+          fontWeight="700"
+          fontSize={fs(8)}
+          fill="#E8A020"
           textAnchor="end"
         >
-          Valid: {new Date().getFullYear()}
+          EPIC CAMPUS {new Date().getFullYear()}
         </text>
-
-        {/* Watermark diagonal lines */}
-        {[0.15, 0.35, 0.55, 0.75, 0.95].map((t, i) => (
-          <line
-            key={i}
-            x1={W * t}
-            y1={fs(61)}
-            x2={W * t + fs(20)}
-            y2={H - fs(32)}
-            stroke="#0B3D6B"
-            strokeWidth="0.5"
-            opacity="0.04"
-          />
-        ))}
       </svg>
     </div>
   )

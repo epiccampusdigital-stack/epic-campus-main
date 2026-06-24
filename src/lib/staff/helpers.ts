@@ -23,8 +23,10 @@ export function toDate(value: unknown): Date | null {
 }
 
 export function parseStaff(id: string, data: Record<string, unknown>): StaffMember | null {
-  const role = String(data.role ?? '') as Role
-  if (role === 'student' || !STAFF_ROLES.includes(role as StaffRole)) return null
+  if (!data.name && !data.displayName && !data.email) return null
+  const rawRole = String(data.role ?? '')
+  if (rawRole === 'student') return null
+  const role = (STAFF_ROLES.includes(rawRole as StaffRole) ? rawRole : 'teacher') as Role
 
   const created = toDate(data.createdAt)
   const approved = toDate(data.approvedAt)

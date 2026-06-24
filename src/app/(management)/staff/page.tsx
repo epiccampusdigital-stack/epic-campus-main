@@ -237,6 +237,8 @@ export default function StaffPage() {
             <option value="accountant">Accountant</option>
             <option value="teacher">Teacher</option>
             <option value="examCoordinator">Exam Coordinator</option>
+            <option value="kitchen">Kitchen</option>
+            <option value="agent">Agent</option>
           </select>
           <select
             value={statusFilter}

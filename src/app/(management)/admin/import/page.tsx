@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { collection, doc, writeBatch } from 'firebase/firestore'
+import { addDoc, collection } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { useManagement } from '@/components/layout/ManagementContext'
 
@@ -287,6 +287,7 @@ export default function UniversalImportPage() {
   const [aiParsed, setAiParsed] = useState<Record<string, unknown>[]>([])
   const [parsing, setParsing] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState('')
   const [aiLog, setAiLog] = useState('')
   const [result, setResult] = useState<{ success: number; errors: string[] } | null>(null)
   const [toast, setToast] = useState('')
@@ -325,38 +326,35 @@ export default function UniversalImportPage() {
   async function handleImport() {
     if (!user || aiParsed.length === 0) return
     setImporting(true)
+    setImportProgress('')
     const errors: string[] = []
     let success = 0
 
     try {
-      const chunks: Record<string, unknown>[][] = []
-      for (let i = 0; i < aiParsed.length; i += 400) {
-        chunks.push(aiParsed.slice(i, i + 400))
-      }
-
       const now = new Date().toISOString()
+      const total = aiParsed.length
 
-      for (const chunk of chunks) {
-        const batch = writeBatch(db)
-        for (const row of chunk) {
-          try {
-            const ref = doc(collection(db, target.collection))
-            batch.set(ref, {
-              ...row,
-              importedAt: now,
-              importedBy: user.uid,
-            })
-            success++
-          } catch {
-            errors.push(`Row failed: ${JSON.stringify(row).slice(0, 80)}`)
-          }
+      for (let i = 0; i < aiParsed.length; i++) {
+        const row = aiParsed[i]
+        setImportProgress(`Importing ${i + 1} of ${total}…`)
+        try {
+          await addDoc(collection(db, target.collection), {
+            ...row,
+            importedAt: now,
+            importedBy: user.uid,
+          })
+          success++
+        } catch (err) {
+          console.error('[Import row error]', err, row)
+          errors.push(`Row ${i + 1} failed: ${JSON.stringify(row).slice(0, 80)}`)
         }
-        await batch.commit()
       }
     } catch (err) {
-      errors.push(`Batch error: ${String(err)}`)
+      console.error('[Import error]', err)
+      errors.push(`Import error: ${String(err)}`)
     } finally {
       setImporting(false)
+      setImportProgress('')
       setResult({ success, errors })
       if (errors.length === 0) {
         showToast(`✅ ${success} records imported to Firestore!`)
@@ -584,7 +582,7 @@ Total | Rs. 361,480.00 | Rs. 541,050.00`)}
                 {importing ? (
                   <>
                     <span className="ti ti-loader animate-spin" />
-                    Importing to Firestore...
+                    {importProgress || 'Importing to Firestore...'}
                   </>
                 ) : (
                   <>

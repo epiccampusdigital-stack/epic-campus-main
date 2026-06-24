@@ -79,7 +79,7 @@ export default function MaterialsPage() {
   async function loadMaterials() {
     setLoading(true)
     try {
-      const snap = await getDocs(query(collection(db, 'studyMaterials'), orderBy('createdAt', 'desc')))
+      const snap = await getDocs(query(collection(db, 'materials'), orderBy('createdAt', 'desc')))
       setMaterials(snap.docs.map((d) => {
         const data = d.data()
         return {
@@ -117,7 +117,7 @@ export default function MaterialsPage() {
   }
 
   async function uploadFile(file: File, courseId: string): Promise<string> {
-    const path = `study-materials/${courseId}/${Date.now()}-${file.name}`
+    const path = `materials/${courseId}/${Date.now()}_${file.name}`
     const storageRef = ref(storage, path)
     return new Promise((resolve, reject) => {
       const task = uploadBytesResumable(storageRef, file)
@@ -147,9 +147,9 @@ export default function MaterialsPage() {
         createdBy: userEmail,
       }
       if (editId) {
-        await updateDoc(doc(db, 'studyMaterials', editId), payload)
+        await updateDoc(doc(db, 'materials', editId), payload)
       } else {
-        await addDoc(collection(db, 'studyMaterials'), { ...payload, createdAt: serverTimestamp() })
+        await addDoc(collection(db, 'materials'), { ...payload, createdAt: serverTimestamp() })
       }
       await loadMaterials()
       setSlideOpen(false)
@@ -163,7 +163,7 @@ export default function MaterialsPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this material?')) return
-    await deleteDoc(doc(db, 'studyMaterials', id))
+    await deleteDoc(doc(db, 'materials', id))
     setMaterials((prev) => prev.filter((m) => m.id !== id))
   }
 

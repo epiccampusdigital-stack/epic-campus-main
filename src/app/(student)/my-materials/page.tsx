@@ -33,12 +33,12 @@ export default function MyMaterialsPage() {
         // Fetch materials for this specific course OR 'all' courses
         const [courseSnap, allSnap] = await Promise.all([
           getDocs(query(
-            collection(db, 'studyMaterials'),
+            collection(db, 'materials'),
             where('courseId', '==', student!.courseId),
             orderBy('createdAt', 'desc'),
           )).catch(() => ({ docs: [] })),
           getDocs(query(
-            collection(db, 'studyMaterials'),
+            collection(db, 'materials'),
             where('courseId', '==', 'all'),
             orderBy('createdAt', 'desc'),
           )).catch(() => ({ docs: [] })),

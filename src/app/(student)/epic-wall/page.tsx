@@ -425,7 +425,7 @@ export default function EpicWallPage() {
         className="flex w-full items-center gap-3 rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] px-4 py-3 text-left"
       >
         <Avatar name={authorName} photoUrl={authorPhoto} size="md" />
-        <span className="flex-1 rounded-full border border-[#DDE3EC] dark:border-white/[0.08] bg-[#F5F7FB] dark:bg-white/[0.06] px-4 py-2 text-sm text-[#5A6A7A] dark:text-white/40">
+        <span className="flex-1 rounded-full border border-[#DDE3EC] dark:border-white/[0.08] bg-[#F5F7FB] dark:bg-white/[0.08] px-4 py-2 text-sm text-[#5A6A7A] dark:text-white/40">
           Share something with Epic Campus...
         </span>
       </button>
@@ -436,7 +436,7 @@ export default function EpicWallPage() {
           type="button"
           onClick={() => setFilterType('all')}
           className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
-            filterType === 'all' ? 'bg-[#E8A020] text-white' : 'border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/60'
+            filterType === 'all' ? 'bg-[#E8A020] text-white' : 'border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] text-[#5A6A7A] dark:text-white/60'
           }`}
         >
           All
@@ -447,7 +447,7 @@ export default function EpicWallPage() {
             type="button"
             onClick={() => setFilterType(t.value)}
             className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold capitalize ${
-              filterType === t.value ? 'bg-[#0B3D6B] text-white' : 'border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/60'
+              filterType === t.value ? 'bg-[#0B3D6B] text-white' : 'border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] text-[#5A6A7A] dark:text-white/60'
             }`}
           >
             {t.label}

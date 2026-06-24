@@ -58,34 +58,44 @@ export default function ExamsListPage() {
     if (!user) return
     const uid = user.uid
     async function load() {
-      const snap = await getDocs(
-        query(
-          collection(db, 'examPapers'),
-          where('isPublished', '==', true),
-          orderBy('order', 'asc'),
-        ),
-      )
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ExamPaperDoc))
-      setPapers(list)
+      try {
+        const snap = await getDocs(
+          query(
+            collection(db, 'examPapers'),
+            where('isPublished', '==', true),
+            orderBy('order', 'asc'),
+          ),
+        ).catch(() =>
+          getDocs(query(collection(db, 'examPapers'), orderBy('order', 'asc')))
+        ).catch(() =>
+          getDocs(collection(db, 'examPapers'))
+        )
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ExamPaperDoc))
+        setPapers(list.filter(p => p.isPublished !== false))
 
-      const attSnap = await getDocs(
-        query(
-          collection(db, 'examAttempts'),
-          where('studentId', '==', uid),
-          where('status', '==', 'completed'),
-        ),
-      )
-      const map: Record<string, { pct: number; count: number }> = {}
-      attSnap.docs.forEach((d) => {
-        const data = d.data()
-        const pid = data.paperId as string
-        const pct = data.percentage as number
-        if (!map[pid]) map[pid] = { pct: 0, count: 0 }
-        map[pid].count++
-        if (pct > map[pid].pct) map[pid].pct = pct
-      })
-      setAttempts(map)
-      setLoading(false)
+        const attSnap = await getDocs(
+          query(
+            collection(db, 'examAttempts'),
+            where('studentId', '==', uid),
+            where('status', '==', 'completed'),
+          ),
+        ).catch(() => ({ docs: [] as typeof snap.docs }))
+        const map: Record<string, { pct: number; count: number }> = {}
+        attSnap.docs.forEach((d) => {
+          const data = d.data()
+          const pid = data.paperId as string
+          const pct = data.percentage as number
+          if (!map[pid]) map[pid] = { pct: 0, count: 0 }
+          map[pid].count++
+          if (pct > map[pid].pct) map[pid].pct = pct
+        })
+        setAttempts(map)
+      } catch (err) {
+        console.error('[ExamsPage]', err)
+        setPapers([])
+      } finally {
+        setLoading(false)
+      }
     }
     void load()
   }, [user])

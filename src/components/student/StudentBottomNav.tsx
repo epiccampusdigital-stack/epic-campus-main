@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 const NAV = [
   { label: 'Wall', href: '/epic-wall', icon: 'ti-home' },
   { label: 'Dashboard', href: '/my-dashboard', icon: 'ti-layout-dashboard' },
+  { label: 'Schedule', href: '/my-schedule', icon: 'ti-calendar' },
   { label: 'Exams', href: '/exams', icon: 'ti-writing' },
   { label: 'Results', href: '/my-results', icon: 'ti-certificate' },
   { label: 'Book', href: '/book-consultation', icon: 'ti-calendar' },
