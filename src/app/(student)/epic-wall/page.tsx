@@ -386,7 +386,7 @@ export default function EpicWallPage() {
       )}
 
       {/* Stories row */}
-      <div className="flex gap-3 overflow-x-auto pb-1 pt-1 scrollbar-hide">
+      <div className="flex gap-3 overflow-x-auto pb-1 pt-1 scrollbar-hide touch-pan-x">
         <button
           type="button"
           onClick={() => setStoryCreatorOpen(true)}
@@ -431,12 +431,12 @@ export default function EpicWallPage() {
       </button>
 
       {/* Filter tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide touch-pan-x">
         <button
           type="button"
           onClick={() => setFilterType('all')}
           className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
-            filterType === 'all' ? 'bg-[#E8A020] text-white' : 'border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] text-[#5A6A7A] dark:text-white/60'
+            filterType === 'all' ? 'bg-[#E8A020] text-white' : 'border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] text-[#5A6A7A] dark:text-white/90'
           }`}
         >
           All
@@ -447,7 +447,7 @@ export default function EpicWallPage() {
             type="button"
             onClick={() => setFilterType(t.value)}
             className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold capitalize ${
-              filterType === t.value ? 'bg-[#0B3D6B] text-white' : 'border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] text-[#5A6A7A] dark:text-white/60'
+              filterType === t.value ? 'bg-[#0B3D6B] text-white' : 'border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] text-[#5A6A7A] dark:text-white/90'
             }`}
           >
             {t.label}
@@ -480,7 +480,7 @@ export default function EpicWallPage() {
             return (
               <div
                 key={post.id}
-                className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] overflow-hidden"
+                className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.08] overflow-hidden"
               >
                 {/* Post header */}
                 <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3">

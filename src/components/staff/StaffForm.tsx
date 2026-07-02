@@ -111,6 +111,7 @@ export default function StaffForm({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null)
 
   const isEdit = !!staff && !readonly
   const isView = !!staff && readonly
@@ -146,7 +147,7 @@ export default function StaffForm({
     staffDocId: string,
     email: string,
     displayName: string,
-  ): Promise<string> {
+  ): Promise<{ uid: string; password: string }> {
     const password = generateTempPassword()
     const res = await fetch('/api/staff/create-account', {
       method: 'POST',
@@ -180,7 +181,7 @@ export default function StaffForm({
     }
     const data = (await res.json()) as { uid: string }
     await sendCredentialsEmail(email, displayName, password)
-    return data.uid
+    return { uid: data.uid, password }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -231,10 +232,11 @@ export default function StaffForm({
           }).catch(() => {})
         }
       } else if (form.status === 'active') {
-        const uid = await createAuthAccount(staffDocId, form.email.trim(), form.displayName.trim())
+        const { uid, password } = await createAuthAccount(staffDocId, form.email.trim(), form.displayName.trim())
         if (photoUrl) {
           await updateDoc(doc(db, 'users', uid), { photoUrl })
         }
+        setCreatedCredentials({ email: form.email.trim(), password })
       } else {
         await setDoc(doc(db, 'users', staffDocId), {
           ...payload,
@@ -262,7 +264,7 @@ export default function StaffForm({
 
       toast.success(isEdit ? 'Staff updated' : 'Staff saved')
       onSaved()
-      onClose()
+      if (form.status !== 'active' || isEdit) onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save staff member')
       toast.error('Something went wrong. Please try again.')
@@ -572,6 +574,41 @@ export default function StaffForm({
           )}
         </form>
       </aside>
+
+      {createdCredentials && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0D1B2A]/60 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm rounded-2xl border border-[#DDE3EC] bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="ti ti-shield-check text-2xl text-emerald-600" />
+              <h3 className="font-jakarta text-lg font-bold text-[#0D1B2A]">Staff Account Created</h3>
+            </div>
+            <p className="mb-4 text-sm text-[#5A6A7A]">Login credentials have been emailed. Copy them now for reference:</p>
+            <div className="mb-3 rounded-lg bg-[#F5F7FB] px-4 py-3 font-mono text-sm text-[#0D1B2A]">
+              <div><span className="text-[#5A6A7A]">Email: </span>{createdCredentials.email}</div>
+              <div><span className="text-[#5A6A7A]">Password: </span>{createdCredentials.password}</div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(`Email: ${createdCredentials.email}\nPassword: ${createdCredentials.password}`)
+                  toast.success('Copied!')
+                }}
+                className="flex-1 rounded-lg border border-[#DDE3EC] py-2.5 font-jakarta text-sm font-semibold text-[#0B3D6B] hover:bg-[#F5F7FB]"
+              >
+                <span className="ti ti-copy mr-1" />Copy
+              </button>
+              <button
+                type="button"
+                onClick={() => { setCreatedCredentials(null); onClose() }}
+                className="flex-1 rounded-lg bg-[#E8A020] py-2.5 font-jakarta text-sm font-bold text-[#0B3D6B] hover:bg-[#F5B942]"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

@@ -313,9 +313,9 @@ export default function InventoryPage() {
         itemName: values.itemName,
         category: values.category,
         unit: values.unit,
-        currentStock: Number(values.currentStock),
-        minStockLevel: Number(values.minStockLevel),
-        unitCost: Number(values.unitCost),
+        currentStock: parseFloat(values.currentStock),
+        minStockLevel: parseFloat(values.minStockLevel),
+        unitCost: parseFloat(values.unitCost),
         isActive: true,
         lastUpdated: serverTimestamp(),
         updatedBy: user?.uid ?? '',
@@ -339,7 +339,7 @@ export default function InventoryPage() {
         savedItemId = editItem.id
         await addDoc(collection(db, 'inventory', editItem.id, 'history'), {
           action: 'updated',
-          qty: Number(values.currentStock),
+          qty: parseFloat(values.currentStock),
           reason: 'manual-edit',
           date: new Date().toISOString().slice(0, 10),
           by: user?.uid ?? '',
@@ -374,7 +374,7 @@ export default function InventoryPage() {
     if (!restockItem || !restockQty || Number(restockQty) <= 0) return
     setSaving(true)
     try {
-      const newStock = restockItem.currentStock + Number(restockQty)
+      const newStock = parseFloat((restockItem.currentStock + parseFloat(restockQty)).toFixed(10))
       const lastRestockedDate = new Date().toISOString().slice(0, 10)
       await updateDoc(doc(db, 'inventory', restockItem.id), {
         currentStock: newStock,
@@ -415,7 +415,7 @@ export default function InventoryPage() {
     if (!removeItem || !removeQty || Number(removeQty) <= 0) return
     try {
       const qty = Number(removeQty)
-      const newStock = Math.max(0, removeItem.currentStock - qty)
+      const newStock = parseFloat(Math.max(0, parseFloat((removeItem.currentStock - qty).toFixed(10))).toString())
       await updateDoc(doc(db, 'inventory', removeItem.id), {
         currentStock: newStock,
         lastUpdated: serverTimestamp(),

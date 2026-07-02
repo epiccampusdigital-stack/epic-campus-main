@@ -1,0 +1,479 @@
+'use client'
+
+import { useCallback, useEffect, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import {
+  collection,
+  doc,
+  addDoc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+  where,
+} from 'firebase/firestore'
+import { db } from '@/lib/firebase/client'
+import { useExamPortal } from '@/components/exam/ExamContext'
+
+interface ExamPaper {
+  id: string
+  title: string
+  description?: string
+  categoryId?: string
+  totalQuestions?: number
+  timeLimitSeconds?: number
+  passMark?: number
+  hasAudioCheck?: boolean
+  isPublished?: boolean
+}
+
+interface ExamSection {
+  id: string
+  name: string
+  order: number
+  sectionType?: string
+}
+
+interface ExamQuestion {
+  id: string
+  sectionId: string
+  order: number
+  questionText?: string
+  questionTextJP?: string
+  options: { index: number; text: string }[]
+  correctIndex: number
+  audioUrl?: string
+  imageUrl?: string
+}
+
+type Phase = 'loading' | 'start' | 'audio-check' | 'exam' | 'submitting' | 'results'
+
+function formatTime(s: number) {
+  const m = Math.floor(s / 60)
+  const sec = s % 60
+  return `${m}:${sec.toString().padStart(2, '0')}`
+}
+
+export default function ExamPage() {
+  const { paperId } = useParams<{ paperId: string }>()
+  const router = useRouter()
+  const { user, student } = useExamPortal()
+
+  const [phase, setPhase] = useState<Phase>('loading')
+  const [paper, setPaper] = useState<ExamPaper | null>(null)
+  const [sections, setSections] = useState<ExamSection[]>([])
+  const [questions, setQuestions] = useState<ExamQuestion[]>([])
+  const [answers, setAnswers] = useState<Record<string, number>>({})
+  const [flagged, setFlagged] = useState<Set<string>>(new Set())
+  const [currentQ, setCurrentQ] = useState(0)
+  const [timeLeft, setTimeLeft] = useState(3600)
+  const [audioChecked, setAudioChecked] = useState(false)
+  const [score, setScore] = useState<{ correct: number; total: number; pct: number } | null>(null)
+  const [error, setError] = useState('')
+
+  const load = useCallback(async () => {
+    if (!paperId) return
+    try {
+      const paperSnap = await getDoc(doc(db, 'examPapers', paperId))
+      if (!paperSnap.exists()) {
+        setError('Exam paper not found.')
+        setPhase('start')
+        return
+      }
+      const p = { id: paperSnap.id, ...paperSnap.data() } as ExamPaper
+      setPaper(p)
+      setTimeLeft(p.timeLimitSeconds ?? 3600)
+
+      const secsSnap = await getDocs(
+        query(collection(db, 'examSections'), where('paperId', '==', paperId), orderBy('order', 'asc'))
+      ).catch(() => getDocs(query(collection(db, 'examSections'), where('paperId', '==', paperId))))
+      setSections(secsSnap.docs.map(d => ({ id: d.id, ...d.data() } as ExamSection)))
+
+      const qsSnap = await getDocs(
+        query(collection(db, 'examQuestions'), where('paperId', '==', paperId), orderBy('order', 'asc'))
+      ).catch(() => getDocs(query(collection(db, 'examQuestions'), where('paperId', '==', paperId))))
+      setQuestions(qsSnap.docs.map(d => ({ id: d.id, ...d.data() } as ExamQuestion)))
+
+      setPhase('start')
+    } catch (err) {
+      console.error('[ExamPage load]', err)
+      setError('Failed to load exam.')
+      setPhase('start')
+    }
+  }, [paperId])
+
+  useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    if (phase !== 'exam') return
+    if (timeLeft <= 0) { void handleSubmit(); return }
+    const t = setInterval(() => setTimeLeft(s => s - 1), 1000)
+    return () => clearInterval(t)
+  })
+
+  async function handleSubmit() {
+    if (!paper) return
+    setPhase('submitting')
+    try {
+      const correct = questions.filter(q => answers[q.id] === q.correctIndex).length
+      const total = questions.length
+      const pct = total > 0 ? Math.round((correct / total) * 100) : 0
+      setScore({ correct, total, pct })
+      await addDoc(collection(db, 'examAttempts'), {
+        studentId: user.uid,
+        studentName: student?.name ?? user.displayName ?? 'Student',
+        studentCode: student?.studentCode ?? '',
+        paperId: paper.id,
+        paperTitle: paper.title,
+        answers,
+        score: correct,
+        totalQuestions: total,
+        percentage: pct,
+        timeTaken: (paper.timeLimitSeconds ?? 3600) - timeLeft,
+        status: 'completed',
+        completedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+      })
+    } catch (err) {
+      console.error('[ExamPage submit]', err)
+    } finally {
+      setPhase('results')
+    }
+  }
+
+  function toggleFlag(qId: string) {
+    setFlagged(prev => {
+      const next = new Set(prev)
+      next.has(qId) ? next.delete(qId) : next.add(qId)
+      return next
+    })
+  }
+
+  const q = questions[currentQ]
+  const section = q ? sections.find(s => s.id === q.sectionId) : null
+  const answered = Object.keys(answers).length
+  const timerWarn = timeLeft < 300
+  const passed = score && paper && score.pct >= (paper.passMark ?? 80)
+
+  // ── LOADING ──
+  if (phase === 'loading') return (
+    <div className="flex min-h-screen items-center justify-center bg-[#F5F7FB]">
+      <div className="text-center">
+        <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-[#0B3D6B] border-t-transparent" />
+        <p className="mt-4 text-sm text-[#5A6A7A]">Loading exam...</p>
+      </div>
+    </div>
+  )
+
+  // ── START ──
+  if (phase === 'start') return (
+    <div className="flex min-h-screen items-center justify-center bg-[#F5F7FB] p-4">
+      <div className="w-full max-w-lg space-y-5">
+        {error && <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
+        <div className="rounded-2xl bg-gradient-to-br from-[#0B3D6B] to-[#1A6BAD] p-6 text-white">
+          <h1 className="font-jakarta text-2xl font-bold">{paper?.title ?? 'Exam'}</h1>
+          {paper?.description && <p className="mt-1 text-sm text-white/70">{paper.description}</p>}
+          <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+            <div className="rounded-xl bg-white/10 p-3">
+              <p className="text-xl font-bold">{questions.length}</p>
+              <p className="text-xs text-white/60">Questions</p>
+            </div>
+            <div className="rounded-xl bg-white/10 p-3">
+              <p className="text-xl font-bold">{formatTime(paper?.timeLimitSeconds ?? 3600)}</p>
+              <p className="text-xs text-white/60">Time</p>
+            </div>
+            <div className="rounded-xl bg-white/10 p-3">
+              <p className="text-xl font-bold">{paper?.passMark ?? 80}%</p>
+              <p className="text-xs text-white/60">Pass Mark</p>
+            </div>
+          </div>
+        </div>
+
+        {sections.length > 0 && (
+          <div className="rounded-2xl border border-[#DDE3EC] bg-white p-5">
+            <h2 className="font-jakarta font-bold text-[#0B3D6B] mb-3">Exam Sections</h2>
+            <div className="space-y-2">
+              {sections.map((sec, i) => (
+                <div key={sec.id} className="flex items-center gap-3 text-sm">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0B3D6B]/10 text-xs font-bold text-[#0B3D6B]">{i + 1}</div>
+                  <span className="text-[#0D1B2A]">{sec.name}</span>
+                  <span className="ml-auto text-xs text-[#5A6A7A]">
+                    {questions.filter(qs => qs.sectionId === sec.id).length} questions
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="rounded-2xl border border-[#DDE3EC] bg-white p-5">
+          <h2 className="font-jakarta font-bold text-[#0B3D6B] mb-2">Before you begin</h2>
+          <ul className="space-y-1 text-sm text-[#5A6A7A]">
+            <li className="flex items-center gap-2"><span className="ti ti-check text-emerald-500" />Stable internet connection required</li>
+            <li className="flex items-center gap-2"><span className="ti ti-check text-emerald-500" />Do not refresh or close the browser</li>
+            <li className="flex items-center gap-2"><span className="ti ti-check text-emerald-500" />Timer starts immediately when you begin</li>
+            <li className="flex items-center gap-2"><span className="ti ti-check text-emerald-500" />Flag questions to review before submitting</li>
+          </ul>
+        </div>
+
+        <div className="flex gap-3">
+          <button type="button" onClick={() => router.back()} className="flex-1 rounded-xl border border-[#DDE3EC] bg-white py-3 text-sm font-semibold text-[#5A6A7A]">Back</button>
+          <button
+            type="button"
+            disabled={questions.length === 0}
+            onClick={() => paper?.hasAudioCheck ? setPhase('audio-check') : setPhase('exam')}
+            className="flex-1 rounded-xl bg-[#E8A020] py-3 text-sm font-bold text-[#0B3D6B] disabled:opacity-40"
+          >
+            {questions.length === 0 ? 'No Questions Yet' : 'Begin Exam →'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
+  // ── AUDIO CHECK ──
+  if (phase === 'audio-check') return (
+    <div className="flex min-h-screen items-center justify-center bg-[#F5F7FB] p-4">
+      <div className="w-full max-w-md space-y-6 text-center">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#0B3D6B]/10">
+          <span className="ti ti-volume text-4xl text-[#0B3D6B]" />
+        </div>
+        <h1 className="font-jakarta text-2xl font-bold text-[#0B3D6B]">Audio Check</h1>
+        <p className="text-sm text-[#5A6A7A]">This exam has listening questions. Confirm your audio is working.</p>
+        <div className="rounded-2xl border border-[#DDE3EC] bg-white p-5 text-left">
+          <p className="text-sm font-semibold text-[#0B3D6B] mb-3">Play the test sound:</p>
+          <audio controls className="w-full" onPlay={() => setAudioChecked(true)}>
+            <source src="/audio/test-tone.mp3" type="audio/mpeg" />
+          </audio>
+          {audioChecked && (
+            <p className="mt-3 text-sm text-emerald-600 flex items-center gap-1">
+              <span className="ti ti-check" />Audio confirmed!
+            </p>
+          )}
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={() => setPhase('start')} className="flex-1 rounded-xl border border-[#DDE3EC] bg-white py-3 text-sm font-semibold text-[#5A6A7A]">Back</button>
+          <button type="button" onClick={() => { setAudioChecked(true); setPhase('exam') }} className="flex-1 rounded-xl bg-[#E8A020] py-3 text-sm font-bold text-[#0B3D6B]">
+            {audioChecked ? 'Start Exam →' : 'Skip & Start'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
+  // ── SUBMITTING ──
+  if (phase === 'submitting') return (
+    <div className="flex min-h-screen items-center justify-center bg-[#F5F7FB]">
+      <div className="text-center">
+        <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-[#0B3D6B] border-t-transparent" />
+        <p className="mt-4 text-sm text-[#5A6A7A]">Submitting your exam...</p>
+      </div>
+    </div>
+  )
+
+  // ── RESULTS ──
+  if (phase === 'results') return (
+    <div className="flex min-h-screen items-center justify-center bg-[#F5F7FB] p-4">
+      <div className="w-full max-w-lg space-y-5">
+        <div className={`rounded-2xl p-6 text-white text-center ${passed ? 'bg-gradient-to-br from-emerald-600 to-emerald-500' : 'bg-gradient-to-br from-[#0B3D6B] to-[#1A6BAD]'}`}>
+          <div className="text-5xl mb-3">{passed ? '🏆' : '📚'}</div>
+          <h1 className="font-jakarta text-2xl font-bold">{passed ? 'Congratulations!' : 'Keep Practising!'}</h1>
+          <p className="mt-1 text-sm text-white/70">{paper?.title}</p>
+          <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+            <div className="rounded-xl bg-white/10 p-3">
+              <p className="text-2xl font-bold">{score?.pct ?? 0}%</p>
+              <p className="text-xs text-white/60">Score</p>
+            </div>
+            <div className="rounded-xl bg-white/10 p-3">
+              <p className="text-2xl font-bold">{score?.correct ?? 0}/{score?.total ?? 0}</p>
+              <p className="text-xs text-white/60">Correct</p>
+            </div>
+            <div className="rounded-xl bg-white/10 p-3">
+              <p className="text-2xl font-bold">{passed ? '✓' : '✗'}</p>
+              <p className="text-xs text-white/60">{passed ? 'Passed' : 'Not Yet'}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[#DDE3EC] bg-white p-5">
+          <h2 className="font-jakarta font-bold text-[#0B3D6B] mb-3">Question Review</h2>
+          <div className="max-h-72 overflow-y-auto space-y-2">
+            {questions.map((qs, i) => {
+              const userAns = answers[qs.id]
+              const correct = userAns === qs.correctIndex
+              const correctOption = qs.options.find(o => o.index === qs.correctIndex)
+              return (
+                <div key={qs.id} className={`rounded-xl p-3 text-sm ${correct ? 'bg-emerald-50 border border-emerald-100' : 'bg-red-50 border border-red-100'}`}>
+                  <div className="flex items-start gap-2">
+                    <span className={`shrink-0 font-bold text-xs mt-0.5 ${correct ? 'text-emerald-600' : 'text-red-600'}`}>Q{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-[#5A6A7A] line-clamp-2">{qs.questionText ?? qs.questionTextJP}</p>
+                      {!correct && correctOption && (
+                        <p className="text-xs text-emerald-700 font-semibold mt-1">✓ {correctOption.text}</p>
+                      )}
+                    </div>
+                    <span className={`shrink-0 ti ${correct ? 'ti-check text-emerald-600' : 'ti-x text-red-500'}`} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button type="button" onClick={() => router.push('/exams')} className="flex-1 rounded-xl border border-[#DDE3EC] bg-white py-3 text-sm font-semibold text-[#5A6A7A]">All Exams</button>
+          <button
+            type="button"
+            onClick={() => { setAnswers({}); setFlagged(new Set()); setCurrentQ(0); setTimeLeft(paper?.timeLimitSeconds ?? 3600); setScore(null); setPhase('start') }}
+            className="flex-1 rounded-xl bg-[#E8A020] py-3 text-sm font-bold text-[#0B3D6B]"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
+  // ── EXAM ──
+  return (
+    <div className="flex h-screen flex-col bg-[#F5F7FB]">
+      {/* Top bar */}
+      <div className={`flex items-center justify-between px-4 py-3 ${timerWarn ? 'bg-red-600' : 'bg-[#0B3D6B]'}`}>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => { if (confirm('Exit? Your progress will be lost.')) router.push('/exams') }}
+            className="text-white/60 hover:text-white"
+          >
+            <span className="ti ti-x text-xl" />
+          </button>
+          <div>
+            {section && <p className="text-xs text-white/60">{section.name}</p>}
+            <p className="text-sm font-bold text-white">{currentQ + 1} / {questions.length}</p>
+          </div>
+        </div>
+        <div className={`flex items-center gap-2 rounded-xl px-3 py-1.5 font-mono font-bold text-white ${timerWarn ? 'bg-red-700 animate-pulse' : 'bg-white/10'}`}>
+          <span className="ti ti-clock" />{formatTime(timeLeft)}
+        </div>
+        <button
+          type="button"
+          onClick={() => { if (confirm(`Submit? ${answered}/${questions.length} answered.`)) void handleSubmit() }}
+          className="rounded-xl bg-[#E8A020] px-3 py-1.5 text-xs font-bold text-[#0B3D6B]"
+        >
+          Submit
+        </button>
+      </div>
+
+      {/* Progress */}
+      <div className="h-1 bg-white/10">
+        <div className="h-full bg-[#E8A020] transition-all" style={{ width: `${questions.length > 0 ? (answered / questions.length) * 100 : 0}%` }} />
+      </div>
+
+      {/* Question area */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {q ? (
+          <div className="mx-auto max-w-2xl space-y-4">
+            <div className="rounded-2xl bg-white border border-[#DDE3EC] p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  {q.questionText && <p className="text-base font-semibold text-[#0D1B2A]">{q.questionText}</p>}
+                  {q.questionTextJP && <p className="mt-2 text-lg text-[#0B3D6B]">{q.questionTextJP}</p>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleFlag(q.id)}
+                  className={`shrink-0 rounded-xl p-2 ${flagged.has(q.id) ? 'bg-amber-100 text-amber-600' : 'bg-[#F5F7FB] text-[#5A6A7A]'}`}
+                >
+                  <span className="ti ti-flag text-lg" />
+                </button>
+              </div>
+              {q.audioUrl && (
+                <audio controls className="mt-3 w-full">
+                  <source src={q.audioUrl} type="audio/mpeg" />
+                </audio>
+              )}
+              {q.imageUrl && (
+                <img src={q.imageUrl} alt="Question visual" className="mt-3 rounded-xl max-h-48 object-contain" />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              {q.options.map(opt => {
+                const selected = answers[q.id] === opt.index
+                return (
+                  <button
+                    key={opt.index}
+                    type="button"
+                    onClick={() => setAnswers(prev => ({ ...prev, [q.id]: opt.index }))}
+                    className={`flex w-full items-center gap-3 rounded-xl border-2 p-4 text-left transition-all ${
+                      selected ? 'border-[#E8A020] bg-[#E8A020]/10' : 'border-[#DDE3EC] bg-white hover:border-[#0B3D6B]/30'
+                    }`}
+                  >
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold ${
+                      selected ? 'border-[#E8A020] bg-[#E8A020] text-white' : 'border-[#DDE3EC] text-[#5A6A7A]'
+                    }`}>
+                      {opt.index}
+                    </div>
+                    <span className={`text-sm font-medium ${selected ? 'text-[#0B3D6B]' : 'text-[#0D1B2A]'}`}>{opt.text}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Section question tiles */}
+            {sections.length > 1 && (
+              <div className="rounded-2xl border border-[#DDE3EC] bg-white p-4">
+                <p className="text-xs font-bold uppercase text-[#5A6A7A] mb-2">All Questions</p>
+                <div className="flex flex-wrap gap-1">
+                  {questions.map((qs, i) => (
+                    <button
+                      key={qs.id}
+                      type="button"
+                      onClick={() => setCurrentQ(i)}
+                      className={`h-7 w-7 rounded-lg text-xs font-bold ${
+                        i === currentQ ? 'bg-[#0B3D6B] text-white' :
+                        flagged.has(qs.id) ? 'bg-amber-100 text-amber-700' :
+                        answers[qs.id] !== undefined ? 'bg-emerald-100 text-emerald-700' :
+                        'bg-[#F5F7FB] text-[#5A6A7A]'
+                      }`}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <p className="text-[#5A6A7A]">No questions found</p>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom nav */}
+      <div className="border-t border-[#DDE3EC] bg-white px-4 py-3">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
+          <button
+            type="button"
+            disabled={currentQ === 0}
+            onClick={() => setCurrentQ(i => i - 1)}
+            className="flex items-center gap-2 rounded-xl border border-[#DDE3EC] px-4 py-2.5 text-sm font-semibold text-[#5A6A7A] disabled:opacity-40"
+          >
+            <span className="ti ti-arrow-left" /> Previous
+          </button>
+          <span className="text-xs text-[#5A6A7A]">{answered} of {questions.length} answered</span>
+          <button
+            type="button"
+            disabled={currentQ === questions.length - 1}
+            onClick={() => setCurrentQ(i => i + 1)}
+            className="flex items-center gap-2 rounded-xl border border-[#DDE3EC] px-4 py-2.5 text-sm font-semibold text-[#5A6A7A] disabled:opacity-40"
+          >
+            Next <span className="ti ti-arrow-right" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

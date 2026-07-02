@@ -1,11 +1,11 @@
 'use client'
-
 import { createContext, useContext } from 'react'
 import type { EpicUser, Student } from '@/types'
 
 interface ExamContextValue {
   user: EpicUser
   student: Student | null
+  loading?: boolean
 }
 
 export const ExamContext = createContext<ExamContextValue | null>(null)

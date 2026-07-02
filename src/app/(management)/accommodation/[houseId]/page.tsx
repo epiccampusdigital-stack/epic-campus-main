@@ -1,937 +1,636 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import {
   addDoc,
   collection,
   doc,
   getDoc,
   getDocs,
-  orderBy,
-  query,
   serverTimestamp,
   updateDoc,
-  where,
+  deleteDoc,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { useManagement } from '@/components/layout/ManagementContext'
-import { COURSE_MAP } from '@/lib/constants/courses'
-import { formatLKR } from '@/lib/utility-bills/helpers'
-import { getInitials } from '@/lib/students/helpers'
 
-type TabId = 'bills' | 'students' | 'overview'
-type ToastKind = 'success' | 'warning'
-type BillType = 'rent' | 'electricity' | 'water' | 'internet' | 'repair' | 'other'
-type BillStatus = 'paid' | 'unpaid' | 'overdue'
-
-type House = {
+interface House {
   id: string
   name: string
-  address: string
-  landlordName: string
-  landlordPhone: string
-  monthlyRent: number
-  leaseStart: string
-  leaseEnd: string
-  location: string
-  capacity: number
-  notes: string
-  createdBy?: string
+  address?: string
+  landlordName?: string
+  landlordPhone?: string
+  monthlyRent?: number
+  leaseStart?: string
+  leaseEnd?: string
+  location?: string
+  capacity?: number
+  notes?: string
 }
 
-type HouseBill = {
+interface Student {
   id: string
-  type: BillType
-  amount: number
+  name: string
+  studentCode?: string
+  courseId?: string
+  houseId?: string
+  accommodationId?: string
+}
+
+interface UtilityBill {
+  id: string
+  houseName: string
   month: string
-  dueDate: string
-  paidDate: string | null
-  status: BillStatus
-  notes: string
-  addedBy: string
-  createdAt?: unknown
+  year: number
+  ceb: number
+  water: number
+  internet?: number
+  other?: number
+  notes?: string
+  paid?: boolean
+  paidAt?: string
 }
 
-type StudentLite = {
+interface HouseInventoryItem {
   id: string
-  name: string
-  studentCode: string
-  courseId: string
-  houseId?: string | null
-  houseName?: string | null
+  itemName: string
+  category: 'kitchen' | 'supplies' | 'furniture' | 'appliances' | 'other'
+  quantity: number
+  unit: string
+  condition: 'good' | 'fair' | 'poor' | 'needs-replacement'
+  notes?: string
+  lastUpdated?: string
 }
 
-type HouseForm = {
-  name: string
-  address: string
-  landlordName: string
-  landlordPhone: string
-  monthlyRent: string
-  leaseStart: string
-  leaseEnd: string
-  location: string
-  capacity: string
-  notes: string
+const COURSE_LABELS: Record<string, string> = {
+  'japan-ssw': '🇯🇵 Japan SSW',
+  'korea': '🇰🇷 Korea',
+  'china': '🇨🇳 China',
+  'ielts': '📝 IELTS',
+  'nvq': '🎓 NVQ',
 }
 
-type BillForm = {
-  type: BillType
-  month: string
-  amount: string
-  dueDate: string
-  notes: string
+const CATEGORY_LABELS: Record<string, string> = {
+  kitchen: '🍳 Kitchen',
+  supplies: '🧹 Supplies',
+  furniture: '🪑 Furniture',
+  appliances: '⚡ Appliances',
+  other: '📦 Other',
 }
 
-const BILL_TYPE_OPTIONS: { value: BillType; label: string }[] = [
-  { value: 'rent', label: 'Rent' },
-  { value: 'electricity', label: 'Electricity' },
-  { value: 'water', label: 'Water' },
-  { value: 'internet', label: 'Internet' },
-  { value: 'repair', label: 'Repair' },
-  { value: 'other', label: 'Other' },
-]
-
-function typeBadgeClass(type: BillType): string {
-  if (type === 'rent') return 'bg-[#0B3D6B]/10 text-[#0B3D6B] border-[#0B3D6B]/20'
-  if (type === 'electricity') return 'bg-amber-100 text-amber-800 border-amber-200'
-  if (type === 'water') return 'bg-blue-100 text-blue-800 border-blue-200'
-  if (type === 'internet') return 'bg-teal-100 text-teal-800 border-teal-200'
-  if (type === 'repair') return 'bg-orange-100 text-orange-800 border-orange-200'
-  return 'bg-gray-100 text-gray-700 border-gray-200'
+const CONDITION_COLORS: Record<string, string> = {
+  good: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  fair: 'bg-amber-50 text-amber-700 border-amber-200',
+  poor: 'bg-red-50 text-red-700 border-red-200',
+  'needs-replacement': 'bg-red-100 text-red-800 border-red-300',
 }
 
-function statusBadgeClass(status: BillStatus): string {
-  if (status === 'paid') return 'bg-emerald-100 text-emerald-700 border-emerald-200'
-  if (status === 'overdue') return 'bg-red-100 text-red-700 border-red-200'
-  return 'bg-amber-100 text-amber-700 border-amber-200'
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+function formatLKR(n: number) {
+  return `LKR ${(n ?? 0).toLocaleString('en-LK')}`
 }
 
-function leaseBadge(leaseEnd: string): { label: string; cls: string } {
-  const today = new Date()
-  const end = new Date(leaseEnd)
-  const ms = end.getTime() - today.getTime()
-  const days = Math.ceil(ms / (1000 * 60 * 60 * 24))
-  if (Number.isNaN(days)) {
-    return { label: 'Unknown', cls: 'bg-gray-100 text-gray-700 border-gray-200' }
-  }
-  if (days < 0) {
-    return { label: 'Expired', cls: 'bg-red-100 text-red-700 border-red-200' }
-  }
-  if (days <= 30) {
-    return { label: 'Expiring Soon', cls: 'bg-amber-100 text-amber-700 border-amber-200' }
-  }
-  return { label: 'Active', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' }
-}
+type Tab = 'overview' | 'bills' | 'inventory'
 
-function monthLabel(month: string): string {
-  if (!month || month === 'all') return 'All months'
-  const [y, m] = month.split('-')
-  if (!y || !m) return month
-  return new Date(Number(y), Number(m) - 1, 1).toLocaleString('en-US', {
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-function monthOptions(): { value: string; label: string }[] {
-  const base = new Date()
-  const list: { value: string; label: string }[] = [{ value: 'all', label: 'All' }]
-  for (let i = 0; i < 6; i += 1) {
-    const dt = new Date(base.getFullYear(), base.getMonth() - i, 1)
-    const yyyy = dt.getFullYear()
-    const mm = String(dt.getMonth() + 1).padStart(2, '0')
-    list.push({ value: `${yyyy}-${mm}`, label: dt.toLocaleString('en-US', { month: 'short', year: 'numeric' }) })
-  }
-  return list
-}
-
-function todayYmd(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function currentMonth(): string {
-  return todayYmd().slice(0, 7)
-}
-
-function emptyHouseForm(): HouseForm {
-  return {
-    name: '',
-    address: '',
-    landlordName: '',
-    landlordPhone: '',
-    monthlyRent: '',
-    leaseStart: '',
-    leaseEnd: '',
-    location: 'Ahangama',
-    capacity: '1',
-    notes: '',
-  }
-}
-
-function emptyBillForm(): BillForm {
-  return {
-    type: 'rent',
-    month: currentMonth(),
-    amount: '',
-    dueDate: todayYmd(),
-    notes: '',
-  }
-}
-
-function SummaryCard({ label, value, loading }: { label: string; value: string; loading?: boolean }) {
-  return (
-    <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
-      <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">{label}</p>
-      {loading ? <div className="mt-2 h-8 w-24 animate-pulse rounded bg-[#DDE3EC]" /> : <p className="mt-1 font-jakarta text-2xl font-bold text-[#0B3D6B]">{value}</p>}
-    </div>
-  )
-}
-
-export default function AccommodationHousePage() {
-  const params = useParams()
-  const houseId = String(params.houseId ?? '')
+export default function HouseDetailPage() {
+  const { houseId } = useParams<{ houseId: string }>()
+  const router = useRouter()
   const { user } = useManagement()
 
-  const [tab, setTab] = useState<TabId>('bills')
+  const [tab, setTab] = useState<Tab>('overview')
   const [house, setHouse] = useState<House | null>(null)
+  const [students, setStudents] = useState<Student[]>([])
+  const [bills, setBills] = useState<UtilityBill[]>([])
+  const [inventory, setInventory] = useState<HouseInventoryItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [toast, setToast] = useState('')
-  const [toastKind, setToastKind] = useState<ToastKind>('success')
 
-  const [bills, setBills] = useState<HouseBill[]>([])
-  const [billMonthFilter, setBillMonthFilter] = useState(currentMonth())
+  // Bill form
   const [billFormOpen, setBillFormOpen] = useState(false)
+  const [billForm, setBillForm] = useState({ month: MONTHS[new Date().getMonth()], year: new Date().getFullYear(), ceb: '', water: '', internet: '', other: '', notes: '', paid: false })
   const [savingBill, setSavingBill] = useState(false)
-  const [billForm, setBillForm] = useState<BillForm>(emptyBillForm())
 
-  const [assignedStudents, setAssignedStudents] = useState<StudentLite[]>([])
-  const [studentsLoading, setStudentsLoading] = useState(false)
-  const [assignModalOpen, setAssignModalOpen] = useState(false)
-  const [allStudents, setAllStudents] = useState<StudentLite[]>([])
-  const [studentSearch, setStudentSearch] = useState('')
+  // Inventory form
+  const [invFormOpen, setInvFormOpen] = useState(false)
+  const [invForm, setInvForm] = useState({ itemName: '', category: 'supplies' as HouseInventoryItem['category'], quantity: '1', unit: 'units', condition: 'good' as HouseInventoryItem['condition'], notes: '' })
+  const [savingInv, setSavingInv] = useState(false)
 
-  const [editOpen, setEditOpen] = useState(false)
-  const [savingHouse, setSavingHouse] = useState(false)
-  const [houseForm, setHouseForm] = useState<HouseForm>(emptyHouseForm())
+  const [toast, setToast] = useState('')
+  function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
-  const allowed = user?.role === 'admin' || user?.role === 'owner' || user?.role === 'accountant'
+  const canEdit = ['admin', 'owner', 'accountant', 'reception'].includes(user?.role ?? '')
 
-  const showToast = useCallback((msg: string, kind: ToastKind = 'success') => {
-    setToastKind(kind)
-    setToast(msg)
-    setTimeout(() => setToast(''), 3000)
-  }, [])
-
-  const loadHouse = useCallback(async () => {
+  const load = useCallback(async () => {
     if (!houseId) return
     setLoading(true)
     try {
-      const snap = await getDoc(doc(db, 'accommodation', houseId))
-      if (!snap.exists()) {
-        setHouse(null)
-        return
+      let houseData: House | null = null
+      const snap1 = await getDoc(doc(db, 'accommodation', houseId)).catch(() => null)
+      if (snap1?.exists()) {
+        houseData = { id: snap1.id, ...snap1.data() } as House
+      } else {
+        const snap2 = await getDoc(doc(db, 'accommodations', houseId)).catch(() => null)
+        if (snap2?.exists()) houseData = { id: snap2.id, ...snap2.data() } as House
       }
-      setHouse({ id: snap.id, ...(snap.data() as Omit<House, 'id'>) })
+      setHouse(houseData)
+
+      if (houseData) {
+        const studSnap = await getDocs(collection(db, 'students'))
+        setStudents(
+          studSnap.docs
+            .map(d => ({ id: d.id, ...d.data() } as Student))
+            .filter(s => s.houseId === houseId || s.accommodationId === houseId || s.houseId === houseData!.name)
+        )
+
+        const billsSnap = await getDocs(collection(db, 'utilityBills'))
+        setBills(
+          billsSnap.docs
+            .map(d => ({ id: d.id, ...d.data() } as UtilityBill))
+            .filter(b => b.houseName?.toLowerCase() === houseData!.name?.toLowerCase())
+            .sort((a, b) => {
+              if (a.year !== b.year) return b.year - a.year
+              return MONTHS.indexOf(b.month) - MONTHS.indexOf(a.month)
+            })
+        )
+
+        const invSnap = await getDocs(collection(db, 'accommodation', houseId, 'inventory'))
+          .catch(() => getDocs(collection(db, 'accommodations', houseId, 'inventory')).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] })))
+        setInventory(invSnap.docs.map(d => ({ id: d.id, ...d.data() } as HouseInventoryItem)))
+      }
     } catch (err) {
-      console.error('[AccommodationHouse] house', err)
-      setHouse(null)
+      console.error('[HouseDetail]', err)
     } finally {
       setLoading(false)
     }
   }, [houseId])
 
-  const loadBills = useCallback(async () => {
-    if (!houseId) return
-    try {
-      const snap = await getDocs(
-        query(collection(db, 'accommodation', houseId, 'bills'), orderBy('createdAt', 'desc')),
-      )
-      setBills(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<HouseBill, 'id'>) })))
-    } catch (err) {
-      console.error('[AccommodationHouse] bills', err)
-      setBills([])
-    }
-  }, [houseId])
+  useEffect(() => { void load() }, [load])
 
-  const loadAssignedStudents = useCallback(async () => {
-    if (!houseId) return
-    setStudentsLoading(true)
-    try {
-      const snap = await getDocs(query(collection(db, 'students'), where('houseId', '==', houseId)))
-      setAssignedStudents(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: String(d.data().name ?? ''),
-          studentCode: String(d.data().studentCode ?? ''),
-          courseId: String(d.data().courseId ?? ''),
-          houseId: d.data().houseId as string | null | undefined,
-          houseName: d.data().houseName as string | null | undefined,
-        })),
-      )
-    } catch (err) {
-      console.error('[AccommodationHouse] students', err)
-      setAssignedStudents([])
-    } finally {
-      setStudentsLoading(false)
-    }
-  }, [houseId])
-
-  useEffect(() => {
-    if (!allowed) return
-    void loadHouse()
-    void loadBills()
-    void loadAssignedStudents()
-  }, [allowed, loadHouse, loadBills, loadAssignedStudents])
-
-  const billsView = useMemo(() => {
-    if (billMonthFilter === 'all') return bills
-    return bills.filter((b) => b.month === billMonthFilter)
-  }, [bills, billMonthFilter])
-
-  const billStats = useMemo(() => {
-    const month = currentMonth()
-    const thisMonth = bills.filter((b) => b.month === month)
-    const thisMonthTotal = thisMonth.reduce((sum, b) => sum + Number(b.amount || 0), 0)
-    const unpaidCount = billsView.filter((b) => b.status === 'unpaid' || b.status === 'overdue').length
-    const paidThisMonth = thisMonth
-      .filter((b) => b.status === 'paid' && (b.paidDate || '').slice(0, 7) === month)
-      .reduce((sum, b) => sum + Number(b.amount || 0), 0)
-    const overdueCount = billsView.filter((b) => b.status === 'overdue').length
-    return { thisMonthTotal, unpaidCount, paidThisMonth, overdueCount }
-  }, [bills, billsView])
-
-  const capacityReached = useMemo(() => {
-    if (!house) return false
-    return assignedStudents.length >= Number(house.capacity || 0)
-  }, [assignedStudents.length, house])
-
-  const availableStudents = useMemo(() => {
-    const q = studentSearch.trim().toLowerCase()
-    return allStudents.filter((s) => {
-      if (s.houseId && s.houseId !== houseId) return false
-      if (!q) return true
-      return s.name.toLowerCase().includes(q)
-    })
-  }, [allStudents, studentSearch, houseId])
-
-  async function handleAddBill() {
-    if (!user || !houseId) return
-    if (!billForm.amount) return
+  async function saveBill() {
+    if (!house || !houseId) return
     setSavingBill(true)
     try {
-      const due = billForm.dueDate || todayYmd()
-      const isOverdue = due < todayYmd()
-      await addDoc(collection(db, 'accommodation', houseId, 'bills'), {
-        type: billForm.type,
-        amount: Number(billForm.amount || 0),
+      await addDoc(collection(db, 'utilityBills'), {
+        houseName: house.name,
+        houseId,
         month: billForm.month,
-        dueDate: due,
-        paidDate: null,
-        status: (isOverdue ? 'overdue' : 'unpaid') as BillStatus,
+        year: Number(billForm.year),
+        ceb: parseFloat(billForm.ceb || '0'),
+        water: parseFloat(billForm.water || '0'),
+        internet: parseFloat(billForm.internet || '0'),
+        other: parseFloat(billForm.other || '0'),
         notes: billForm.notes.trim(),
-        addedBy: user.uid,
+        paid: billForm.paid,
         createdAt: serverTimestamp(),
+        createdBy: user?.uid,
       })
-      setBillForm(emptyBillForm())
-      setBillFormOpen(false)
       showToast('Bill added successfully')
-      await loadBills()
+      setBillFormOpen(false)
+      setBillForm({ month: MONTHS[new Date().getMonth()], year: new Date().getFullYear(), ceb: '', water: '', internet: '', other: '', notes: '', paid: false })
+      void load()
     } catch (err) {
-      console.error('[AccommodationHouse] add bill', err)
-      showToast('Failed to add bill', 'warning')
+      console.error('[SaveBill]', err)
+      showToast('Failed to save bill')
     } finally {
       setSavingBill(false)
     }
   }
 
-  async function handleMarkPaid(bill: HouseBill) {
-    if (!houseId) return
+  async function toggleBillPaid(bill: UtilityBill) {
     try {
-      await updateDoc(doc(db, 'accommodation', houseId, 'bills', bill.id), {
-        status: 'paid',
-        paidDate: todayYmd(),
+      await updateDoc(doc(db, 'utilityBills', bill.id), { paid: !bill.paid, updatedAt: serverTimestamp() })
+      setBills(prev => prev.map(b => b.id === bill.id ? { ...b, paid: !b.paid } : b))
+    } catch (err) { console.error('[TogglePaid]', err) }
+  }
+
+  async function deleteBill(bill: UtilityBill) {
+    if (!confirm(`Delete ${bill.month} ${bill.year} bill?`)) return
+    try {
+      await deleteDoc(doc(db, 'utilityBills', bill.id))
+      setBills(prev => prev.filter(b => b.id !== bill.id))
+      showToast('Bill deleted')
+    } catch (err) { console.error('[DeleteBill]', err) }
+  }
+
+  async function saveInventoryItem() {
+    if (!houseId || !invForm.itemName.trim()) return
+    setSavingInv(true)
+    try {
+      await addDoc(collection(db, 'accommodation', houseId, 'inventory'), {
+        itemName: invForm.itemName.trim(),
+        category: invForm.category,
+        quantity: parseFloat(invForm.quantity || '1'),
+        unit: invForm.unit.trim(),
+        condition: invForm.condition,
+        notes: invForm.notes.trim(),
+        lastUpdated: new Date().toISOString(),
+        createdBy: user?.uid,
       })
-      showToast('Marked as paid')
-      await loadBills()
+      showToast('Item added')
+      setInvFormOpen(false)
+      setInvForm({ itemName: '', category: 'supplies', quantity: '1', unit: 'units', condition: 'good', notes: '' })
+      void load()
     } catch (err) {
-      console.error('[AccommodationHouse] mark paid', err)
-      showToast('Failed to update bill', 'warning')
-    }
-  }
-
-  async function handleOpenAssignModal() {
-    setAssignModalOpen(true)
-    try {
-      const snap = await getDocs(collection(db, 'students'))
-      setAllStudents(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: String(d.data().name ?? ''),
-          studentCode: String(d.data().studentCode ?? ''),
-          courseId: String(d.data().courseId ?? ''),
-          houseId: d.data().houseId as string | null | undefined,
-          houseName: d.data().houseName as string | null | undefined,
-        })),
-      )
-    } catch (err) {
-      console.error('[AccommodationHouse] load all students', err)
-      setAllStudents([])
-    }
-  }
-
-  async function handleAssignStudent(studentId: string) {
-    if (!houseId || !house) return
-    if (capacityReached) {
-      showToast('Capacity reached for this house', 'warning')
-      return
-    }
-    try {
-      await updateDoc(doc(db, 'students', studentId), {
-        houseId,
-        houseName: house.name,
-      })
-      showToast('Student assigned successfully')
-      await loadAssignedStudents()
-      setAssignModalOpen(false)
-    } catch (err) {
-      console.error('[AccommodationHouse] assign', err)
-      showToast('Failed to assign student', 'warning')
-    }
-  }
-
-  async function handleRemoveStudent(studentId: string) {
-    try {
-      await updateDoc(doc(db, 'students', studentId), {
-        houseId: null,
-        houseName: null,
-      })
-      showToast('Student removed from house')
-      await loadAssignedStudents()
-    } catch (err) {
-      console.error('[AccommodationHouse] remove', err)
-      showToast('Failed to remove student', 'warning')
-    }
-  }
-
-  function openEditHouse() {
-    if (!house) return
-    setHouseForm({
-      name: house.name ?? '',
-      address: house.address ?? '',
-      landlordName: house.landlordName ?? '',
-      landlordPhone: house.landlordPhone ?? '',
-      monthlyRent: String(house.monthlyRent ?? ''),
-      leaseStart: house.leaseStart ?? '',
-      leaseEnd: house.leaseEnd ?? '',
-      location: house.location || 'Ahangama',
-      capacity: String(house.capacity ?? 1),
-      notes: house.notes ?? '',
-    })
-    setEditOpen(true)
-  }
-
-  async function handleSaveHouseEdit() {
-    if (!houseId || !houseForm.name.trim() || !houseForm.address.trim()) return
-    setSavingHouse(true)
-    try {
-      await updateDoc(doc(db, 'accommodation', houseId), {
-        name: houseForm.name.trim(),
-        address: houseForm.address.trim(),
-        landlordName: houseForm.landlordName.trim(),
-        landlordPhone: houseForm.landlordPhone.trim(),
-        monthlyRent: Number(houseForm.monthlyRent || 0),
-        leaseStart: houseForm.leaseStart,
-        leaseEnd: houseForm.leaseEnd,
-        location: houseForm.location,
-        capacity: Math.max(1, Number(houseForm.capacity || 1)),
-        notes: houseForm.notes.trim(),
-      })
-      showToast('House updated successfully')
-      setEditOpen(false)
-      await loadHouse()
-    } catch (err) {
-      console.error('[AccommodationHouse] edit', err)
-      showToast('Failed to update house', 'warning')
+      console.error('[SaveInv]', err)
+      showToast('Failed to save item')
     } finally {
-      setSavingHouse(false)
+      setSavingInv(false)
     }
   }
 
-  if (!allowed) {
-    return <p>You do not have access to this page.</p>
+  async function deleteInventoryItem(item: HouseInventoryItem) {
+    if (!houseId || !confirm(`Delete ${item.itemName}?`)) return
+    try {
+      await deleteDoc(doc(db, 'accommodation', houseId, 'inventory', item.id))
+      setInventory(prev => prev.filter(i => i.id !== item.id))
+      showToast('Item deleted')
+    } catch (err) { console.error('[DeleteInv]', err) }
   }
 
-  if (loading) {
-    return (
-      <div className="animate-pulse space-y-4 p-6">
-        <div className="h-10 w-56 rounded bg-[#DDE3EC]" />
-        <div className="h-64 rounded-xl bg-[#DDE3EC]" />
-      </div>
-    )
-  }
+  if (!user) return null
 
-  if (!house) {
-    return (
-      <div className="rounded-xl border border-[#DDE3EC] bg-white p-12 text-center">
-        <p className="font-jakarta text-lg font-bold text-[#0D1B2A]">House not found</p>
-        <Link href="/accommodation" className="mt-4 inline-block text-sm font-medium text-[#0B3D6B] hover:text-[#E8A020]">
-          ← Back to Accommodation
-        </Link>
-      </div>
-    )
-  }
+  const totalCEB = bills.reduce((s, b) => s + (b.ceb ?? 0), 0)
+  const totalWater = bills.reduce((s, b) => s + (b.water ?? 0), 0)
+  const totalInternet = bills.reduce((s, b) => s + (b.internet ?? 0), 0)
+  const totalOther = bills.reduce((s, b) => s + (b.other ?? 0), 0)
+  const totalUnpaid = bills.filter(b => !b.paid).reduce((s, b) => s + (b.ceb ?? 0) + (b.water ?? 0) + (b.internet ?? 0) + (b.other ?? 0), 0)
+  const invByCategory = inventory.reduce<Record<string, HouseInventoryItem[]>>((acc, item) => {
+    if (!acc[item.category]) acc[item.category] = []
+    acc[item.category].push(item)
+    return acc
+  }, {})
 
-  const lease = leaseBadge(house.leaseEnd)
+  const inputClass = 'w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-[#F5F7FB] dark:bg-white/[0.04] px-3 py-2.5 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020]'
+
+  if (loading) return (
+    <div className="animate-pulse space-y-4">
+      <div className="h-10 w-48 rounded-xl bg-[#DDE3EC] dark:bg-white/10" />
+      <div className="h-40 rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />
+    </div>
+  )
+
+  if (!house) return (
+    <div className="rounded-2xl border border-[#DDE3EC] bg-white dark:bg-white/[0.04] py-16 text-center">
+      <span className="ti ti-home-off text-4xl text-[#DDE3EC]" />
+      <p className="mt-3 text-sm text-[#5A6A7A]">House not found</p>
+      <button type="button" onClick={() => router.push('/accommodation')} className="mt-4 rounded-xl bg-[#E8A020] px-4 py-2 text-sm font-bold text-[#0B3D6B]">Back</button>
+    </div>
+  )
 
   return (
-    <div className="space-y-6">
-      {toast && (
-        <div
-          className={`fixed bottom-6 right-4 z-50 rounded-xl px-5 py-3 text-sm font-medium text-white shadow-lg ${
-            toastKind === 'warning' ? 'bg-amber-600' : 'bg-emerald-600'
-          }`}
-        >
-          {toast}
-        </div>
-      )}
+    <div className="space-y-5">
+      {toast && <div className="fixed bottom-6 right-4 z-50 rounded-xl bg-[#0B3D6B] px-5 py-3 text-sm font-medium text-white shadow-lg">{toast}</div>}
 
-      <Link
-        href="/accommodation"
-        className="inline-flex items-center gap-1 font-inter text-sm text-[#5A6A7A] hover:text-[#0B3D6B]"
-      >
-        <span className="ti ti-arrow-left" aria-hidden="true" />
-        Back to Accommodation
-      </Link>
+      {/* Back */}
+      <button type="button" onClick={() => router.push('/accommodation')} className="flex items-center gap-2 text-sm font-semibold text-[#5A6A7A] hover:text-[#0B3D6B] dark:text-white/50 dark:hover:text-white">
+        <span className="ti ti-arrow-left" /> Back to Accommodation
+      </button>
 
-      <div className="rounded-xl border border-[#DDE3EC] bg-white p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      {/* House Header */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#0B3D6B] to-[#1A6BAD] p-6 text-white">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="font-jakarta text-2xl font-bold text-[#0D1B2A]">{house.name}</h1>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="inline-flex rounded-full border border-[#DDE3EC] bg-[#F5F7FB] px-2.5 py-0.5 text-xs font-medium text-[#0B3D6B]">
-                {house.location}
-              </span>
-              <span className="inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${lease.cls}">
-                {lease.label}
-              </span>
+            <h1 className="font-jakarta text-2xl font-bold flex items-center gap-2">
+              <span className="ti ti-home text-[#E8A020]" />{house.name}
+            </h1>
+            {house.address && <p className="text-sm text-white/70 mt-1 flex items-center gap-1"><span className="ti ti-map-pin" />{house.address}</p>}
+            {house.location && <p className="text-sm text-white/60 mt-0.5">{house.location}</p>}
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            {house.monthlyRent && <span className="rounded-xl bg-[#E8A020] px-3 py-1.5 text-sm font-bold text-[#0B3D6B]">{formatLKR(house.monthlyRent)}/month</span>}
+            <span className="text-xs text-white/60">{house.capacity ?? 0} student capacity</span>
+          </div>
+        </div>
+        {(house.landlordName || house.landlordPhone || house.leaseStart) && (
+          <div className="mt-4 flex flex-wrap gap-4 text-sm text-white/70">
+            {house.landlordName && <span className="flex items-center gap-1"><span className="ti ti-user" />{house.landlordName}</span>}
+            {house.landlordPhone && <span className="flex items-center gap-1"><span className="ti ti-phone" />{house.landlordPhone}</span>}
+            {house.leaseStart && <span className="flex items-center gap-1"><span className="ti ti-calendar" />{house.leaseStart} → {house.leaseEnd ?? 'ongoing'}</span>}
+          </div>
+        )}
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-4 text-center">
+          <p className="font-jakarta text-2xl font-black text-[#0B3D6B] dark:text-white">{students.length}</p>
+          <p className="text-xs text-[#5A6A7A] dark:text-white/50">Students</p>
+        </div>
+        <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-4 text-center">
+          <p className="font-jakarta text-2xl font-black text-[#0B3D6B] dark:text-white">{bills.length}</p>
+          <p className="text-xs text-[#5A6A7A] dark:text-white/50">Bill Records</p>
+        </div>
+        <div className={`rounded-2xl border p-4 text-center ${totalUnpaid > 0 ? 'border-red-200 bg-red-50 dark:bg-red-900/20' : 'border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20'}`}>
+          <p className={`font-jakarta text-lg font-black ${totalUnpaid > 0 ? 'text-red-700' : 'text-emerald-700'}`}>{formatLKR(totalUnpaid)}</p>
+          <p className={`text-xs ${totalUnpaid > 0 ? 'text-red-600' : 'text-emerald-600'}`}>Unpaid</p>
+        </div>
+        <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-4 text-center">
+          <p className="font-jakarta text-2xl font-black text-[#0B3D6B] dark:text-white">{inventory.length}</p>
+          <p className="text-xs text-[#5A6A7A] dark:text-white/50">Inventory Items</p>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2">
+        {(['overview', 'bills', 'inventory'] as Tab[]).map(t => (
+          <button key={t} type="button" onClick={() => setTab(t)}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold capitalize transition-all ${tab === t ? 'bg-[#E8A020] text-white' : 'border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/60'}`}>
+            {t === 'bills' ? '💡 Bills' : t === 'inventory' ? '📦 Inventory' : '👥 Overview'}
+          </button>
+        ))}
+      </div>
+
+      {/* ── OVERVIEW TAB ── */}
+      {tab === 'overview' && (
+        <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#DDE3EC] dark:border-white/[0.08]">
+            <h2 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">Assigned Students ({students.length})</h2>
+          </div>
+          {students.length === 0 ? (
+            <div className="py-10 text-center">
+              <span className="ti ti-users-off text-3xl text-[#DDE3EC]" />
+              <p className="mt-2 text-sm text-[#5A6A7A] dark:text-white/50">No students assigned yet</p>
             </div>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-wide text-[#5A6A7A]">Monthly Rent</p>
-            <p className="font-jakarta text-2xl font-bold text-[#E8A020]">{formatLKR(Number(house.monthlyRent || 0))}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="border-b border-[#DDE3EC]">
-        <nav className="-mb-px flex gap-1 overflow-x-auto">
-          {([
-            { id: 'bills', label: 'Bills', icon: 'ti-receipt' },
-            { id: 'students', label: 'Students', icon: 'ti-users' },
-            { id: 'overview', label: 'Overview', icon: 'ti-home' },
-          ] as { id: TabId; label: string; icon: string }[]).map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={`flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 font-inter text-sm font-medium transition-colors ${
-                tab === t.id
-                  ? 'border-[#E8A020] text-[#0B3D6B]'
-                  : 'border-transparent text-[#5A6A7A] hover:text-[#0B3D6B]'
-              }`}
-            >
-              <span className={`ti ${t.icon}`} aria-hidden="true" />
-              {t.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      {tab === 'bills' && (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <select
-              value={billMonthFilter}
-              onChange={(e) => setBillMonthFilter(e.target.value)}
-              className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm"
-            >
-              {monthOptions().map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
+          ) : (
+            <div className="divide-y divide-[#DDE3EC] dark:divide-white/[0.06]">
+              {students.map(s => (
+                <div key={s.id} className="flex items-center gap-3 px-5 py-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0B3D6B] text-xs font-bold text-white">
+                    {s.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[#0D1B2A] dark:text-white truncate">{s.name}</p>
+                    <p className="text-xs text-[#5A6A7A] dark:text-white/40">
+                      {s.studentCode && <span className="font-mono mr-2">{s.studentCode}</span>}
+                      {COURSE_LABELS[s.courseId ?? ''] ?? s.courseId}
+                    </p>
+                  </div>
+                </div>
               ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => setBillFormOpen(true)}
-              className="ml-auto inline-flex items-center gap-2 rounded-full bg-[#E8A020] px-5 py-2.5 font-jakarta text-sm font-bold text-[#0B3D6B] hover:bg-[#F5B942]"
-            >
-              <span className="ti ti-plus" />
-              Add Bill
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <SummaryCard label="This Month Total" value={formatLKR(billStats.thisMonthTotal)} />
-            <SummaryCard label="Unpaid" value={String(billStats.unpaidCount)} />
-            <SummaryCard label="Paid This Month" value={formatLKR(billStats.paidThisMonth)} />
-            <SummaryCard label="Overdue" value={String(billStats.overdueCount)} />
-          </div>
-
-          <div className="overflow-x-auto rounded-xl border border-[#DDE3EC] bg-white">
-            <table className="min-w-full">
-              <thead className="border-b border-[#DDE3EC] bg-[#F5F7FB]">
-                <tr>
-                  {['Month', 'Type', 'Amount', 'Due Date', 'Status', 'Notes', 'Actions'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#DDE3EC]">
-                {billsView.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-[#5A6A7A]">
-                      No bills for {monthLabel(billMonthFilter)}.
-                    </td>
-                  </tr>
-                ) : (
-                  billsView.map((b) => (
-                    <tr key={b.id}>
-                      <td className="px-4 py-3 text-sm text-[#0D1B2A]">{b.month}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${typeBadgeClass(b.type)}`}>
-                          {b.type}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm font-bold text-[#0B3D6B]">{formatLKR(Number(b.amount || 0))}</td>
-                      <td className="px-4 py-3 text-sm text-[#0D1B2A]">{b.dueDate || '-'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${statusBadgeClass(b.status)}`}>
-                          {b.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-[#5A6A7A]">{b.notes || '-'}</td>
-                      <td className="px-4 py-3">
-                        {(b.status === 'unpaid' || b.status === 'overdue') ? (
-                          <button
-                            type="button"
-                            onClick={() => void handleMarkPaid(b)}
-                            className="rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
-                          >
-                            Mark Paid
-                          </button>
-                        ) : (
-                          <span className="text-xs text-[#5A6A7A]">Paid {b.paidDate || ''}</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {tab === 'students' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-[#5A6A7A]">
-              Assigned {assignedStudents.length} / {Number(house.capacity || 0)} students
-            </p>
-            <button
-              type="button"
-              onClick={() => void handleOpenAssignModal()}
-              className="inline-flex items-center gap-2 rounded-full bg-[#E8A020] px-5 py-2.5 font-jakarta text-sm font-bold text-[#0B3D6B] hover:bg-[#F5B942]"
-            >
-              <span className="ti ti-plus" />
-              Assign Student
-            </button>
-          </div>
-
-          {capacityReached && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              House is at max capacity.
             </div>
           )}
+        </div>
+      )}
 
-          <div className="rounded-xl border border-[#DDE3EC] bg-white">
-            {studentsLoading ? (
-              <div className="space-y-2 p-4">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="h-14 animate-pulse rounded bg-[#DDE3EC]" />
-                ))}
+      {/* ── BILLS TAB ── */}
+      {tab === 'bills' && (
+        <div className="space-y-4">
+          {/* Bill totals */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[
+              { label: 'CEB Total', value: totalCEB, color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200 dark:bg-amber-900/20' },
+              { label: 'Water Total', value: totalWater, color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200 dark:bg-blue-900/20' },
+              { label: 'Internet Total', value: totalInternet, color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200 dark:bg-purple-900/20' },
+              { label: 'Other Total', value: totalOther, color: 'text-[#5A6A7A]', bg: 'border-[#DDE3EC] bg-white dark:bg-white/[0.04]' },
+            ].map(s => (
+              <div key={s.label} className={`rounded-2xl border p-4 text-center ${s.bg}`}>
+                <p className={`font-jakarta text-lg font-black ${s.color}`}>{formatLKR(s.value)}</p>
+                <p className={`text-xs ${s.color}`}>{s.label}</p>
               </div>
-            ) : assignedStudents.length === 0 ? (
-              <p className="p-6 text-center text-sm text-[#5A6A7A]">No students assigned yet.</p>
+            ))}
+          </div>
+
+          {canEdit && (
+            <button type="button" onClick={() => setBillFormOpen(true)}
+              className="flex items-center gap-2 rounded-xl bg-[#E8A020] px-4 py-2.5 text-sm font-bold text-[#0B3D6B]">
+              <span className="ti ti-plus" /> Add Bill
+            </button>
+          )}
+
+          {/* Bills table */}
+          <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#DDE3EC] dark:border-white/[0.08]">
+              <h2 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">Bill History ({bills.length} months)</h2>
+            </div>
+            {bills.length === 0 ? (
+              <div className="py-10 text-center">
+                <span className="ti ti-receipt-off text-3xl text-[#DDE3EC]" />
+                <p className="mt-2 text-sm text-[#5A6A7A] dark:text-white/50">No bills yet — add manually or use AI Importer</p>
+              </div>
             ) : (
-              <ul className="divide-y divide-[#DDE3EC]">
-                {assignedStudents.map((s) => (
-                  <li key={s.id} className="flex items-center justify-between gap-3 p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0B3D6B] text-xs font-bold text-white">
-                        {getInitials(s.name)}
-                      </div>
-                      <div>
-                        <p className="font-jakarta text-sm font-semibold text-[#0D1B2A]">{s.name}</p>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                          <span className="inline-flex rounded-full border border-[#DDE3EC] bg-[#F5F7FB] px-2.5 py-0.5 text-[11px] font-medium text-[#0B3D6B]">
-                            {COURSE_MAP[s.courseId as keyof typeof COURSE_MAP]?.label ?? s.courseId}
-                          </span>
-                          <span className="text-xs text-[#5A6A7A]">{s.studentCode}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void handleRemoveStudent(s.id)}
-                      className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#DDE3EC] dark:border-white/[0.08] bg-[#F5F7FB] dark:bg-white/[0.02]">
+                      <th className="px-4 py-3 text-left text-xs font-bold uppercase text-[#5A6A7A]">Month</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold uppercase text-[#5A6A7A]">CEB</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold uppercase text-[#5A6A7A]">Water</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold uppercase text-[#5A6A7A]">Internet</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold uppercase text-[#5A6A7A]">Total</th>
+                      <th className="px-4 py-3 text-center text-xs font-bold uppercase text-[#5A6A7A]">Status</th>
+                      {canEdit && <th className="px-4 py-3 text-xs font-bold uppercase text-[#5A6A7A]">Actions</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bills.map(b => {
+                      const total = (b.ceb ?? 0) + (b.water ?? 0) + (b.internet ?? 0) + (b.other ?? 0)
+                      return (
+                        <tr key={b.id} className="border-b border-[#DDE3EC]/50 dark:border-white/[0.04] last:border-0 hover:bg-[#F5F7FB]/50 dark:hover:bg-white/[0.02]">
+                          <td className="px-4 py-3 font-semibold text-[#0D1B2A] dark:text-white">{b.month} {b.year}</td>
+                          <td className="px-4 py-3 text-right font-mono text-[#0D1B2A] dark:text-white">{(b.ceb ?? 0).toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right font-mono text-[#0D1B2A] dark:text-white">{(b.water ?? 0).toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right font-mono text-[#0D1B2A] dark:text-white">{(b.internet ?? 0).toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right font-mono font-bold text-[#0B3D6B] dark:text-blue-300">{total.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-center">
+                            {canEdit ? (
+                              <button type="button" onClick={() => void toggleBillPaid(b)}
+                                className={`rounded-full px-2.5 py-0.5 text-xs font-bold border ${b.paid ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                                {b.paid ? '✓ Paid' : 'Unpaid'}
+                              </button>
+                            ) : (
+                              <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold border ${b.paid ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                                {b.paid ? '✓ Paid' : 'Unpaid'}
+                              </span>
+                            )}
+                          </td>
+                          {canEdit && (
+                            <td className="px-4 py-3">
+                              <button type="button" onClick={() => void deleteBill(b)} className="text-red-400 hover:text-red-600">
+                                <span className="ti ti-trash text-sm" />
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      )
+                    })}
+                    <tr className="bg-[#0B3D6B]/5 dark:bg-white/[0.02] font-bold">
+                      <td className="px-4 py-3 text-[#0B3D6B] dark:text-blue-300">TOTAL</td>
+                      <td className="px-4 py-3 text-right font-mono text-[#0B3D6B] dark:text-blue-300">{totalCEB.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right font-mono text-[#0B3D6B] dark:text-blue-300">{totalWater.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right font-mono text-[#0B3D6B] dark:text-blue-300">{totalInternet.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right font-mono text-[#0B3D6B] dark:text-blue-300">{(totalCEB + totalWater + totalInternet + totalOther).toLocaleString()}</td>
+                      <td className="px-4 py-3" />{canEdit && <td className="px-4 py-3" />}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
-        </div>
-      )}
 
-      {tab === 'overview' && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="font-jakarta text-lg font-bold text-[#0B3D6B]">House Details</h3>
-            <button
-              type="button"
-              onClick={openEditHouse}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Edit
-            </button>
-          </div>
-
-          <dl className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
-            <div>
-              <dt className="font-medium text-[#5A6A7A]">Name</dt>
-              <dd className="text-[#0D1B2A]">{house.name}</dd>
-            </div>
-            <div>
-              <dt className="font-medium text-[#5A6A7A]">Location</dt>
-              <dd className="text-[#0D1B2A]">{house.location}</dd>
-            </div>
-            <div>
-              <dt className="font-medium text-[#5A6A7A]">Address</dt>
-              <dd className="text-[#0D1B2A]">{house.address}</dd>
-            </div>
-            <div>
-              <dt className="font-medium text-[#5A6A7A]">Landlord</dt>
-              <dd className="text-[#0D1B2A]">{house.landlordName || '-'}</dd>
-            </div>
-            <div>
-              <dt className="font-medium text-[#5A6A7A]">Landlord Phone</dt>
-              <dd className="text-[#0D1B2A]">{house.landlordPhone || '-'}</dd>
-            </div>
-            <div>
-              <dt className="font-medium text-[#5A6A7A]">Monthly Rent</dt>
-              <dd className="font-bold text-[#E8A020]">{formatLKR(Number(house.monthlyRent || 0))}</dd>
-            </div>
-            <div>
-              <dt className="font-medium text-[#5A6A7A]">Capacity</dt>
-              <dd className="text-[#0D1B2A]">{house.capacity} students</dd>
-            </div>
-            <div>
-              <dt className="font-medium text-[#5A6A7A]">Lease Period</dt>
-              <dd className="text-[#0D1B2A]">{house.leaseStart} → {house.leaseEnd}</dd>
-            </div>
-            <div>
-              <dt className="font-medium text-[#5A6A7A]">Lease Status</dt>
-              <dd>
-                <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${lease.cls}`}>
-                  {lease.label}
-                </span>
-              </dd>
-            </div>
-            <div className="md:col-span-2">
-              <dt className="font-medium text-[#5A6A7A]">Notes</dt>
-              <dd className="text-[#0D1B2A]">{house.notes || '-'}</dd>
-            </div>
-          </dl>
-        </div>
-      )}
-
-      {billFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-stretch justify-end">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setBillFormOpen(false)} />
-          <div className="relative z-10 h-full w-full max-w-md bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#DDE3EC] px-5 py-4">
-              <h2 className="font-jakarta text-lg font-bold text-[#0B3D6B]">Add Bill</h2>
-              <button type="button" onClick={() => setBillFormOpen(false)} className="rounded-full p-1.5 hover:bg-[#F5F7FB]">
-                <span className="ti ti-x text-lg" />
-              </button>
-            </div>
-            <div className="space-y-4 p-5">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Type</label>
-                <select
-                  value={billForm.type}
-                  onChange={(e) => setBillForm((p) => ({ ...p, type: e.target.value as BillType }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                >
-                  {BILL_TYPE_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Month</label>
-                <input
-                  type="month"
-                  value={billForm.month}
-                  onChange={(e) => setBillForm((p) => ({ ...p, month: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Amount LKR</label>
-                <input
-                  type="number"
-                  value={billForm.amount}
-                  onChange={(e) => setBillForm((p) => ({ ...p, amount: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Due Date</label>
-                <input
-                  type="date"
-                  value={billForm.dueDate}
-                  onChange={(e) => setBillForm((p) => ({ ...p, dueDate: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Notes</label>
-                <textarea
-                  rows={3}
-                  value={billForm.notes}
-                  onChange={(e) => setBillForm((p) => ({ ...p, notes: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                />
-              </div>
-            </div>
-            <div className="mt-auto border-t border-[#DDE3EC] p-4">
-              <button
-                type="button"
-                onClick={() => void handleAddBill()}
-                disabled={savingBill || !billForm.amount}
-                className="w-full rounded-xl bg-[#E8A020] py-2.5 text-sm font-bold text-[#0B3D6B] disabled:opacity-50"
-              >
-                {savingBill ? 'Saving…' : 'Save Bill'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {assignModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setAssignModalOpen(false)} />
-          <div className="relative z-10 w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
-            <h2 className="font-jakarta text-lg font-bold text-[#0B3D6B]">Assign Student</h2>
-            <input
-              type="search"
-              value={studentSearch}
-              onChange={(e) => setStudentSearch(e.target.value)}
-              placeholder="Search students by name"
-              className="mt-3 w-full rounded-lg border border-[#DDE3EC] px-3 py-2 text-sm"
-            />
-            <div className="mt-4 max-h-[360px] space-y-2 overflow-y-auto">
-              {availableStudents.length === 0 ? (
-                <p className="text-sm text-[#5A6A7A]">No students found</p>
-              ) : (
-                availableStudents.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => void handleAssignStudent(s.id)}
-                    disabled={capacityReached && s.houseId !== houseId}
-                    className="flex w-full items-center justify-between rounded-lg border border-[#DDE3EC] p-3 text-left hover:bg-[#F5F7FB] disabled:opacity-50"
-                  >
+          {/* Add Bill Modal */}
+          {billFormOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/50" onClick={() => setBillFormOpen(false)} />
+              <div className="relative z-10 w-full max-w-md rounded-2xl bg-white dark:bg-[#0d1a2e] p-6 shadow-2xl">
+                <h2 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white mb-4">Add Utility Bill — {house.name}</h2>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-[#0D1B2A]">{s.name}</p>
-                      <p className="text-xs text-[#5A6A7A]">{s.studentCode}</p>
+                      <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">Month</label>
+                      <select value={billForm.month} onChange={e => setBillForm(f => ({ ...f, month: e.target.value }))} className={inputClass}>
+                        {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
                     </div>
-                    <span className="text-xs font-medium text-[#0B3D6B]">Assign</span>
+                    <div>
+                      <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">Year</label>
+                      <input type="number" value={billForm.year} onChange={e => setBillForm(f => ({ ...f, year: Number(e.target.value) }))} className={inputClass} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-bold text-amber-600">CEB (LKR)</label>
+                      <input type="number" value={billForm.ceb} onChange={e => setBillForm(f => ({ ...f, ceb: e.target.value }))} placeholder="0" className={inputClass} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-bold text-blue-600">Water (LKR)</label>
+                      <input type="number" value={billForm.water} onChange={e => setBillForm(f => ({ ...f, water: e.target.value }))} placeholder="0" className={inputClass} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-bold text-purple-600">Internet (LKR)</label>
+                      <input type="number" value={billForm.internet} onChange={e => setBillForm(f => ({ ...f, internet: e.target.value }))} placeholder="0" className={inputClass} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-bold text-[#5A6A7A]">Other (LKR)</label>
+                      <input type="number" value={billForm.other} onChange={e => setBillForm(f => ({ ...f, other: e.target.value }))} placeholder="0" className={inputClass} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">Notes</label>
+                    <input type="text" value={billForm.notes} onChange={e => setBillForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional notes" className={inputClass} />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-[#0D1B2A] dark:text-white">
+                    <input type="checkbox" checked={billForm.paid} onChange={e => setBillForm(f => ({ ...f, paid: e.target.checked }))} className="rounded" />
+                    Mark as paid
+                  </label>
+                </div>
+                <div className="mt-5 flex gap-3">
+                  <button type="button" onClick={() => setBillFormOpen(false)} className="flex-1 rounded-xl border border-[#DDE3EC] py-2.5 text-sm font-semibold text-[#5A6A7A]">Cancel</button>
+                  <button type="button" disabled={savingBill} onClick={() => void saveBill()} className="flex-1 rounded-xl bg-[#E8A020] py-2.5 text-sm font-bold text-[#0B3D6B] disabled:opacity-50">
+                    {savingBill ? 'Saving...' : 'Save Bill'}
                   </button>
-                ))
-              )}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
-      {editOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setEditOpen(false)} />
-          <div className="relative z-10 w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
-            <h2 className="font-jakarta text-lg font-bold text-[#0B3D6B]">Edit House</h2>
-            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-xs font-medium text-gray-500">House Name</label>
-                <input value={houseForm.name} onChange={(e) => setHouseForm((p) => ({ ...p, name: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-              </div>
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-xs font-medium text-gray-500">Address</label>
-                <input value={houseForm.address} onChange={(e) => setHouseForm((p) => ({ ...p, address: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Location</label>
-                <select value={houseForm.location} onChange={(e) => setHouseForm((p) => ({ ...p, location: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                  {['Ahangama', 'Galle', 'Waduraba', 'Pinnaduwa'].map((loc) => (
-                    <option key={loc} value={loc}>{loc}</option>
+      {/* ── INVENTORY TAB ── */}
+      {tab === 'inventory' && (
+        <div className="space-y-4">
+          {canEdit && (
+            <button type="button" onClick={() => setInvFormOpen(true)}
+              className="flex items-center gap-2 rounded-xl bg-[#E8A020] px-4 py-2.5 text-sm font-bold text-[#0B3D6B]">
+              <span className="ti ti-plus" /> Add Item
+            </button>
+          )}
+
+          {inventory.length === 0 ? (
+            <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] py-12 text-center">
+              <span className="ti ti-package-off text-4xl text-[#DDE3EC]" />
+              <p className="mt-3 text-sm text-[#5A6A7A] dark:text-white/50">No inventory items yet</p>
+              <p className="mt-1 text-xs text-[#5A6A7A]/60">Track furniture, appliances, kitchen items and supplies per house</p>
+            </div>
+          ) : (
+            Object.entries(invByCategory).map(([cat, items]) => (
+              <div key={cat} className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] overflow-hidden">
+                <div className="px-5 py-3 border-b border-[#DDE3EC] dark:border-white/[0.08] bg-[#F5F7FB] dark:bg-white/[0.02]">
+                  <h3 className="font-jakarta font-bold text-sm text-[#0B3D6B] dark:text-white">{CATEGORY_LABELS[cat] ?? cat}</h3>
+                </div>
+                <div className="divide-y divide-[#DDE3EC] dark:divide-white/[0.06]">
+                  {items.map(item => (
+                    <div key={item.id} className="flex items-center gap-3 px-5 py-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-[#0D1B2A] dark:text-white">{item.itemName}</p>
+                        <p className="text-xs text-[#5A6A7A] dark:text-white/40">{item.quantity} {item.unit}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-bold ${CONDITION_COLORS[item.condition] ?? CONDITION_COLORS.fair}`}>
+                        {item.condition.replace('-', ' ')}
+                      </span>
+                      {canEdit && (
+                        <button type="button" onClick={() => void deleteInventoryItem(item)} className="shrink-0 text-red-400 hover:text-red-600">
+                          <span className="ti ti-trash text-sm" />
+                        </button>
+                      )}
+                    </div>
                   ))}
-                </select>
+                </div>
               </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Landlord Name</label>
-                <input value={houseForm.landlordName} onChange={(e) => setHouseForm((p) => ({ ...p, landlordName: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Landlord Phone</label>
-                <input value={houseForm.landlordPhone} onChange={(e) => setHouseForm((p) => ({ ...p, landlordPhone: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Monthly Rent LKR</label>
-                <input type="number" value={houseForm.monthlyRent} onChange={(e) => setHouseForm((p) => ({ ...p, monthlyRent: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Capacity</label>
-                <input type="number" min={1} value={houseForm.capacity} onChange={(e) => setHouseForm((p) => ({ ...p, capacity: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Lease Start</label>
-                <input type="date" value={houseForm.leaseStart} onChange={(e) => setHouseForm((p) => ({ ...p, leaseStart: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-500">Lease End</label>
-                <input type="date" value={houseForm.leaseEnd} onChange={(e) => setHouseForm((p) => ({ ...p, leaseEnd: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-              </div>
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-xs font-medium text-gray-500">Notes</label>
-                <textarea rows={3} value={houseForm.notes} onChange={(e) => setHouseForm((p) => ({ ...p, notes: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+            ))
+          )}
+
+          {/* Add Inventory Modal */}
+          {invFormOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/50" onClick={() => setInvFormOpen(false)} />
+              <div className="relative z-10 w-full max-w-md rounded-2xl bg-white dark:bg-[#0d1a2e] p-6 shadow-2xl">
+                <h2 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white mb-4">Add Inventory Item</h2>
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">Item Name</label>
+                    <input type="text" value={invForm.itemName} onChange={e => setInvForm(f => ({ ...f, itemName: e.target.value }))} placeholder="e.g. Rice Cooker" className={inputClass} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">Category</label>
+                      <select value={invForm.category} onChange={e => setInvForm(f => ({ ...f, category: e.target.value as HouseInventoryItem['category'] }))} className={inputClass}>
+                        <option value="kitchen">Kitchen</option>
+                        <option value="supplies">Supplies</option>
+                        <option value="furniture">Furniture</option>
+                        <option value="appliances">Appliances</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">Condition</label>
+                      <select value={invForm.condition} onChange={e => setInvForm(f => ({ ...f, condition: e.target.value as HouseInventoryItem['condition'] }))} className={inputClass}>
+                        <option value="good">Good</option>
+                        <option value="fair">Fair</option>
+                        <option value="poor">Poor</option>
+                        <option value="needs-replacement">Needs Replacement</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">Quantity</label>
+                      <input type="number" value={invForm.quantity} onChange={e => setInvForm(f => ({ ...f, quantity: e.target.value }))} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">Unit</label>
+                      <input type="text" value={invForm.unit} onChange={e => setInvForm(f => ({ ...f, unit: e.target.value }))} placeholder="units / kg / sets" className={inputClass} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">Notes</label>
+                    <input type="text" value={invForm.notes} onChange={e => setInvForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" className={inputClass} />
+                  </div>
+                </div>
+                <div className="mt-5 flex gap-3">
+                  <button type="button" onClick={() => setInvFormOpen(false)} className="flex-1 rounded-xl border border-[#DDE3EC] py-2.5 text-sm font-semibold text-[#5A6A7A]">Cancel</button>
+                  <button type="button" disabled={savingInv || !invForm.itemName.trim()} onClick={() => void saveInventoryItem()} className="flex-1 rounded-xl bg-[#E8A020] py-2.5 text-sm font-bold text-[#0B3D6B] disabled:opacity-50">
+                    {savingInv ? 'Saving...' : 'Add Item'}
+                  </button>
+                </div>
               </div>
             </div>
-            <div className="mt-6 flex gap-3">
-              <button type="button" onClick={() => setEditOpen(false)} className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium">Cancel</button>
-              <button type="button" onClick={() => void handleSaveHouseEdit()} disabled={savingHouse} className="flex-1 rounded-xl bg-[#E8A020] py-2.5 text-sm font-bold text-[#0B3D6B] disabled:opacity-50">
-                {savingHouse ? 'Saving…' : 'Save Changes'}
-              </button>
-            </div>
-          </div>
+          )}
+        </div>
+      )}
+
+      {house.notes && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 px-5 py-4">
+          <p className="text-xs font-bold text-amber-700 mb-1">Notes</p>
+          <p className="text-sm text-amber-800 dark:text-amber-300">{house.notes}</p>
         </div>
       )}
     </div>

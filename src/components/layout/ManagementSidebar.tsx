@@ -21,13 +21,14 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { label: 'My Dashboard', href: '/teacher', icon: 'ti-layout-dashboard', roles: ['teacher'] },
   { label: 'Dashboard', href: '/dashboard', icon: 'ti-layout-dashboard', roles: ['admin', 'owner', 'reception', 'accountant', 'teacher'] },
   { label: 'Students', href: '/students', icon: 'ti-users', roles: ['admin', 'owner', 'reception', 'teacher'] },
   { label: 'CRM', href: '/crm', icon: 'ti-address-book', roles: ['admin', 'owner', 'reception'] },
   { label: 'Payments', href: '/payments', icon: 'ti-credit-card', roles: ['admin', 'owner', 'reception', 'accountant'] },
   { label: 'Payment Tracker', href: '/payments/tracker', icon: 'ti-checkbox', roles: ['admin', 'owner', 'reception', 'accountant'] },
-  { label: 'Utility Bills', href: '/utility-bills', icon: 'ti-receipt', roles: ['admin', 'owner', 'accountant'] },
-  { label: 'Accommodation', href: '/accommodation', icon: 'ti-home', roles: ['admin', 'owner', 'accountant'] },
+  { label: 'Utility Bills', href: '/utility-bills', icon: 'ti-receipt', roles: ['admin', 'owner', 'accountant', 'reception'] },
+  { label: 'Accommodation', href: '/accommodation', icon: 'ti-home', roles: ['admin', 'owner', 'accountant', 'reception', 'teacher'] },
   {
     label: 'Supplies',
     href: '/supplies',
@@ -37,12 +38,12 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Attendance', href: '/attendance', icon: 'ti-calendar-check', roles: ['admin', 'owner', 'reception', 'teacher'] },
   { label: 'Schedule', href: '/schedule', icon: 'ti-calendar', roles: ['admin', 'owner', 'reception', 'teacher'] },
   { label: 'Sessions', href: '/sessions', icon: 'ti-chalkboard', roles: ['teacher'] },
-  { label: 'Consultations', href: '/consultations', icon: 'ti-calendar-event', roles: ['admin', 'owner', 'reception'] },
-  { label: 'Booking Requests', href: '/consultations/requests', icon: 'ti-calendar-check', roles: ['admin', 'owner', 'reception'] },
+  { label: 'Consultations', href: '/consultations', icon: 'ti-calendar-event', roles: ['admin', 'owner', 'reception', 'teacher'] },
+  { label: 'Booking Requests', href: '/consultations/requests', icon: 'ti-calendar-check', roles: ['admin', 'owner', 'reception', 'teacher'] },
   { label: 'Payroll', href: '/payroll', icon: 'ti-report-money', roles: ['admin', 'owner', 'accountant'] },
   { label: 'Staff', href: '/staff', icon: 'ti-id-badge', roles: ['admin', 'owner'] },
   { label: 'Audit Log', href: '/audit-log', icon: 'ti-shield-check', roles: ['admin', 'owner'] },
-  { label: 'Reports', href: '/reports', icon: 'ti-chart-bar', roles: ['admin', 'owner', 'accountant'] },
+  { label: 'Reports', href: '/reports', icon: 'ti-chart-bar', roles: ['admin', 'owner', 'accountant', 'teacher'] },
   { label: 'Agent Reports', href: '/agent-reports', icon: 'ti-chart-dots-2', roles: ['admin', 'owner', 'accountant'] },
   { label: 'Partners', href: '/partner-companies', icon: 'ti-building', roles: ['admin', 'owner'] },
   { label: 'Analytics', href: '/admin/analytics', icon: 'ti-chart-dots', roles: ['admin', 'owner'] },
@@ -50,13 +51,13 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Kitchen Orders', href: '/admin/kitchen-orders', icon: 'ti-soup', roles: ['admin', 'owner'] },
   { label: 'Kitchen Finance', href: '/accountant/dashboard', icon: 'ti-coin', roles: ['accountant', 'admin', 'owner'] },
   { label: 'Visa Tracker', href: '/admin/visa', icon: 'ti-plane', roles: ['admin', 'owner', 'reception'] },
-  { label: 'Messages', href: '/messages', icon: 'ti-message', roles: ['admin', 'owner', 'reception'] },
-  { label: 'Broadcast', href: '/broadcast', icon: 'ti-speakerphone', roles: ['admin', 'owner', 'reception'] },
+  { label: 'Messages', href: '/messages', icon: 'ti-message', roles: ['admin', 'owner', 'reception', 'teacher'] },
+  { label: 'Broadcast', href: '/broadcast', icon: 'ti-speakerphone', roles: ['admin', 'owner', 'reception', 'teacher'] },
   { label: 'Enrollments', href: '/enrollments', icon: 'ti-clipboard-list', roles: ['admin', 'owner', 'reception'] },
   { label: 'Exam Manager', href: '/admin-exams', icon: 'ti-writing', roles: ['admin', 'owner', 'examCoordinator', 'teacher'] },
   { label: 'Materials', href: '/materials', icon: 'ti-book', roles: ['admin', 'owner', 'teacher'] },
   { label: 'Chat Logs', href: '/chat-logs', icon: 'ti-message-dots', roles: ['admin', 'owner'] },
-  { label: 'AI Importer', href: '/admin/import', icon: 'ti-sparkles', roles: ['admin', 'owner'] },
+  { label: 'AI Importer', href: '/admin/import', icon: 'ti-sparkles', roles: ['admin', 'owner', 'reception'] },
 ]
 
 export default function ManagementSidebar() {

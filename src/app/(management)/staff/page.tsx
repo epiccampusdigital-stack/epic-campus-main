@@ -65,10 +65,16 @@ export default function StaffPage() {
   const loadStaff = useCallback(async () => {
     setLoading(true)
     try {
-      const snap = await getDocs(collection(db, 'users'))
-      const members = snap.docs
+      const [usersSnap, staffSnap] = await Promise.all([
+        getDocs(collection(db, 'users')),
+        getDocs(collection(db, 'staff')).catch(() => null),
+      ])
+      console.log('[StaffPage] users docs:', usersSnap.docs.length, usersSnap.docs.map(d => ({ id: d.id, role: d.data().role, status: d.data().status, email: d.data().email })))
+      const allDocs = [...usersSnap.docs, ...(staffSnap?.docs ?? [])]
+      const members = allDocs
         .map((d) => parseStaff(d.id, d.data() as Record<string, unknown>))
         .filter((s): s is StaffMember => s !== null)
+        .filter((s, i, arr) => arr.findIndex(x => x.email === s.email) === i)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       setStaff(members)
     } catch (err) {

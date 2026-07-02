@@ -11,13 +11,13 @@ interface CountStepperProps {
 export default function CountStepper({
   value,
   onChange,
-  step = 1,
+  step = 0.01,
   min = 0,
   inputClassName = '',
 }: CountStepperProps) {
   const adjust = (delta: number) => {
     const current = parseFloat(value) || 0
-    const next = Math.max(min, current + delta)
+    const next = Math.max(min, parseFloat((current + delta).toFixed(10)))
     onChange(next > 0 ? String(next) : '')
   }
 

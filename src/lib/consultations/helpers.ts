@@ -7,6 +7,8 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  QueryDocumentSnapshot,
+  DocumentData,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { parseStaff } from '@/lib/staff/helpers'
@@ -130,11 +132,15 @@ export function formatTimeRange(start: string, end: string): string {
 }
 
 export async function fetchStaffForConsultations(): Promise<StaffMember[]> {
-  const snap = await getDocs(collection(db, 'users'))
-  return snap.docs
+  const [usersSnap, staffSnap] = await Promise.all([
+    getDocs(collection(db, 'users')),
+    getDocs(collection(db, 'staff')).catch(() => ({ docs: [] as QueryDocumentSnapshot<DocumentData>[] })),
+  ])
+  const allDocs = [...usersSnap.docs, ...(staffSnap as { docs: QueryDocumentSnapshot<DocumentData>[] }).docs]
+  return allDocs
     .map((d) => parseStaff(d.id, d.data() as Record<string, unknown>))
     .filter((s): s is StaffMember => s !== null && s.status === 'active')
-    .sort((a, b) => a.displayName.localeCompare(b.displayName))
+    .filter((s, i, arr) => arr.findIndex(x => x.email === s.email) === i)
 }
 
 export async function fetchConsultationSlots(): Promise<ConsultationSlot[]> {

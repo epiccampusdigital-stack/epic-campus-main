@@ -105,7 +105,7 @@ function AccommodationPageContent() {
   const [toast, setToast] = useState('')
   const [toastKind, setToastKind] = useState<ToastKind>('success')
 
-  const allowed = user?.role === 'admin' || user?.role === 'owner' || user?.role === 'accountant'
+  const allowed = ['admin', 'owner', 'accountant', 'reception', 'teacher', 'examCoordinator'].includes(user?.role ?? '')
 
   const showToast = useCallback((msg: string, kind: ToastKind = 'success') => {
     setToastKind(kind)
@@ -329,13 +329,15 @@ function AccommodationPageContent() {
                 >
                   View Bills
                 </Link>
-                <button
-                  type="button"
-                  onClick={() => openEditModal(house)}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Edit
-                </button>
+                {user?.role !== 'teacher' && (
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(house)}
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Edit
+                  </button>
+                )}
                 {(user?.role === 'admin' || user?.role === 'owner') && (
                   <button
                     type="button"
