@@ -125,7 +125,6 @@ export default function SessionForm({
     return students.filter((s) => s.courseId === form.courseId).slice(0, 30)
   }, [students, form.courseId])
 
-  const selectedStaff = staff.find((s) => s.id === form.staffId)
   const selectedStudent = students.find((s) => s.id === form.studentId)
 
   function setField<K extends keyof SessionFormValues>(
@@ -138,8 +137,8 @@ export default function SessionForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!user) return
-    if (!form.courseId || !form.staffId) {
-      setError('Course and staff member are required.')
+    if (!form.courseId) {
+      setError('Course is required.')
       return
     }
     if (form.type === 'class' && !form.batchName) {
@@ -159,14 +158,14 @@ export default function SessionForm({
     setError('')
 
     try {
-      const staffMember = staff.find((s) => s.id === form.staffId)
+      const staffMember = staff.find((s) => s.id === user.uid)
       const courseName = COURSE_MAP[form.courseId]?.label ?? ''
       const basePayload: Record<string, unknown> = {
         type: form.type,
         courseId: form.courseId,
         courseName,
-        staffId: form.staffId,
-        staffName: staffMember?.displayName ?? '',
+        staffId: user?.uid ?? '',
+        staffName: staffMember?.displayName ?? user.displayName ?? '',
         studentId: form.type === 'consultation' && !form.openSlot ? form.studentId : '',
         studentName:
           form.type === 'consultation' && !form.openSlot
@@ -310,28 +309,6 @@ export default function SessionForm({
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div className="mb-5">
-              <FieldLabel>Staff Member *</FieldLabel>
-              <select
-                value={form.staffId}
-                onChange={(e) => setField('staffId', e.target.value)}
-                required
-                className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
-              >
-                <option value="">Select staff</option>
-                {staff
-                  .filter((s) => s.status === 'active')
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.displayName} ({s.role})
-                    </option>
-                  ))}
-              </select>
-              {selectedStaff && (
-                <p className="mt-1 text-xs text-[#5A6A7A]">{selectedStaff.email}</p>
-              )}
             </div>
 
             {form.type === 'class' && (

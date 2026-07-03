@@ -28,8 +28,10 @@ import { formatLKR } from '@/lib/utils/formatCurrency'
 import type { InventoryCategory, InventoryItem } from '@/types/kitchen'
 
 function formatQty(n: number): string {
-  if (Number.isInteger(n)) return n.toString()
-  return parseFloat(n.toFixed(3)).toString()
+  if (!isFinite(n)) return '0'
+  const fixed = parseFloat(n.toFixed(4))
+  if (Number.isInteger(fixed)) return fixed.toString()
+  return fixed.toString().replace(/\.?0+$/, '')
 }
 
 const CATEGORY_LABELS: Record<InventoryCategory, string> = {
@@ -374,7 +376,7 @@ export default function InventoryPage() {
     if (!restockItem || !restockQty || Number(restockQty) <= 0) return
     setSaving(true)
     try {
-      const newStock = parseFloat((restockItem.currentStock + parseFloat(restockQty)).toFixed(10))
+      const newStock = parseFloat((restockItem.currentStock + parseFloat(restockQty)).toFixed(4))
       const lastRestockedDate = new Date().toISOString().slice(0, 10)
       await updateDoc(doc(db, 'inventory', restockItem.id), {
         currentStock: newStock,
@@ -415,7 +417,7 @@ export default function InventoryPage() {
     if (!removeItem || !removeQty || Number(removeQty) <= 0) return
     try {
       const qty = Number(removeQty)
-      const newStock = parseFloat(Math.max(0, parseFloat((removeItem.currentStock - qty).toFixed(10))).toString())
+      const newStock = parseFloat(Math.max(0, parseFloat((removeItem.currentStock - qty).toFixed(4))).toString())
       await updateDoc(doc(db, 'inventory', removeItem.id), {
         currentStock: newStock,
         lastUpdated: serverTimestamp(),
@@ -762,7 +764,8 @@ export default function InventoryPage() {
         <>
           <div
             className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-            onClick={() => {
+            onClick={(e) => {
+              if (e.target !== e.currentTarget) return
               setRestockItem(null)
               setRestockQty('')
               setRestockBrand('')
@@ -866,7 +869,7 @@ export default function InventoryPage() {
         <>
           <div
             className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-            onClick={() => setRemoveItem(null)}
+            onClick={(e) => { if (e.target === e.currentTarget) setRemoveItem(null) }}
           />
           <div className="fixed bottom-0 left-0 right-0 z-50 mx-auto max-w-lg rounded-t-2xl bg-white p-6 shadow-2xl dark:bg-gray-900">
             <div className="mb-4 flex items-center gap-3">
@@ -970,7 +973,7 @@ export default function InventoryPage() {
         <>
           <div
             className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-            onClick={() => setDeleteConfirmItem(null)}
+            onClick={(e) => { if (e.target === e.currentTarget) setDeleteConfirmItem(null) }}
           />
           <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/80 bg-white/95 p-6 shadow-2xl dark:border-white/[0.08] dark:bg-[#0d1a2e]/95">
             <p className="mb-4 text-sm font-semibold text-[#0D1B2A] dark:text-white">

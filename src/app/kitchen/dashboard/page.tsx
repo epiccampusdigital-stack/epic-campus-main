@@ -64,6 +64,8 @@ export default function KitchenDashboardPage() {
   const [monthCost, setMonthCost] = useState(0)
   const [weekWaste, setWeekWaste] = useState(0)
   const [lowStockCount, setLowStockCount] = useState(0)
+  const [lowStockItems, setLowStockItems] = useState<InventoryItem[]>([])
+  const [lowStockModalOpen, setLowStockModalOpen] = useState(false)
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
   const [monthlyBudget, setMonthlyBudget] = useState(0)
   const [budgetModalOpen, setBudgetModalOpen] = useState(false)
@@ -107,7 +109,9 @@ export default function KitchenDashboardPage() {
 
         const items = invSnap.docs.map((d) => ({ id: d.id, ...d.data() } as InventoryItem))
         setInventoryItems(items)
-        setLowStockCount(items.filter((i) => i.currentStock <= i.minStockLevel).length)
+        const lowItems = items.filter((i) => i.currentStock <= i.minStockLevel)
+        setLowStockItems(lowItems)
+        setLowStockCount(lowItems.length)
 
         if (budgetSnap.exists()) {
           setMonthlyBudget(Number(budgetSnap.data().monthlyBudget) || 0)
@@ -205,7 +209,10 @@ export default function KitchenDashboardPage() {
   return (
     <div className="space-y-5 md:space-y-6">
       {!loading && lowStockCount > 0 && (
-        <div className="w-full rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-700/40 dark:bg-amber-900/20">
+        <div
+          onClick={() => setLowStockModalOpen(true)}
+          className="w-full cursor-pointer rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-700/40 dark:bg-amber-900/20"
+        >
           <div className="flex items-center gap-2">
             <span className="ti ti-alert-triangle text-xl text-amber-600 dark:text-amber-400" />
             <p className="text-base font-semibold text-amber-800 dark:text-amber-300">
@@ -214,6 +221,7 @@ export default function KitchenDashboardPage() {
           </div>
           <Link
             href="/kitchen/orders"
+            onClick={(e) => e.stopPropagation()}
             className="mt-3 flex min-h-[48px] w-full items-center justify-center rounded-xl bg-amber-600 text-sm font-bold text-white hover:bg-amber-700 md:mt-0 md:ml-auto md:w-auto md:px-4"
           >
             Generate Order List
@@ -458,6 +466,38 @@ export default function KitchenDashboardPage() {
             </div>
           </div>
         </>
+      )}
+
+      {lowStockModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setLowStockModalOpen(false)} />
+          <div className="relative z-10 w-full max-w-md rounded-2xl bg-white dark:bg-[#0d1a2e] p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">
+                ⚠️ Low Stock Items ({lowStockItems.length})
+              </h2>
+              <button type="button" onClick={() => setLowStockModalOpen(false)} className="text-[#5A6A7A] hover:text-[#0B3D6B]">
+                <span className="ti ti-x text-xl" />
+              </button>
+            </div>
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {lowStockItems.map(item => (
+                <div key={item.id} className="flex items-center justify-between rounded-xl border border-red-100 bg-red-50 dark:bg-red-900/20 dark:border-red-800 px-4 py-3">
+                  <div>
+                    <p className="font-semibold text-sm text-[#0D1B2A] dark:text-white">{item.itemName}</p>
+                    <p className="text-xs text-red-600 dark:text-red-400">
+                      Stock: {item.currentStock} {item.unit} — Min: {item.minStockLevel} {item.unit}
+                    </p>
+                  </div>
+                  <span className="text-xl">{item.emoji ?? '📦'}</span>
+                </div>
+              ))}
+            </div>
+            <a href="/kitchen/inventory" className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#E8A020] py-2.5 text-sm font-bold text-[#0B3D6B]">
+              <span className="ti ti-arrow-right" /> Go to Inventory
+            </a>
+          </div>
+        </div>
       )}
     </div>
   )

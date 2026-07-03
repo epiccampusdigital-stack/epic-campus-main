@@ -13,12 +13,21 @@ import QuickActions from '@/components/student/QuickActions'
 import { useStudentPortal } from '@/components/student/StudentContext'
 import type { AttendanceRecord, Payment } from '@/types'
 
+interface ExamMilestone {
+  day: number
+  title: string
+  unlocked: boolean
+  completed: boolean
+  isFinal: boolean
+}
+
 export default function MyDashboardPage() {
   const { student } = useStudentPortal()
   const [fallbackStudent, setFallbackStudent] = useState<any | null>(null)
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [examCount, setExamCount] = useState(0)
+  const [milestones, setMilestones] = useState<ExamMilestone[]>([])
   const [houseInfo, setHouseInfo] = useState<{
     name: string
     address: string
@@ -94,6 +103,49 @@ export default function MyDashboardPage() {
                 })
               }
             }
+          }
+        }
+
+        const activeStudentForCourse = student ?? fallbackStudent
+        if (activeStudentForCourse?.courseId === 'japan-ssw') {
+          const paperSnap = await getDocs(
+            query(collection(db, 'examPapers'), where('categoryId', '==', 'japan-ssw-45day')),
+          ).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] }))
+          const milestonePapers = paperSnap.docs
+            .map((d) => ({ id: d.id, ...d.data() } as {
+              id: string
+              unlockDay?: number
+              title?: string
+              isFinalExam?: boolean
+            }))
+            .sort((a, b) => (a.unlockDay ?? 0) - (b.unlockDay ?? 0))
+
+          const attSnap = await getDocs(
+            query(
+              collection(db, 'examAttempts'),
+              where('studentId', '==', activeStudentForCourse.id),
+              where('status', '==', 'completed'),
+            ),
+          ).catch(() => ({ docs: [] as { data: () => Record<string, unknown> }[] }))
+          const attemptedPaperIds = new Set(attSnap.docs.map((d) => d.data().paperId as string))
+
+          const startStr = activeStudentForCourse.enrollmentDate ?? activeStudentForCourse.batchStartDate
+          const start = startStr ? new Date(startStr) : null
+          const daysSince =
+            start && !Number.isNaN(start.getTime())
+              ? Math.floor((Date.now() - start.getTime()) / (1000 * 60 * 60 * 24))
+              : null
+
+          if (!cancelled) {
+            setMilestones(
+              milestonePapers.map((p) => ({
+                day: p.unlockDay ?? 0,
+                title: p.title ?? `Day ${p.unlockDay}`,
+                unlocked: daysSince !== null && (p.unlockDay ?? 0) <= daysSince,
+                completed: attemptedPaperIds.has(p.id),
+                isFinal: !!p.isFinalExam,
+              })),
+            )
           }
         }
       } catch (err) {
@@ -193,6 +245,48 @@ export default function MyDashboardPage() {
         examCount={examCount}
       />
       <QuickActions />
+      {milestones.length > 0 && (
+        <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+          <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white mb-4">
+            Course Progress
+          </h3>
+          <div className="flex items-center">
+            {milestones.map((m, i) => (
+              <div key={m.day} className="flex flex-1 items-center last:flex-none">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      m.completed
+                        ? 'bg-emerald-500 text-white'
+                        : m.unlocked
+                          ? 'bg-gray-200 dark:bg-white/10 text-gray-500'
+                          : 'bg-gray-100 dark:bg-white/[0.04] text-gray-400'
+                    }`}
+                  >
+                    {m.completed ? (
+                      <span className="ti ti-check" />
+                    ) : m.unlocked ? (
+                      <span className="ti ti-hourglass" />
+                    ) : (
+                      <span className="ti ti-lock" />
+                    )}
+                  </div>
+                  <p className="mt-1 whitespace-nowrap text-[10px] font-medium text-[#5A6A7A] dark:text-white/40">
+                    Day {m.day}{m.isFinal ? ' (Final)' : ''}
+                  </p>
+                </div>
+                {i < milestones.length - 1 && (
+                  <div
+                    className={`mx-1 mb-4 h-0.5 flex-1 ${
+                      m.completed ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-white/10'
+                    }`}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <StudyStatsWidget studentId={activeStudent.id} />
       <StudentSessionsWidget studentId={activeStudent.id} />
       <CourseDashboard

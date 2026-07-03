@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import toast from 'react-hot-toast'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import {
@@ -77,6 +78,7 @@ export default function StaffPage() {
         .filter((s, i, arr) => arr.findIndex(x => x.email === s.email) === i)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       setStaff(members)
+      console.log('[StaffPage] parsed members:', members.length, members.map(m => ({ id: m.id, email: m.email, role: m.role, status: m.status })))
     } catch (err) {
       console.error('[StaffPage]', err)
       setStaff([])
@@ -179,6 +181,27 @@ export default function StaffPage() {
     }
   }
 
+  async function handleDelete(member: StaffMember) {
+    if (!user || !['admin', 'owner'].includes(user.role)) return
+    if (!confirm(`Delete ${member.displayName}? This will remove their account.`)) return
+    try {
+      const res = await fetch('/api/staff/delete-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staffId: member.id, uid: member.uid }),
+      })
+      if (res.ok) {
+        toast.success('Staff account deleted')
+        void loadStaff()
+      } else {
+        toast.error('Failed to delete')
+      }
+    } catch (err) {
+      console.error('[DeleteStaff]', err)
+      toast.error('Failed to delete')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -269,6 +292,7 @@ export default function StaffPage() {
             onView={openView}
             onEdit={openEdit}
             onApprove={handleApprove}
+            onDelete={handleDelete}
             approvingId={approvingId}
           />
           {!loading && filtered.length > 0 && (

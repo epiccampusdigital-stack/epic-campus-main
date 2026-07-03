@@ -37,6 +37,13 @@ interface PaperDoc {
   createdBy?: string
   hasAudioCheck?: boolean
   scoringScale?: 250 | 100
+  isLive?: boolean
+  examDate?: string
+  examTime?: string
+  examCourseId?: string
+  examBatch?: string
+  accessCode?: string
+  codeGeneratedAt?: string
 }
 
 interface SectionDoc {
@@ -125,9 +132,16 @@ export default function AdminExamsPage() {
     title: '', description: '', categoryId: 'japan-ssw',
     totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1,
     hasAudioCheck: true, scoringScale: 250 as 250 | 100,
+    isLive: false, examDate: '', examTime: '', examCourseId: '', examBatch: '',
   })
   const [editingPaper, setEditingPaper] = useState<PaperDoc | null>(null)
   const [savingPaper, setSavingPaper] = useState(false)
+
+  // Live exam code panel
+  const [liveCodePaper, setLiveCodePaper] = useState<PaperDoc | null>(null)
+  const [currentCode, setCurrentCode] = useState<string>('')
+  const [codeExpiry, setCodeExpiry] = useState<Date | null>(null)
+  const [codeModalOpen, setCodeModalOpen] = useState(false)
 
   // Question form
   const [qForm, setQForm] = useState({
@@ -188,21 +202,41 @@ export default function AdminExamsPage() {
         isPublished: editingPaper?.isPublished ?? false,
         createdBy: user.uid,
         updatedAt: serverTimestamp(),
+        isLive: paperForm.isLive ?? false,
+        examDate: paperForm.examDate ?? null,
+        examTime: paperForm.examTime ?? null,
+        examCourseId: paperForm.examCourseId ?? null,
+        examBatch: paperForm.examBatch ?? null,
       }
       if (editingPaper) {
         await updateDoc(doc(db, 'examPapers', editingPaper.id), payload)
         setToast('Paper updated')
       } else {
-        await addDoc(collection(db, 'examPapers'), {
+        const paperRef = await addDoc(collection(db, 'examPapers'), {
           ...payload,
           isPublished: false,
           createdAt: serverTimestamp(),
         })
         setToast('Paper created')
+        if (paperForm.isLive && paperForm.examDate && paperForm.examTime) {
+          await addDoc(collection(db, 'schedule'), {
+            title: paperForm.title + ' (Exam)',
+            date: paperForm.examDate,
+            startTime: paperForm.examTime,
+            endTime: paperForm.examTime,
+            type: 'exam',
+            courseId: paperForm.examCourseId ?? '',
+            batch: paperForm.examBatch ?? '',
+            notes: 'Live exam — requires access code',
+            paperId: paperRef.id,
+            createdAt: serverTimestamp(),
+            createdBy: user?.uid ?? '',
+          })
+        }
       }
       await loadPapers()
       setEditingPaper(null)
-      setPaperForm({ title: '', description: '', categoryId: 'japan-ssw', totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1, hasAudioCheck: true, scoringScale: 250 as 250 | 100 })
+      setPaperForm({ title: '', description: '', categoryId: 'japan-ssw', totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1, hasAudioCheck: true, scoringScale: 250 as 250 | 100, isLive: false, examDate: '', examTime: '', examCourseId: '', examBatch: '' })
     } finally {
       setSavingPaper(false)
     }
@@ -228,6 +262,27 @@ export default function AdminExamsPage() {
     if (selectedPaper?.id === paper.id) setSelectedPaper(null)
     setToast('Paper deleted')
     await loadPapers()
+  }
+
+  // ── Live exam code ───────────────────────────────────────────────────────────
+  function generateCode(): string {
+    return String(Math.floor(1000 + Math.random() * 9000))
+  }
+
+  async function startLiveExam(paper: PaperDoc) {
+    const code = generateCode()
+    const now = new Date()
+    const expiry = new Date(now.getTime() + 30 * 60 * 1000) // 30 mins
+    setCurrentCode(code)
+    setCodeExpiry(expiry)
+    setLiveCodePaper(paper)
+    setCodeModalOpen(true)
+    // Save code to Firestore so students can validate
+    await updateDoc(doc(db, 'examPapers', paper.id), {
+      accessCode: code,
+      codeGeneratedAt: now.toISOString(),
+      codeExpiresAt: expiry.toISOString(),
+    })
   }
 
   // ── Auto-create default sections ────────────────────────────────────────────
@@ -467,9 +522,61 @@ export default function AdminExamsPage() {
                 </label>
               </div>
             </div>
+
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={paperForm.isLive ?? false}
+                  onChange={e => setPaperForm(f => ({ ...f, isLive: e.target.checked }))}
+                  className="h-4 w-4 rounded"
+                />
+                <span className="text-sm font-semibold text-[#0B3D6B] dark:text-white">
+                  🔴 Live Exam (requires access code)
+                </span>
+              </label>
+            </div>
+
+            {paperForm.isLive && (
+              <div className="space-y-3 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4">
+                <p className="text-xs font-bold text-red-700 dark:text-red-400 uppercase">Live Exam Settings</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-[#5A6A7A]">Exam Date</label>
+                    <input type="date" value={paperForm.examDate ?? ''} onChange={e => setPaperForm(f => ({ ...f, examDate: e.target.value }))}
+                      className="w-full rounded-xl border border-[#DDE3EC] bg-white dark:bg-white/[0.04] px-3 py-2 text-sm dark:border-white/20 dark:text-white" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-[#5A6A7A]">Exam Time</label>
+                    <input type="time" value={paperForm.examTime ?? ''} onChange={e => setPaperForm(f => ({ ...f, examTime: e.target.value }))}
+                      className="w-full rounded-xl border border-[#DDE3EC] bg-white dark:bg-white/[0.04] px-3 py-2 text-sm dark:border-white/20 dark:text-white" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-[#5A6A7A]">Course</label>
+                    <select value={paperForm.examCourseId ?? ''} onChange={e => setPaperForm(f => ({ ...f, examCourseId: e.target.value }))}
+                      className="w-full rounded-xl border border-[#DDE3EC] bg-white dark:bg-white/[0.04] px-3 py-2 text-sm dark:border-white/20 dark:text-white">
+                      <option value="">All courses</option>
+                      <option value="japan-ssw">🇯🇵 Japan SSW</option>
+                      <option value="korea">🇰🇷 Korea</option>
+                      <option value="china">🇨🇳 China</option>
+                      <option value="ielts">📝 IELTS</option>
+                      <option value="nvq">🎓 NVQ</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-[#5A6A7A]">Batch (optional)</label>
+                    <input type="text" value={paperForm.examBatch ?? ''} onChange={e => setPaperForm(f => ({ ...f, examBatch: e.target.value }))}
+                      placeholder="e.g. Batch 1" className="w-full rounded-xl border border-[#DDE3EC] bg-white dark:bg-white/[0.04] px-3 py-2 text-sm dark:border-white/20 dark:text-white" />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3">
               {editingPaper && (
-                <button type="button" onClick={() => { setEditingPaper(null); setPaperForm({ title: '', description: '', categoryId: 'japan-ssw', totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1, hasAudioCheck: true, scoringScale: 250 as 250 | 100 }) }}
+                <button type="button" onClick={() => { setEditingPaper(null); setPaperForm({ title: '', description: '', categoryId: 'japan-ssw', totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1, hasAudioCheck: true, scoringScale: 250 as 250 | 100, isLive: false, examDate: '', examTime: '', examCourseId: '', examBatch: '' }) }}
                   className="flex-1 rounded-xl border border-[#DDE3EC] dark:border-white/20 py-2.5 text-sm font-semibold text-[#5A6A7A] dark:text-white/60">
                   Cancel
                 </button>
@@ -510,6 +617,12 @@ export default function AdminExamsPage() {
                       </p>
                     </div>
                     <div className="flex shrink-0 gap-1 flex-wrap justify-end">
+                      {paper.isLive && (
+                        <button type="button" onClick={() => void startLiveExam(paper)}
+                          className="rounded-lg bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700">
+                          🔴 Start Live
+                        </button>
+                      )}
                       <button type="button" onClick={() => { setSelectedPaper(paper); setActiveTab('questions'); void ensureDefaultSections(paper.id) }}
                         className="rounded-lg border border-[#DDE3EC] dark:border-white/20 px-2 py-1 text-xs font-semibold text-[#0B3D6B] dark:text-white/70">
                         Questions
@@ -520,7 +633,7 @@ export default function AdminExamsPage() {
                         }`}>
                         {paper.isPublished ? 'Unpublish' : 'Publish'}
                       </button>
-                      <button type="button" onClick={() => { setEditingPaper(paper); setPaperForm({ title: paper.title, description: paper.description ?? '', categoryId: paper.categoryId, totalQuestions: paper.totalQuestions, timeLimitSeconds: paper.timeLimitSeconds, passMark: paper.passMark, order: paper.order, hasAudioCheck: paper.hasAudioCheck ?? true, scoringScale: (paper.scoringScale ?? 250) as 250 | 100 }) }}
+                      <button type="button" onClick={() => { setEditingPaper(paper); setPaperForm({ title: paper.title, description: paper.description ?? '', categoryId: paper.categoryId, totalQuestions: paper.totalQuestions, timeLimitSeconds: paper.timeLimitSeconds, passMark: paper.passMark, order: paper.order, hasAudioCheck: paper.hasAudioCheck ?? true, scoringScale: (paper.scoringScale ?? 250) as 250 | 100, isLive: paper.isLive ?? false, examDate: paper.examDate ?? '', examTime: paper.examTime ?? '', examCourseId: paper.examCourseId ?? '', examBatch: paper.examBatch ?? '' }) }}
                         className="rounded-lg border border-[#DDE3EC] dark:border-white/20 px-2 py-1 text-xs text-[#5A6A7A] dark:text-white/60">
                         Edit
                       </button>
@@ -874,6 +987,60 @@ export default function AdminExamsPage() {
           )}
         </div>
       )}
+
+      {codeModalOpen && liveCodePaper && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70" />
+          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-[#0B3D6B] p-8 shadow-2xl text-center">
+            <p className="text-sm font-bold text-white/60 uppercase tracking-wider mb-2">Live Exam Code</p>
+            <p className="text-sm text-white/70 mb-4">{liveCodePaper.title}</p>
+            <div className="rounded-2xl bg-white/10 py-6 px-4 mb-4">
+              <p className="font-mono text-6xl font-black text-[#E8A020] tracking-[0.3em]">{currentCode}</p>
+            </div>
+            {codeExpiry && (
+              <CodeCountdown expiry={codeExpiry} onExpire={() => void startLiveExam(liveCodePaper)} />
+            )}
+            <p className="text-xs text-white/50 mt-2 mb-6">Code auto-refreshes every 30 minutes</p>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => void startLiveExam(liveCodePaper)}
+                className="flex-1 rounded-xl bg-[#E8A020] py-3 text-sm font-bold text-[#0B3D6B]">
+                🔄 New Code
+              </button>
+              <button type="button" onClick={() => setCodeModalOpen(false)}
+                className="flex-1 rounded-xl bg-white/10 py-3 text-sm font-bold text-white">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CodeCountdown({ expiry, onExpire }: { expiry: Date; onExpire: () => void }) {
+  const [secondsLeft, setSecondsLeft] = useState(0)
+  useEffect(() => {
+    function tick() {
+      const diff = Math.max(0, Math.floor((expiry.getTime() - Date.now()) / 1000))
+      setSecondsLeft(diff)
+      if (diff === 0) onExpire()
+    }
+    tick()
+    const t = setInterval(tick, 1000)
+    return () => clearInterval(t)
+  }, [expiry, onExpire])
+  const m = Math.floor(secondsLeft / 60)
+  const s = secondsLeft % 60
+  const pct = (secondsLeft / 1800) * 100
+  return (
+    <div className="space-y-2">
+      <div className="h-2 rounded-full bg-white/20 overflow-hidden">
+        <div className="h-full bg-[#E8A020] transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="text-sm font-mono font-bold text-white">
+        {m}:{s.toString().padStart(2, '0')} remaining
+      </p>
     </div>
   )
 }

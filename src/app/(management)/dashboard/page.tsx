@@ -91,6 +91,9 @@ export default function DashboardPage() {
   const [allPayments, setAllPayments] = useState<Payment[]>([])
   const [allAttendance, setAllAttendance] = useState<AttendanceRecord[]>([])
   const [partnerNotifications, setPartnerNotifications] = useState<PartnerNotification[]>([])
+  const [pendingApprovals, setPendingApprovals] = useState<
+    { id: string; displayName: string; email: string; requestedRole: string; createdAt: unknown }[]
+  >([])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -117,8 +120,21 @@ export default function DashboardPage() {
       )
       if (user?.role === 'admin' || user?.role === 'owner') {
         setPartnerNotifications(await fetchUnreadPartnerNotifications())
+        const appSnap = await getDocs(
+          query(collection(db, 'pendingApprovals'), where('status', '==', 'pending'))
+        ).catch(() => ({ docs: [] }))
+        setPendingApprovals(
+          appSnap.docs.map(d => ({ id: d.id, ...d.data() } as {
+            id: string
+            displayName: string
+            email: string
+            requestedRole: string
+            createdAt: unknown
+          })),
+        )
       } else {
         setPartnerNotifications([])
+        setPendingApprovals([])
       }
     } catch (err) {
       console.error('Dashboard fetch error:', err)
@@ -404,6 +420,59 @@ export default function DashboardPage() {
               </div>
             ))}
       </section>
+
+      {pendingApprovals.length > 0 && (user?.role === 'admin' || user?.role === 'owner') && (
+        <div className="rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="ti ti-user-check text-xl text-amber-600" />
+            <h3 className="font-jakarta font-bold text-amber-800 dark:text-amber-400">
+              {pendingApprovals.length} Pending Approval{pendingApprovals.length > 1 ? 's' : ''}
+            </h3>
+          </div>
+          <div className="space-y-2">
+            {pendingApprovals.map(a => (
+              <div key={a.id} className="flex items-center justify-between gap-3 rounded-xl bg-white dark:bg-white/[0.04] px-4 py-2.5">
+                <div>
+                  <p className="text-sm font-semibold text-[#0D1B2A] dark:text-white">{a.displayName}</p>
+                  <p className="text-xs text-[#5A6A7A] dark:text-white/40">{a.email} — wants to join as {a.requestedRole}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button"
+                    onClick={async () => {
+                      const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore')
+                      await updateDoc(doc(db, 'pendingApprovals', a.id), { status: 'rejected', updatedAt: serverTimestamp() })
+                      setPendingApprovals(prev => prev.filter(x => x.id !== a.id))
+                    }}
+                    className="rounded-lg border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                    Reject
+                  </button>
+                  <button type="button"
+                    onClick={async () => {
+                      const res = await fetch('/api/students/create-account', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          email: a.email,
+                          displayName: a.displayName,
+                          role: a.requestedRole === 'staff' ? 'teacher' : 'student',
+                          uid: undefined,
+                        }),
+                      })
+                      if (res.ok) {
+                        const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore')
+                        await updateDoc(doc(db, 'pendingApprovals', a.id), { status: 'approved', updatedAt: serverTimestamp() })
+                        setPendingApprovals(prev => prev.filter(x => x.id !== a.id))
+                      }
+                    }}
+                    className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700">
+                    Approve
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {(user?.role === 'admin' || user?.role === 'owner') && (
         <StudentRiskAlertsWidget />

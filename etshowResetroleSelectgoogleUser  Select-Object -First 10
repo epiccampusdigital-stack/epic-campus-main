@@ -1,0 +1,14 @@
+warning: in the working copy of 'src/app/(auth)/login/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/(management)/staff/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/kitchen/dashboard/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/kitchen/inventory/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/staff/StaffTable.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/lib/staff/helpers.ts', LF will be replaced by CRLF the next time Git touches it
+ src/app/(auth)/login/page.tsx                 | 154 [32m+++++++++++++++++++++++++[m[31m-[m
+ src/app/(management)/staff/page.tsx           |  23 [32m++++[m
+ src/app/kitchen/dashboard/page.tsx            |  44 [32m+++++++[m[31m-[m
+ src/app/kitchen/inventory/page.tsx            |  17 [32m+[m[31m--[m
+ src/components/kitchen/KitchenBottomSheet.tsx |   2 [32m+[m[31m-[m
+ src/components/staff/StaffTable.tsx           |  10 [32m++[m
+ src/lib/staff/helpers.ts                      |   2 [32m+[m[31m-[m
+ 7 files changed, 238 insertions(+), 14 deletions(-)

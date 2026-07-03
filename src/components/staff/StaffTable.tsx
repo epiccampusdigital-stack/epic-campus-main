@@ -17,6 +17,7 @@ interface StaffTableProps {
   onView: (member: StaffMember) => void
   onEdit: (member: StaffMember) => void
   onApprove: (member: StaffMember) => void
+  onDelete: (member: StaffMember) => void
   approvingId?: string | null
   onAdd?: () => void
 }
@@ -106,6 +107,7 @@ export default function StaffTable({
   onView,
   onEdit,
   onApprove,
+  onDelete,
   approvingId,
   onAdd,
 }: StaffTableProps) {
@@ -238,6 +240,14 @@ export default function StaffTable({
                         <span className="ti ti-check text-lg" aria-hidden="true" />
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => onDelete(member)}
+                      className="rounded-lg p-2 text-red-600 hover:bg-red-50"
+                      title="Delete staff"
+                    >
+                      <span className="ti ti-trash text-lg" aria-hidden="true" />
+                    </button>
                   </div>
                 </td>
               </tr>

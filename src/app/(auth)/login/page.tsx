@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation'
 import {
   signInWithPopup,
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signOut,
   type User,
 } from 'firebase/auth'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import { auth, googleProvider, db } from '@/lib/firebase/client'
 import { logAuditEvent } from '@/lib/audit/helpers'
 import type { Role } from '@/types'
@@ -126,6 +128,11 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loadingGoogle, setLoadingGoogle] = useState(false)
   const [loadingEmail, setLoadingEmail] = useState(false)
+  const [showReset, setShowReset] = useState(false)
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetSent, setResetSent] = useState(false)
+  const [googleUser, setGoogleUser] = useState<User | null>(null)
+  const [showRoleSelect, setShowRoleSelect] = useState(false)
 
   const isLoading = loadingGoogle || loadingEmail
 
@@ -134,8 +141,14 @@ export default function LoginPage() {
     setLoadingGoogle(true)
     try {
       const result = await signInWithPopup(auth, googleProvider)
-      const path = await completeSignIn(result.user)
-      router.push(path)
+      const userDoc = await getDoc(doc(db, 'users', result.user.uid))
+      if (userDoc.exists()) {
+        const path = await completeSignIn(result.user)
+        router.push(path)
+      } else {
+        setGoogleUser(result.user)
+        setShowRoleSelect(true)
+      }
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''
       if (code === 'auth/popup-closed-by-user') return
@@ -263,6 +276,16 @@ export default function LoginPage() {
                 onToggleShow={() => setShowPassword((v) => !v)}
               />
 
+              <div className="-mt-3 mb-4 text-right">
+                <button
+                  type="button"
+                  onClick={() => setShowReset(true)}
+                  className="text-xs text-[#0B3D6B] hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
+
               <GoldSubmitButton
                 loading={loadingEmail}
                 disabled={isLoading}
@@ -285,6 +308,131 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+
+      {showReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowReset(false)} />
+          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="font-jakarta font-bold text-[#0B3D6B] mb-2">Reset Password</h2>
+            {resetSent ? (
+              <div className="text-center py-4">
+                <span className="ti ti-mail-check text-4xl text-emerald-500" />
+                <p className="mt-2 text-sm text-[#5A6A7A]">Reset link sent to {resetEmail}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowReset(false)
+                    setResetSent(false)
+                  }}
+                  className="mt-4 w-full rounded-xl bg-[#E8A020] py-2.5 text-sm font-bold text-[#0B3D6B]"
+                >
+                  Done
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-[#5A6A7A] mb-4">Enter your email and we&apos;ll send you a reset link.</p>
+                <input
+                  type="email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="w-full rounded-xl border border-[#DDE3EC] px-4 py-3 text-sm outline-none focus:border-[#E8A020]"
+                />
+                <div className="mt-4 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowReset(false)}
+                    className="flex-1 rounded-xl border border-[#DDE3EC] py-2.5 text-sm font-semibold text-[#5A6A7A]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!resetEmail.trim()}
+                    onClick={async () => {
+                      try {
+                        await sendPasswordResetEmail(auth, resetEmail.trim())
+                        setResetSent(true)
+                      } catch (err) {
+                        console.error('[ResetPassword]', err)
+                      }
+                    }}
+                    className="flex-1 rounded-xl bg-[#E8A020] py-2.5 text-sm font-bold text-[#0B3D6B] disabled:opacity-40"
+                  >
+                    Send Reset Link
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showRoleSelect && googleUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#0B3D6B]/10">
+              <span className="ti ti-user-question text-3xl text-[#0B3D6B]" />
+            </div>
+            <h2 className="font-jakarta font-bold text-[#0B3D6B]">Welcome to Epic Campus</h2>
+            <p className="mt-1 text-sm text-[#5A6A7A]">How would you like to join?</p>
+            <div className="mt-5 space-y-3">
+              <button
+                type="button"
+                onClick={async () => {
+                  await addDoc(collection(db, 'pendingApprovals'), {
+                    uid: googleUser.uid,
+                    email: googleUser.email,
+                    displayName: googleUser.displayName,
+                    photoUrl: googleUser.photoURL,
+                    requestedRole: 'student',
+                    status: 'pending',
+                    createdAt: serverTimestamp(),
+                  })
+                  await signOut(auth)
+                  setShowRoleSelect(false)
+                  setGoogleUser(null)
+                  alert('Your request has been sent to the admin. You will receive access once approved.')
+                }}
+                className="flex w-full items-center gap-3 rounded-xl border-2 border-[#DDE3EC] p-4 hover:border-[#E8A020]"
+              >
+                <span className="ti ti-school text-2xl text-[#0B3D6B]" />
+                <div className="text-left">
+                  <p className="font-bold text-[#0B3D6B]">Join as Student</p>
+                  <p className="text-xs text-[#5A6A7A]">Enrol in courses and track your progress</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await addDoc(collection(db, 'pendingApprovals'), {
+                    uid: googleUser.uid,
+                    email: googleUser.email,
+                    displayName: googleUser.displayName,
+                    photoUrl: googleUser.photoURL,
+                    requestedRole: 'staff',
+                    status: 'pending',
+                    createdAt: serverTimestamp(),
+                  })
+                  await signOut(auth)
+                  setShowRoleSelect(false)
+                  setGoogleUser(null)
+                  alert('Your staff request has been sent to the admin for approval.')
+                }}
+                className="flex w-full items-center gap-3 rounded-xl border-2 border-[#DDE3EC] p-4 hover:border-[#E8A020]"
+              >
+                <span className="ti ti-briefcase text-2xl text-[#0B3D6B]" />
+                <div className="text-left">
+                  <p className="font-bold text-[#0B3D6B]">Join as Staff</p>
+                  <p className="text-xs text-[#5A6A7A]">Access staff portal after admin approval</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

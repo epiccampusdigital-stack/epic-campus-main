@@ -29,6 +29,7 @@ const BASE_NAV_ITEMS = [
 ]
 
 const EXAM_NAV_ITEM = { label: 'Take Exam', href: '/exams', icon: 'ti-pencil' }
+const EXAM_CODE_NAV_ITEM = { label: 'Enter Exam Code', href: '/exam-code', icon: 'ti-lock-open' }
 
 export default function StudentSidebar() {
   const pathname = usePathname()
@@ -74,7 +75,7 @@ export default function StudentSidebar() {
     (student?.courseId != null && String(student.courseId).includes('japan'))
 
   const navItems = showExamLink
-    ? [...BASE_NAV_ITEMS.slice(0, 1), EXAM_NAV_ITEM, ...BASE_NAV_ITEMS.slice(1)]
+    ? [...BASE_NAV_ITEMS.slice(0, 1), EXAM_NAV_ITEM, EXAM_CODE_NAV_ITEM, ...BASE_NAV_ITEMS.slice(1)]
     : BASE_NAV_ITEMS
 
   const sidebarContent = (

@@ -17,11 +17,22 @@ interface ExamPaperDoc {
   title: string
   description?: string
   categoryId?: string
+  courseTag?: string
+  unlockDay?: number
+  isFinalExam?: boolean
+  maxAttempts?: number
   totalQuestions?: number
   timeLimitSeconds?: number
   passMark?: number
   isPublished?: boolean
   order?: number
+}
+
+function daysSinceCourseStart(startDate: string | undefined): number | null {
+  if (!startDate) return null
+  const start = new Date(startDate)
+  if (Number.isNaN(start.getTime())) return null
+  return Math.floor((Date.now() - start.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 function ScoreRing({ pct, size = 56 }: { pct: number; size?: number }) {
@@ -49,7 +60,8 @@ function ScoreRing({ pct, size = 56 }: { pct: number; size?: number }) {
 
 export default function ExamsListPage() {
   const router = useRouter()
-  const { user } = useStudentPortal()
+  const { user, student } = useStudentPortal()
+  const daysSinceStart = daysSinceCourseStart(student?.enrollmentDate ?? student?.batchStartDate)
   const [papers, setPapers] = useState<ExamPaperDoc[]>([])
   const [attempts, setAttempts] = useState<Record<string, { pct: number; count: number }>>({})
   const [loading, setLoading] = useState(true)
@@ -71,7 +83,13 @@ export default function ExamsListPage() {
           getDocs(collection(db, 'examPapers'))
         )
         const list = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ExamPaperDoc))
-        setPapers(list.filter(p => p.isPublished !== false))
+        setPapers(
+          list.filter((p) => {
+            if (p.isPublished === false) return false
+            if (p.courseTag === 'japan-ssw-45day') return student?.courseId === 'japan-ssw'
+            return true
+          }),
+        )
 
         const attSnap = await getDocs(
           query(
@@ -98,7 +116,7 @@ export default function ExamsListPage() {
       }
     }
     void load()
-  }, [user])
+  }, [user, student])
 
   const categoryGroups = papers.reduce<Record<string, ExamPaperDoc[]>>((acc, p) => {
     const cat = p.categoryId ?? 'general'
@@ -155,6 +173,54 @@ export default function ExamsListPage() {
               {catPapers.map((paper) => {
                 const att = attempts[paper.id]
                 const isPassed = att && att.pct >= (paper.passMark ?? 80)
+                const isFortyFiveDay = paper.courseTag === 'japan-ssw-45day'
+                const locked =
+                  isFortyFiveDay &&
+                  (daysSinceStart === null || (paper.unlockDay ?? 0) > daysSinceStart)
+                const completed45 = isFortyFiveDay && !!att
+
+                if (locked) {
+                  return (
+                    <div
+                      key={paper.id}
+                      className="flex w-full items-center gap-4 rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-[#F5F7FB] dark:bg-white/[0.02] p-4 text-left opacity-70"
+                    >
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-200 dark:bg-white/[0.06] text-xl text-gray-400">
+                        <span className="ti ti-lock" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-jakarta font-bold text-gray-500 dark:text-white/40">
+                          {paper.title}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-400 dark:text-white/30">
+                          Unlocks on Day {paper.unlockDay}
+                        </p>
+                      </div>
+                      <span className="ti ti-lock text-gray-300" />
+                    </div>
+                  )
+                }
+
+                if (completed45) {
+                  return (
+                    <div
+                      key={paper.id}
+                      className="flex w-full items-center gap-4 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-4 text-left"
+                    >
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30 text-xl">
+                        <span className="ti ti-check text-emerald-600" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-jakarta font-bold text-[#0D1B2A] dark:text-white">
+                          {paper.title}
+                        </p>
+                        <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">Completed</p>
+                      </div>
+                      {att && <ScoreRing pct={Math.round(att.pct)} />}
+                    </div>
+                  )
+                }
+
                 return (
                   <button
                     key={paper.id}

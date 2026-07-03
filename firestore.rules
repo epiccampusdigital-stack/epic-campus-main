@@ -4,7 +4,12 @@ service cloud.firestore {
 
     // Users collection — read own, write own on create
     match /users/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+      allow get: if request.auth != null && (
+        request.auth.uid == uid ||
+        request.auth.token.role in ['admin', 'owner', 'reception', 'teacher', 'accountant', 'examCoordinator']
+      );
+      allow list: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'reception', 'teacher', 'accountant', 'examCoordinator'];
       allow create: if request.auth != null && request.auth.uid == uid;
       allow update: if request.auth != null && request.auth.uid == uid;
     }
@@ -446,6 +451,13 @@ service cloud.firestore {
         request.auth.token.role in ['admin','owner','accountant'];
     }
 
+    match /fixedUtilityBills/{docId} {
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin','owner','accountant','reception'];
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin','owner','accountant'];
+    }
+
     match /agents/{docId} {
       allow read: if request.auth != null &&
         request.auth.token.role in ['admin','owner','reception'];
@@ -457,6 +469,14 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin','owner','kitchen'];
+    }
+
+    match /pendingApprovals/{docId} {
+      allow create: if request.auth != null;
+      allow read, update: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner'];
+      allow delete: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner'];
     }
   }
 }

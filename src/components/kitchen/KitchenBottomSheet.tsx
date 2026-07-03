@@ -36,7 +36,7 @@ export default function KitchenBottomSheet({
         className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 md:bg-black/40 ${
           open ? 'opacity-100' : 'opacity-0'
         }`}
-        onClick={onClose}
+        onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
         aria-hidden="true"
       />
       <div

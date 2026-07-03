@@ -23,10 +23,21 @@ interface Enrollment {
   location: string
   status: 'pending' | 'approved' | 'rejected'
   createdAt?: unknown
+  submittedAt?: unknown
   notes?: string
   agentId?: string
   totalFee?: number
   paymentPlan?: string
+  batch?: string
+}
+
+function toMillis(val: unknown): number {
+  if (!val) return 0
+  if (typeof val === 'object' && val !== null && 'toDate' in val) {
+    return (val as { toDate: () => Date }).toDate().getTime()
+  }
+  const t = new Date(String(val)).getTime()
+  return Number.isNaN(t) ? 0 : t
 }
 
 interface PaymentPlanForm {
@@ -68,6 +79,9 @@ export default function EnrollmentsPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'pending' | 'approved' | 'rejected'>('pending')
   const [search, setSearch] = useState('')
+  const [dateSort, setDateSort] = useState<'newest' | 'oldest'>('newest')
+  const [batchFilter, setBatchFilter] = useState('')
+  const [courseFilter, setCourseFilter] = useState('')
   const [approveModal, setApproveModal] = useState<Enrollment | null>(null)
   const [rejectModal, setRejectModal] = useState<Enrollment | null>(null)
   const [rejectReason, setRejectReason] = useState('')
@@ -199,12 +213,21 @@ export default function EnrollmentsPage() {
     }
   }
 
-  const filtered = enrollments.filter(e => {
-    const matchTab = e.status === tab
-    const q = search.trim().toLowerCase()
-    const matchSearch = !q || e.studentName.toLowerCase().includes(q) || e.email.toLowerCase().includes(q)
-    return matchTab && matchSearch
-  })
+  const filtered = enrollments
+    .filter(e => {
+      const matchTab = e.status === tab
+      const q = search.trim().toLowerCase()
+      const matchSearch = !q || e.studentName.toLowerCase().includes(q) || e.email.toLowerCase().includes(q)
+      const matchCourse = !courseFilter || e.courseId === courseFilter
+      const matchBatch =
+        !batchFilter.trim() || (e.batch ?? '').toLowerCase().includes(batchFilter.trim().toLowerCase())
+      return matchTab && matchSearch && matchCourse && matchBatch
+    })
+    .sort((a, b) => {
+      const aTime = toMillis(a.submittedAt ?? a.createdAt)
+      const bTime = toMillis(b.submittedAt ?? b.createdAt)
+      return dateSort === 'newest' ? bTime - aTime : aTime - bTime
+    })
 
   const counts = {
     pending: enrollments.filter(e => e.status === 'pending').length,
@@ -267,6 +290,34 @@ export default function EnrollmentsPage() {
             className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] py-2.5 pl-9 pr-3 text-sm dark:text-white outline-none focus:border-[#E8A020]"
           />
         </div>
+      </div>
+
+      {/* Date / batch / course filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        <select
+          value={dateSort}
+          onChange={e => setDateSort(e.target.value as 'newest' | 'oldest')}
+          className="rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] px-3 py-2.5 text-sm dark:text-white outline-none focus:border-[#E8A020]"
+        >
+          <option value="newest">Newest First</option>
+          <option value="oldest">Oldest First</option>
+        </select>
+        <input
+          value={batchFilter}
+          onChange={e => setBatchFilter(e.target.value)}
+          placeholder="Filter by batch..."
+          className="rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] px-3 py-2.5 text-sm dark:text-white outline-none focus:border-[#E8A020]"
+        />
+        <select
+          value={courseFilter}
+          onChange={e => setCourseFilter(e.target.value)}
+          className="rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] px-3 py-2.5 text-sm dark:text-white outline-none focus:border-[#E8A020]"
+        >
+          <option value="">All Courses</option>
+          {Object.entries(COURSE_LABELS).map(([id, label]) => (
+            <option key={id} value={id}>{label}</option>
+          ))}
+        </select>
       </div>
 
       {/* Enrollment list */}

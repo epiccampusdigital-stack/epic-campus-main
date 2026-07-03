@@ -57,7 +57,9 @@ export default function FixedBillsPanel({ location, month }: FixedBillsPanelProp
     setLoading(true)
     setError('')
     try {
-      await ensureMonthBills()
+      await ensureMonthBills().catch((err) => {
+        console.warn('[FixedBillsPanel] ensureMonthBills failed, showing existing bills only', err)
+      })
       const snap = await getDocs(
         query(
           collection(db, 'fixedUtilityBills'),

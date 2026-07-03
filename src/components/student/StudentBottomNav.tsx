@@ -8,6 +8,7 @@ const NAV = [
   { label: 'Dashboard', href: '/my-dashboard', icon: 'ti-layout-dashboard' },
   { label: 'Schedule', href: '/my-schedule', icon: 'ti-calendar' },
   { label: 'Exams', href: '/exams', icon: 'ti-writing' },
+  { label: 'Code', href: '/exam-code', icon: 'ti-lock-open' },
   { label: 'Results', href: '/my-results', icon: 'ti-certificate' },
   { label: 'Book', href: '/book-consultation', icon: 'ti-calendar' },
   { label: 'Profile', href: '/my-id', icon: 'ti-user' },
