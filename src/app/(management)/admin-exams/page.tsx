@@ -333,7 +333,7 @@ export default function AdminExamsPage() {
         languageMode: qForm.languageMode ?? 'both',
         ...(qForm.questionTextJP ? { questionTextJP: qForm.questionTextJP } : {}),
         ...(qForm.questionTextEN ? { questionTextEN: qForm.questionTextEN } : {}),
-        audioPlayLimit: qForm.audioPlayLimit ?? 2,
+        audioPlayLimit: qForm.audioPlayLimit ?? 0,
         ...(questionImageUrl ? { questionImageUrl } : {}),
         ...(questionAudioUrl ? { questionAudioUrl } : {}),
       }
@@ -807,7 +807,7 @@ export default function AdminExamsPage() {
                       className="text-xs text-[#5A6A7A] dark:text-white/50" />
                     {(qImageFile ?? editingQ?.questionImageUrl) && (
                       <img src={qImageFile ? URL.createObjectURL(qImageFile) : editingQ?.questionImageUrl}
-                        alt="" className="mt-2 h-24 rounded-xl object-contain border border-[#DDE3EC]" />
+                        alt="" className="mt-2 max-h-48 rounded-xl object-contain border border-[#DDE3EC]" />
                     )}
                   </div>
 
@@ -815,8 +815,12 @@ export default function AdminExamsPage() {
                     <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Question Audio (optional · max 3 plays for students)</label>
                     <input type="file" accept="audio/*" onChange={e => setQAudioFile(e.target.files?.[0] ?? null)}
                       className="text-xs text-[#5A6A7A] dark:text-white/50" />
-                    {editingQ?.questionAudioUrl && !qAudioFile && (
-                      <audio src={editingQ.questionAudioUrl} controls className="mt-2 h-8 w-full" />
+                    {(qAudioFile || editingQ?.questionAudioUrl) && (
+                      <audio
+                        src={qAudioFile ? URL.createObjectURL(qAudioFile) : editingQ?.questionAudioUrl}
+                        controls
+                        className="mt-2 w-full rounded-xl"
+                      />
                     )}
                   </div>
 

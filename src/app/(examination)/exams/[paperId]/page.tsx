@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   collection,
@@ -41,10 +41,15 @@ interface ExamQuestion {
   order: number
   questionText?: string
   questionTextJP?: string
-  options: { index: number; text: string }[]
+  questionTextEN?: string
+  options: { index: number; text: string; imageUrl?: string }[]
   correctIndex: number
   audioUrl?: string
   imageUrl?: string
+  questionAudioUrl?: string
+  questionImageUrl?: string
+  audioPlayLimit?: number
+  languageMode?: 'en' | 'jp' | 'both'
 }
 
 type Phase = 'loading' | 'start' | 'audio-check' | 'exam' | 'submitting' | 'results'
@@ -53,6 +58,68 @@ function formatTime(s: number) {
   const m = Math.floor(s / 60)
   const sec = s % 60
   return `${m}:${sec.toString().padStart(2, '0')}`
+}
+
+function AudioPlayer({ src, playLimit }: { src: string; playLimit?: number }) {
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const [playing, setPlaying] = useState(false)
+  const [playCount, setPlayCount] = useState(0)
+  const [progress, setProgress] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const limit = playLimit ?? 99
+
+  function handlePlay() {
+    if (!audioRef.current) return
+    if (playCount >= limit) return
+    audioRef.current.currentTime = 0
+    void audioRef.current.play()
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-[#F5F7FB] dark:bg-white/[0.04] p-3">
+      <audio
+        ref={audioRef}
+        src={src}
+        onPlay={() => { setPlaying(true); setPlayCount(c => c + 1) }}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+        onTimeUpdate={() => {
+          if (audioRef.current) {
+            setProgress(audioRef.current.currentTime)
+            setDuration(audioRef.current.duration || 0)
+          }
+        }}
+      />
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          disabled={playCount >= limit}
+          onClick={handlePlay}
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition-all ${
+            playing ? 'bg-[#E8A020]' : playCount >= limit ? 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed' : 'bg-[#0B3D6B] hover:bg-[#1A6BAD]'
+          }`}
+        >
+          <span className={`ti ${playing ? 'ti-player-pause' : 'ti-player-play'} text-sm`} />
+        </button>
+        <div className="flex-1 space-y-1">
+          <div className="h-1.5 rounded-full bg-[#DDE3EC] dark:bg-white/20 overflow-hidden">
+            <div
+              className="h-full bg-[#E8A020] transition-all"
+              style={{ width: duration > 0 ? `${(progress / duration) * 100}%` : '0%' }}
+            />
+          </div>
+          <div className="flex justify-between text-[10px] text-[#5A6A7A] dark:text-white/40">
+            <span>{Math.floor(progress)}s</span>
+            {limit < 99 && (
+              <span className={playCount >= limit ? 'text-red-500' : ''}>
+                {playCount}/{limit} plays {playCount >= limit ? '(limit reached)' : ''}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function ExamPage() {
@@ -116,7 +183,7 @@ export default function ExamPage() {
     if (!paper) return
     setPhase('submitting')
     try {
-      const correct = questions.filter(q => answers[q.id] === q.correctIndex).length
+      const correct = questions.filter(q => Number(answers[q.id]) === Number(q.correctIndex)).length
       const total = questions.length
       const pct = total > 0 ? Math.round((correct / total) * 100) : 0
       setScore({ correct, total, pct })
@@ -301,7 +368,7 @@ export default function ExamPage() {
           <div className="max-h-72 overflow-y-auto space-y-2">
             {questions.map((qs, i) => {
               const userAns = answers[qs.id]
-              const correct = userAns === qs.correctIndex
+              const correct = Number(userAns) === Number(qs.correctIndex)
               const correctOption = qs.options.find(o => o.index === qs.correctIndex)
               return (
                 <div key={qs.id} className={`rounded-xl p-3 text-sm ${correct ? 'bg-emerald-50 border border-emerald-100' : 'bg-red-50 border border-red-100'}`}>
@@ -377,8 +444,33 @@ export default function ExamPage() {
             <div className="rounded-2xl bg-white border border-[#DDE3EC] p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
-                  {q.questionText && <p className="text-base font-semibold text-[#0D1B2A]">{q.questionText}</p>}
-                  {q.questionTextJP && <p className="mt-2 text-lg text-[#0B3D6B]">{q.questionTextJP}</p>}
+                  {/* Question image — above question text */}
+                  {(q.questionImageUrl || q.imageUrl) && (
+                    <div className="mb-4 overflow-hidden rounded-xl border border-[#DDE3EC] dark:border-white/20">
+                      <img
+                        src={q.questionImageUrl ?? q.imageUrl}
+                        alt="Question"
+                        className="w-full max-h-64 object-contain bg-white dark:bg-white/[0.04]"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Question text */}
+                  {q.questionText && (
+                    <p className="text-base font-semibold text-[#0D1B2A] dark:text-white">{q.questionText}</p>
+                  )}
+                  {q.questionTextJP && (
+                    <p className="mt-2 text-lg text-[#0B3D6B] dark:text-blue-300">{q.questionTextJP}</p>
+                  )}
+
+                  {/* Audio player */}
+                  {(q.questionAudioUrl || q.audioUrl) && (
+                    <AudioPlayer
+                      src={q.questionAudioUrl ?? q.audioUrl ?? ''}
+                      playLimit={q.audioPlayLimit}
+                    />
+                  )}
                 </div>
                 <button
                   type="button"
@@ -388,14 +480,6 @@ export default function ExamPage() {
                   <span className="ti ti-flag text-lg" />
                 </button>
               </div>
-              {q.audioUrl && (
-                <audio controls className="mt-3 w-full">
-                  <source src={q.audioUrl} type="audio/mpeg" />
-                </audio>
-              )}
-              {q.imageUrl && (
-                <img src={q.imageUrl} alt="Question visual" className="mt-3 rounded-xl max-h-48 object-contain" />
-              )}
             </div>
 
             <div className="space-y-2">
@@ -405,17 +489,23 @@ export default function ExamPage() {
                   <button
                     key={opt.index}
                     type="button"
-                    onClick={() => setAnswers(prev => ({ ...prev, [q.id]: opt.index }))}
+                    onClick={() => setAnswers(prev => ({ ...prev, [q.id]: Number(opt.index) }))}
                     className={`flex w-full items-center gap-3 rounded-xl border-2 p-4 text-left transition-all ${
-                      selected ? 'border-[#E8A020] bg-[#E8A020]/10' : 'border-[#DDE3EC] bg-white hover:border-[#0B3D6B]/30'
+                      selected ? 'border-[#E8A020] bg-[#E8A020]/10' : 'border-[#DDE3EC] bg-white dark:bg-white/[0.04] hover:border-[#0B3D6B]/30 dark:border-white/20'
                     }`}
                   >
                     <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold ${
-                      selected ? 'border-[#E8A020] bg-[#E8A020] text-white' : 'border-[#DDE3EC] text-[#5A6A7A]'
+                      selected ? 'border-[#E8A020] bg-[#E8A020] text-white' : 'border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/40'
                     }`}>
                       {opt.index}
                     </div>
-                    <span className={`text-sm font-medium ${selected ? 'text-[#0B3D6B]' : 'text-[#0D1B2A]'}`}>{opt.text}</span>
+                    {opt.imageUrl ? (
+                      <img src={opt.imageUrl} alt={`Option ${opt.index}`} className="h-16 w-auto rounded-lg object-contain" />
+                    ) : (
+                      <span className={`text-sm font-medium ${selected ? 'text-[#0B3D6B] dark:text-white' : 'text-[#0D1B2A] dark:text-white'}`}>
+                        {opt.text}
+                      </span>
+                    )}
                   </button>
                 )
               })}

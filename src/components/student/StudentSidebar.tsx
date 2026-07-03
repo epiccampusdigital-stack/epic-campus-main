@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { collection, onSnapshot, query, where, doc } from 'firebase/firestore'
-import { signOut } from 'firebase/auth'
+import { signOut, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase/client'
 import { COURSE_MAP } from '@/lib/constants/courses'
 import { getCourseBadge } from '@/lib/student/portal'
@@ -37,6 +37,13 @@ export default function StudentSidebar() {
   const { user, student, sidebarOpen, setSidebarOpen } = useStudentPortal()
   const [mounted, setMounted] = useState(false)
   const [unreadMessages, setUnreadMessages] = useState(0)
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwError, setPwError] = useState('')
+  const [pwSuccess, setPwSuccess] = useState(false)
 
   useEffect(() => setMounted(true), [])
 
@@ -65,6 +72,48 @@ export default function StudentSidebar() {
     await fetch('/api/auth/session', { method: 'DELETE' })
     await signOut(auth)
     router.replace('/login')
+  }
+
+  async function handleChangePassword() {
+    setPwError('')
+    if (!newPassword || newPassword.length < 6) {
+      setPwError('New password must be at least 6 characters')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPwError('Passwords do not match')
+      return
+    }
+    const firebaseUser = auth.currentUser
+    if (!firebaseUser || !firebaseUser.email) {
+      setPwError('Not authenticated')
+      return
+    }
+    setPwSaving(true)
+    try {
+      const credential = EmailAuthProvider.credential(firebaseUser.email, currentPassword)
+      await reauthenticateWithCredential(firebaseUser, credential)
+      await updatePassword(firebaseUser, newPassword)
+      setPwSuccess(true)
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setTimeout(() => {
+        setPwSuccess(false)
+        setPasswordModalOpen(false)
+      }, 2000)
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code
+      if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+        setPwError('Current password is incorrect')
+      } else if (code === 'auth/too-many-requests') {
+        setPwError('Too many attempts. Please try again later.')
+      } else {
+        setPwError('Failed to change password. Please try again.')
+      }
+    } finally {
+      setPwSaving(false)
+    }
   }
 
   const courseLabel = student ? getCourseBadge(student.courseId) : ''
@@ -123,6 +172,13 @@ export default function StudentSidebar() {
             <span className="mt-0.5 inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[#E8A020]/15 px-2 py-0.5 text-[10px] font-medium text-[#E8A020]">
               <span className="truncate">{courseName || courseLabel}</span>
             </span>
+            <button
+              type="button"
+              onClick={() => setPasswordModalOpen(true)}
+              className="mt-1.5 block text-[11px] font-medium text-[#5A6A7A] dark:text-white/40 hover:text-[#0B3D6B] dark:hover:text-white/70"
+            >
+              🔒 Change Password
+            </button>
           </div>
         )}
         <div className="flex items-center gap-2 px-1">
@@ -161,6 +217,78 @@ export default function StudentSidebar() {
       >
         {sidebarContent}
       </aside>
+
+      {passwordModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setPasswordModalOpen(false); setPwError(''); setPwSuccess(false) }} />
+          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white dark:bg-[#0d1a2e] p-6 shadow-2xl">
+            <h2 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white mb-1">Change Password</h2>
+            <p className="text-xs text-[#5A6A7A] dark:text-white/50 mb-4">{user?.email}</p>
+
+            {pwSuccess ? (
+              <div className="text-center py-6">
+                <span className="ti ti-circle-check text-5xl text-emerald-500" />
+                <p className="mt-2 font-semibold text-emerald-600">Password changed successfully!</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">Current Password</label>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={e => setCurrentPassword(e.target.value)}
+                    className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-[#F5F7FB] dark:bg-white/[0.04] px-4 py-3 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020]"
+                    placeholder="Enter current password"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">New Password</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-[#F5F7FB] dark:bg-white/[0.04] px-4 py-3 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020]"
+                    placeholder="Min 6 characters"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-[#F5F7FB] dark:bg-white/[0.04] px-4 py-3 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020]"
+                    placeholder="Repeat new password"
+                  />
+                </div>
+                {pwError && (
+                  <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+                    {pwError}
+                  </div>
+                )}
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setPasswordModalOpen(false); setPwError(''); setCurrentPassword(''); setNewPassword(''); setConfirmPassword('') }}
+                    className="flex-1 rounded-xl border border-[#DDE3EC] dark:border-white/20 py-3 text-sm font-semibold text-[#5A6A7A] dark:text-white/60"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!currentPassword || !newPassword || !confirmPassword || pwSaving}
+                    onClick={() => void handleChangePassword()}
+                    className="flex-1 rounded-xl bg-[#E8A020] py-3 text-sm font-bold text-[#0B3D6B] disabled:opacity-40"
+                  >
+                    {pwSaving ? 'Saving...' : 'Change Password'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   )
 }
