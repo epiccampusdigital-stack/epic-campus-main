@@ -39,6 +39,25 @@ function getOrCreateSessionId(): string {
   return id
 }
 
+const BTN_SIZE = 56
+const SAFE_ZONE = 20
+const DRAG_THRESHOLD = 5
+const POS_STORAGE_KEY = 'agentBtnPos'
+
+interface BtnPos {
+  left: number
+  top: number
+}
+
+function clampPos(pos: BtnPos): BtnPos {
+  const maxLeft = Math.max(SAFE_ZONE, window.innerWidth - BTN_SIZE - SAFE_ZONE)
+  const maxTop = Math.max(SAFE_ZONE, window.innerHeight - BTN_SIZE - SAFE_ZONE)
+  return {
+    left: Math.min(Math.max(pos.left, SAFE_ZONE), maxLeft),
+    top: Math.min(Math.max(pos.top, SAFE_ZONE), maxTop),
+  }
+}
+
 export default function ChatBot() {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
@@ -53,13 +72,95 @@ export default function ChatBot() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const sessionId = useRef<string>('')
 
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [basePos, setBasePos] = useState<BtnPos | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const [dragDelta, setDragDelta] = useState({ dx: 0, dy: 0 })
+  const pointerStart = useRef<{ x: number; y: number } | null>(null)
+  const dragStartPos = useRef<BtnPos | null>(null)
+  const movedRef = useRef(false)
+
   useEffect(() => {
     sessionId.current = getOrCreateSessionId()
+    try {
+      const saved = localStorage.getItem(POS_STORAGE_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved) as BtnPos
+        if (typeof parsed.left === 'number' && typeof parsed.top === 'number') {
+          setBasePos(clampPos(parsed))
+        }
+      }
+    } catch {
+      // ignore malformed saved position
+    }
+  }, [])
+
+  // Re-clamp the saved/dragged position if the viewport is resized
+  useEffect(() => {
+    function onResize() {
+      setBasePos((prev) => (prev ? clampPos(prev) : prev))
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
   }, [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
+
+  function handlePointerDown(e: React.PointerEvent<HTMLButtonElement>) {
+    const rect = btnRef.current?.getBoundingClientRect()
+    if (!rect) return
+    dragStartPos.current = { left: rect.left, top: rect.top }
+    pointerStart.current = { x: e.clientX, y: e.clientY }
+    movedRef.current = false
+    setDragging(true)
+    btnRef.current?.setPointerCapture(e.pointerId)
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLButtonElement>) {
+    if (!dragging || !pointerStart.current || !dragStartPos.current) return
+    const dx = e.clientX - pointerStart.current.x
+    const dy = e.clientY - pointerStart.current.y
+    if (Math.hypot(dx, dy) > DRAG_THRESHOLD) movedRef.current = true
+
+    const maxLeft = Math.max(SAFE_ZONE, window.innerWidth - BTN_SIZE - SAFE_ZONE)
+    const maxTop = Math.max(SAFE_ZONE, window.innerHeight - BTN_SIZE - SAFE_ZONE)
+    const clampedLeft = Math.min(Math.max(dragStartPos.current.left + dx, SAFE_ZONE), maxLeft)
+    const clampedTop = Math.min(Math.max(dragStartPos.current.top + dy, SAFE_ZONE), maxTop)
+
+    setDragDelta({
+      dx: clampedLeft - dragStartPos.current.left,
+      dy: clampedTop - dragStartPos.current.top,
+    })
+  }
+
+  function handlePointerUp(e: React.PointerEvent<HTMLButtonElement>) {
+    if (!dragging || !dragStartPos.current) return
+    const finalPos: BtnPos = {
+      left: dragStartPos.current.left + dragDelta.dx,
+      top: dragStartPos.current.top + dragDelta.dy,
+    }
+    setBasePos(finalPos)
+    setDragDelta({ dx: 0, dy: 0 })
+    setDragging(false)
+    btnRef.current?.releasePointerCapture(e.pointerId)
+    try {
+      localStorage.setItem(POS_STORAGE_KEY, JSON.stringify(finalPos))
+    } catch {
+      // storage unavailable — position just won't persist across reloads
+    }
+    pointerStart.current = null
+    dragStartPos.current = null
+  }
+
+  function handleButtonClick() {
+    if (movedRef.current) {
+      movedRef.current = false
+      return
+    }
+    setOpen((prev) => !prev)
+  }
 
   async function send() {
     if (!input.trim() || loading) return
@@ -180,14 +281,26 @@ export default function ChatBot() {
       )}
 
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-[#0B3D6B] shadow-lg transition-all hover:scale-110 hover:bg-[#0a3460]"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onClick={handleButtonClick}
+        style={{
+          ...(basePos ? { left: basePos.left, top: basePos.top, right: 'auto', bottom: 'auto' } : {}),
+          transform: dragging ? `translate(${dragDelta.dx}px, ${dragDelta.dy}px)` : undefined,
+          transition: dragging ? 'none' : undefined,
+          cursor: dragging ? 'grabbing' : 'grab',
+          touchAction: 'none',
+        }}
+        className={`fixed z-[9999] flex h-14 w-14 select-none items-center justify-center overflow-hidden rounded-full bg-[#0B3D6B] shadow-lg transition-all hover:scale-110 hover:bg-[#0a3460] ${basePos ? '' : 'bottom-6 right-6'}`}
       >
         {open ? (
           <span className="text-2xl text-white">✕</span>
         ) : (
-          <img src="/favicon.png" alt="EPIC Campus" className="h-10 w-10 rounded-full object-cover" />
+          <img src="/favicon.png" alt="EPIC Campus" draggable={false} className="h-10 w-10 rounded-full object-cover" />
         )}
       </button>
     </>

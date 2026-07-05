@@ -46,7 +46,7 @@ export default function OrdersPage() {
   const [toast, setToast] = useState('')
   const [generated, setGenerated] = useState(false)
   const [studentTarget, setStudentTarget] = useState('130')
-  const [generating, setGenerating] = useState(false)
+  const [smartLoading, setSmartLoading] = useState(false)
 
   async function loadData() {
     setLoading(true)
@@ -100,7 +100,7 @@ export default function OrdersPage() {
   }
 
   async function generateSmartOrder() {
-    setGenerating(true)
+    setSmartLoading(true)
     try {
       const thirtyDaysAgo = new Date()
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
@@ -150,7 +150,7 @@ export default function OrdersPage() {
     } catch (err) {
       console.error('[SmartOrder]', err)
     } finally {
-      setGenerating(false)
+      setSmartLoading(false)
     }
   }
 
@@ -263,11 +263,15 @@ export default function OrdersPage() {
           </div>
           <button
             type="button"
-            disabled={generating}
+            disabled={smartLoading}
             onClick={() => void generateSmartOrder()}
             className="mt-4 flex items-center gap-2 rounded-xl bg-[#0B3D6B] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60"
           >
-            <span className="ti ti-sparkles" /> {generating ? 'Generating…' : 'Smart Order (30-day avg)'}
+            {smartLoading ? (
+              <><span className="ti ti-loader animate-spin" /> Calculating...</>
+            ) : (
+              <><span className="ti ti-sparkles" /> Smart Order (30-day avg)</>
+            )}
           </button>
         </div>
       </div>

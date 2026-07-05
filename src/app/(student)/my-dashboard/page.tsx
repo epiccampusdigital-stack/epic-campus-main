@@ -253,7 +253,7 @@ export default function MyDashboardPage() {
     ? (typeof startRaw === 'object' && startRaw !== null && 'toDate' in startRaw
         ? (startRaw as { toDate: () => Date }).toDate().getTime()
         : new Date(String(startRaw)).getTime())
-    : null
+    : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).getTime()
   const daysElapsed = startMs ? Math.max(0, Math.floor((Date.now() - startMs) / (1000 * 60 * 60 * 24))) : 0
   const daysRemaining = Math.max(0, duration - daysElapsed)
   const progressPct = Math.min(100, Math.round((daysElapsed / duration) * 100))

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   signInWithPopup,
@@ -137,6 +137,10 @@ async function completeSignIn(user: User): Promise<SignInResult> {
 
 const STAFF_ROLES = ['admin', 'owner', 'teacher', 'reception', 'accountant', 'examCoordinator', 'kitchen']
 
+// TODO: Remove sandbox notice when Twilio live number is activated
+const TWILIO_SANDBOX_KEYWORD = process.env.NEXT_PUBLIC_TWILIO_SANDBOX_KEYWORD || 'your-sandbox-keyword'
+const RESEND_COOLDOWN_SECONDS = 60
+
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -159,8 +163,42 @@ export default function LoginPage() {
   const [twoFactorError, setTwoFactorError] = useState('')
   const [twoFactorLoading, setTwoFactorLoading] = useState(false)
   const [pendingRedirect, setPendingRedirect] = useState('')
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [resending, setResending] = useState(false)
+  const [showSandboxInfo, setShowSandboxInfo] = useState(true)
 
   const isLoading = loadingGoogle || loadingEmail
+
+  // Start the resend cooldown as soon as the 2FA screen appears (an OTP was just sent)
+  useEffect(() => {
+    if (twoFactorRequired) setResendCooldown(RESEND_COOLDOWN_SECONDS)
+  }, [twoFactorRequired])
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = setInterval(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000)
+    return () => clearInterval(timer)
+  }, [resendCooldown])
+
+  async function handleResendOTP() {
+    if (resendCooldown > 0 || resending) return
+    setResending(true)
+    setTwoFactorError('')
+    try {
+      const res = await fetch('/api/twilio/send-2fa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: twoFactorUserId, phone: twoFactorPhone, name: twoFactorName }),
+      })
+      if (!res.ok) throw new Error('Failed to resend code')
+      setResendCooldown(RESEND_COOLDOWN_SECONDS)
+    } catch (err) {
+      console.error('[login] Resend OTP failed:', err)
+      setTwoFactorError('Could not resend the code. Please check your connection and try again.')
+    } finally {
+      setResending(false)
+    }
+  }
 
   async function handleVerify2FA() {
     if (!twoFactorCode || twoFactorCode.length !== 6) {
@@ -304,18 +342,39 @@ export default function LoginPage() {
             }
           </button>
 
+          {/* TODO: Remove sandbox notice when Twilio live number is activated */}
+          <div className="rounded-xl border border-yellow-200 bg-yellow-50 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowSandboxInfo((v) => !v)}
+              className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-xs font-bold text-yellow-800"
+            >
+              <span className="flex items-center gap-2">
+                <span className="ti ti-info-circle text-sm" />
+                Not receiving the code?
+              </span>
+              <span className={`ti ti-chevron-down text-sm transition-transform ${showSandboxInfo ? 'rotate-180' : ''}`} />
+            </button>
+            {showSandboxInfo && (
+              <div className="border-t border-yellow-200 px-4 pb-3 pt-2 text-xs leading-relaxed text-yellow-800">
+                Our WhatsApp messaging is in test mode. To receive codes, please send the message{' '}
+                <strong>&quot;join {TWILIO_SANDBOX_KEYWORD}&quot;</strong> to <strong>+1-415-523-8886</strong> on
+                WhatsApp first, then request a new OTP.
+              </div>
+            )}
+          </div>
+
           <button
             type="button"
-            onClick={async () => {
-              await fetch('/api/twilio/send-2fa', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: twoFactorUserId, phone: twoFactorPhone, name: twoFactorName }),
-              })
-            }}
-            className="w-full text-center text-xs text-[#5A6A7A] hover:text-[#0B3D6B]"
+            disabled={resendCooldown > 0 || resending}
+            onClick={() => void handleResendOTP()}
+            className="w-full text-center text-xs font-semibold text-[#5A6A7A] hover:text-[#0B3D6B] disabled:opacity-50 disabled:hover:text-[#5A6A7A]"
           >
-            Didn&apos;t receive it? Resend code
+            {resending
+              ? 'Sending...'
+              : resendCooldown > 0
+                ? `Resend OTP (${resendCooldown}s)`
+                : "Didn't receive it? Resend OTP"}
           </button>
 
           <button
@@ -331,55 +390,35 @@ export default function LoginPage() {
   )
 
   return (
-    <div className="flex min-h-screen min-h-[100dvh] overflow-hidden">
-      {/* Left panel — navy gradient, desktop only */}
-      <div
-        className="relative hidden lg:flex lg:w-1/2 flex-col items-center justify-center overflow-hidden px-12"
-        style={{ background: 'linear-gradient(135deg, #0B3D6B 0%, #1A6BAD 100%)' }}
-      >
-        {/* Animated blob */}
-        <div
-          className="pointer-events-none absolute -right-16 -top-16 h-72 w-72 rounded-full opacity-25 animate-pulse"
-          style={{ background: '#E8A020', filter: 'blur(60px)' }}
-        />
-        <div
-          className="pointer-events-none absolute -bottom-16 -left-16 h-72 w-72 rounded-full opacity-20"
-          style={{ background: '#1A6BAD', filter: 'blur(60px)' }}
-        />
-
-        <div className="relative z-10 text-center text-white">
-          <div className="mb-8 flex items-center justify-center gap-3">
-            <img src="/favicon.png" alt="EPIC Campus" className="h-12 w-12 rounded-xl object-cover" />
-            <span className="font-jakarta text-2xl font-bold tracking-tight">EPIC Campus</span>
+    <div className="min-h-screen bg-[#F5F7FB] dark:bg-[#04090f]">
+      <div className="mx-auto grid min-h-screen max-w-5xl grid-cols-1 items-center gap-8 px-4 py-12 sm:px-6 lg:grid-cols-5">
+        {/* Left panel — navy gradient, desktop only */}
+        <div className="hidden lg:flex lg:col-span-2 flex-col justify-center rounded-2xl bg-gradient-to-br from-[#0B3D6B] to-[#071428] p-10">
+          <div className="mb-8">
+            <h2 className="font-jakarta text-[32px] font-black text-white leading-tight mb-3">Welcome<br/>back.</h2>
+            <p className="text-[14px] text-white/40 leading-relaxed">Access your EPIC Campus portal. Your role determines what you see after login.</p>
           </div>
-          <p className="font-jakarta text-3xl font-semibold leading-tight">We Create Your Future</p>
-          <p className="mt-4 max-w-xs text-white/70 text-sm leading-relaxed">
-            Sri Lanka&apos;s leading overseas education and employment consultancy.
-          </p>
-          <div className="mt-10 space-y-4 text-left">
+          <div className="space-y-3">
             {[
-              { icon: 'ti-award', text: '15+ years of proven results' },
-              { icon: 'ti-certificate', text: 'TVEC approved & accredited' },
-              { icon: 'ti-chart-line', text: '98% visa success rate' },
-            ].map((f) => (
-              <div key={f.text} className="flex items-center gap-3">
-                <span className={`ti ${f.icon} text-[#E8A020] text-lg`} />
-                <span className="text-sm text-white/80">{f.text}</span>
+              { color: '#E8A020', role: 'Students', desc: 'Exams, schedule, visa tracker and more' },
+              { color: '#10b981', role: 'Teachers', desc: 'Sessions, exam papers and attendance' },
+              { color: '#1A6BAD', role: 'Admin & Reception', desc: 'Full system management access' },
+              { color: '#8b5cf6', role: 'Kitchen Staff', desc: 'Inventory and meal portal' },
+            ].map(r => (
+              <div key={r.role} className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">
+                <div className="h-2 w-2 shrink-0 rounded-full" style={{ background: r.color }} />
+                <div>
+                  <p className="text-[12px] font-bold text-white/70">{r.role}</p>
+                  <p className="text-[10px] text-white/30">{r.desc}</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
-      </div>
 
-      {/* Right panel — login form */}
-      <div
-        className="relative flex w-full flex-col items-center justify-center overflow-hidden bg-[#eef2f7] dark:bg-[#080d18] px-4 py-8 lg:w-1/2 lg:px-12 transition-colors duration-300"
-        style={{
-          backgroundImage: 'radial-gradient(circle, rgba(11,61,107,0.06) 1px, transparent 1px)',
-          backgroundSize: '24px 24px',
-        }}
-      >
-        <div className="w-full max-w-[420px]">
+        {/* Right panel — login form */}
+        <div className="lg:col-span-3">
+        <div className="w-full max-w-[420px] mx-auto">
           {/* Mobile logo */}
           <div className="mb-8 flex items-center justify-center gap-2 lg:hidden">
             <img src="/favicon.png" alt="EPIC Campus" className="h-9 w-9 rounded-lg object-cover" />
@@ -456,6 +495,7 @@ export default function LoginPage() {
           <p className="mt-6 text-center text-xs text-[#5A6A7A]/60 dark:text-white/25">
             epiccampus.live
           </p>
+        </div>
         </div>
       </div>
 

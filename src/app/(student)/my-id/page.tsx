@@ -108,8 +108,10 @@ export default function MyIdPage() {
 
       {/* ID Card preview */}
       <div className="flex justify-center rounded-xl bg-[#F5F7FB] dark:bg-white/[0.04] p-6 sm:p-8">
-        <div id="student-id-card">
-          <StudentIDCard {...cardProps} />
+        <div className="mx-auto w-full max-w-sm sm:max-w-md">
+          <div id="student-id-card">
+            <StudentIDCard {...cardProps} />
+          </div>
         </div>
       </div>
 

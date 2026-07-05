@@ -1,208 +1,154 @@
-'use client'
+import ContactForm from '@/components/public/ContactForm'
 
-import { useState } from 'react'
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase/client'
+export const dynamic = 'force-dynamic'
 
-const PROGRAMS = ['Japan SSW', 'Korea D2/D4', 'China', 'IELTS', 'NVQ']
+export const metadata = {
+  title: 'Contact Us — EPIC Campus',
+  description: 'Get in touch with EPIC Campus. Visit us in Galle, call or email us.',
+}
+
+function toTelHref(line: string): string {
+  const digits = line.replace(/\s+/g, '')
+  if (digits.startsWith('+')) return `tel:${digits}`
+  if (digits.startsWith('0')) return `tel:+94${digits.slice(1)}`
+  return `tel:${digits}`
+}
 
 export default function ContactPage() {
-  const [form, setForm] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    program: '',
-    message: '',
-  })
-  const [submitting, setSubmitting] = useState(false)
-  const [success, setSuccess] = useState(false)
-  const [error, setError] = useState('')
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!form.fullName || !form.email || !form.phone || !form.program) {
-      setError('Please fill in all required fields.')
-      return
-    }
-    setSubmitting(true)
-    setError('')
-    try {
-      await addDoc(collection(db, 'inquiries'), {
-        fullName: form.fullName.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        program: form.program,
-        message: form.message.trim(),
-        status: 'new',
-        createdAt: serverTimestamp(),
-      })
-      setSuccess(true)
-      setForm({ fullName: '', email: '', phone: '', program: '', message: '' })
-    } catch {
-      setError('Something went wrong. Please call us at +94 91 222 83 83.')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   return (
-    <>
-      <section className="bg-[#0B3D6B] py-16 text-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <h1 className="font-jakarta text-4xl font-bold">Contact Us</h1>
-          <p className="mt-3 text-white/80">
-            Ready to start your journey? Send us an inquiry and our team will respond within 24
-            hours.
+    <div>
+      {/* Hero */}
+      <section className="relative overflow-hidden bg-[#03080f] py-20">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(26,107,173,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(26,107,173,0.07)_1px,transparent_1px)] bg-[size:40px_40px]" />
+        <div className="pointer-events-none absolute left-1/2 top-0 h-[400px] w-[400px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(11,61,107,0.4)_0%,transparent_70%)]" />
+        <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-[4px] text-[#E8A020]">Get in touch</p>
+          <h1 className="font-jakarta text-[48px] font-black leading-tight text-white">Contact us</h1>
+          <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-white/40">
+            We are here to help. Reach out to our team and we will get back to you within 24 hours.
           </p>
         </div>
       </section>
 
-      <section className="py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-10 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              {success ? (
-                <div className="rounded-2xl border border-green-200 bg-green-50 p-8 text-center">
-                  <span className="text-4xl">✅</span>
-                  <h2 className="mt-4 font-jakarta text-xl font-bold text-[#0B3D6B]">
-                    Inquiry Submitted!
-                  </h2>
-                  <p className="mt-2 text-[#5A6A7A]">
-                    Thank you for contacting Epic Campus. Our team will reach out to you shortly.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setSuccess(false)}
-                    className="mt-6 text-sm font-semibold text-[#1A6BAD] hover:underline"
-                  >
-                    Submit another inquiry
-                  </button>
-                </div>
-              ) : (
-                <form
-                  onSubmit={handleSubmit}
-                  className="rounded-2xl border border-[#DDE3EC] bg-white p-8"
-                >
-                  <h2 className="font-jakarta text-xl font-bold text-[#0B3D6B]">
-                    Application / Inquiry Form
-                  </h2>
-                  <div className="mt-6 grid gap-5 sm:grid-cols-2">
-                    <div className="sm:col-span-2">
-                      <label className="text-sm font-medium text-[#0D1B2A]">
-                        Full Name *
-                      </label>
-                      <input
-                        required
-                        value={form.fullName}
-                        onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-[#DDE3EC] px-4 py-2.5 text-sm focus:border-[#0B3D6B] focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-[#0D1B2A]">Email *</label>
-                      <input
-                        required
-                        type="email"
-                        value={form.email}
-                        onChange={(e) => setForm({ ...form, email: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-[#DDE3EC] px-4 py-2.5 text-sm focus:border-[#0B3D6B] focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-[#0D1B2A]">Phone *</label>
-                      <input
-                        required
-                        type="tel"
-                        value={form.phone}
-                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-[#DDE3EC] px-4 py-2.5 text-sm focus:border-[#0B3D6B] focus:outline-none"
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="text-sm font-medium text-[#0D1B2A]">
-                        Program of Interest *
-                      </label>
-                      <select
-                        required
-                        value={form.program}
-                        onChange={(e) => setForm({ ...form, program: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-[#DDE3EC] px-4 py-2.5 text-sm focus:border-[#0B3D6B] focus:outline-none"
-                      >
-                        <option value="">Select a program</option>
-                        {PROGRAMS.map((p) => (
-                          <option key={p} value={p}>
-                            {p}
-                          </option>
+      {/* Main content */}
+      <section className="bg-[#F5F7FB] py-20 dark:bg-[#04090f]">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+
+          {/* Prominent WhatsApp CTA — above the form */}
+          <div className="mb-12 flex flex-col items-center">
+            <a
+              href="https://wa.me/94912228383"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-8 py-4 text-[15px] font-black text-white shadow-sm transition-colors hover:bg-[#1ebe57] sm:w-auto"
+            >
+              <span className="ti ti-brand-whatsapp text-[20px]" />
+              Chat with us on WhatsApp
+            </a>
+            <p className="mt-2 text-center text-[12px] text-[#5A6A7A] dark:text-white/40">
+              Usually responds within 1 hour · Mon–Sat 8am–6pm
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-10 lg:grid-cols-5">
+
+            {/* Contact info */}
+            <div className="space-y-6 lg:col-span-2">
+              <div className="rounded-2xl bg-[#0B3D6B] p-7 text-white">
+                <h2 className="font-jakarta text-[20px] font-black mb-6">Find us</h2>
+                <div className="space-y-5">
+                  {[
+                    {
+                      icon: 'ti-map-pin',
+                      title: 'Main Office',
+                      lines: ['No. 59/2, Sri Dewamitta Road', 'China Garden, Galle', 'Sri Lanka'],
+                    },
+                    {
+                      icon: 'ti-map-pin',
+                      title: 'Training Campus',
+                      lines: ['Idurovita, Ataniketha', 'Thiththagalla, Ahangama', 'Galle, Sri Lanka'],
+                    },
+                    {
+                      icon: 'ti-phone',
+                      title: 'Phone',
+                      lines: ['+94 91 222 83 83', '076 254 8383', '076 380 8383'],
+                    },
+                    {
+                      icon: 'ti-mail',
+                      title: 'Email',
+                      lines: ['info@epiccampus.lk'],
+                    },
+                    {
+                      icon: 'ti-world',
+                      title: 'Website',
+                      lines: ['www.epiccampus.live'],
+                    },
+                  ].map(item => (
+                    <div key={item.title} className="flex items-start gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#E8A020]/20 mt-0.5">
+                        <span className={`ti ${item.icon} text-[#E8A020] text-[14px]`} />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-bold text-[#E8A020] uppercase tracking-wider mb-1">{item.title}</p>
+                        {item.lines.map(line => (
+                          item.icon === 'ti-phone' ? (
+                            <a key={line} href={toTelHref(line)} className="block text-[13px] text-white/60 hover:text-white hover:underline">{line}</a>
+                          ) : (
+                            <p key={line} className="text-[13px] text-white/60">{line}</p>
+                          )
                         ))}
-                      </select>
+                      </div>
                     </div>
-                    <div className="sm:col-span-2">
-                      <label className="text-sm font-medium text-[#0D1B2A]">Message</label>
-                      <textarea
-                        rows={4}
-                        value={form.message}
-                        onChange={(e) => setForm({ ...form, message: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-[#DDE3EC] px-4 py-2.5 text-sm focus:border-[#0B3D6B] focus:outline-none"
-                        placeholder="Tell us about your goals and any questions you have…"
-                      />
+                  ))}
+                </div>
+              </div>
+
+              {/* Social */}
+              <div className="rounded-2xl border border-[#DDE3EC] bg-white p-6 dark:border-white/[0.08] dark:bg-white/[0.04]">
+                <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white mb-4">Follow us</h3>
+                <div className="flex gap-3">
+                  {[
+                    { icon: 'ti-brand-facebook', href: 'https://facebook.com/epicschoolofcomputing', label: 'Facebook' },
+                    { icon: 'ti-brand-instagram', href: 'https://instagram.com/epiccampusdigital', label: 'Instagram' },
+                    { icon: 'ti-brand-tiktok', href: 'https://tiktok.com/@epic_campus', label: 'TikTok' },
+                  ].map(s => (
+                    <a key={s.icon} href={s.href} target="_blank" rel="noopener noreferrer"
+                      className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#DDE3EC] text-[#5A6A7A] hover:border-[#0B3D6B] hover:text-[#0B3D6B] transition-all dark:border-white/10 dark:text-white/40 dark:hover:border-[#E8A020] dark:hover:text-[#E8A020]">
+                      <span className={`ti ${s.icon} text-[18px]`} />
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              {/* Hours */}
+              <div className="rounded-2xl border border-[#DDE3EC] bg-white p-6 dark:border-white/[0.08] dark:bg-white/[0.04]">
+                <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white mb-4">Office hours</h3>
+                <div className="space-y-2">
+                  {[
+                    { day: 'Monday — Friday', time: '8:00 AM — 5:00 PM' },
+                    { day: 'Saturday', time: '8:00 AM — 1:00 PM' },
+                    { day: 'Sunday', time: 'Closed' },
+                  ].map(h => (
+                    <div key={h.day} className="flex justify-between text-[13px]">
+                      <span className="text-[#5A6A7A] dark:text-white/50">{h.day}</span>
+                      <span className={`font-semibold ${h.time === 'Closed' ? 'text-red-500' : 'text-[#0B3D6B] dark:text-white'}`}>{h.time}</span>
                     </div>
-                  </div>
-                  {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="mt-6 rounded-lg bg-[#E8A020] px-8 py-3 font-jakarta text-sm font-bold text-[#0B3D6B] disabled:opacity-60"
-                  >
-                    {submitting ? 'Submitting…' : 'Submit Inquiry'}
-                  </button>
-                </form>
-              )}
+                  ))}
+                </div>
+              </div>
             </div>
 
-            <aside className="space-y-6">
-              <div className="rounded-2xl border border-[#DDE3EC] bg-white p-6">
-                <h3 className="font-jakarta font-bold text-[#0B3D6B]">Contact Details</h3>
-                <ul className="mt-4 space-y-3 text-sm text-[#5A6A7A]">
-                  <li>
-                    📍 No. 59/2, Sri Dewamitta Road,
-                    <br />
-                    China Garden, Galle
-                  </li>
-                  <li>
-                    <a href="tel:+94912228383" className="hover:text-[#0B3D6B]">
-                      📞 +94 91 222 83 83
-                    </a>
-                  </li>
-                  <li>
-                    <a href="mailto:info@epiccampus.lk" className="hover:text-[#0B3D6B]">
-                      📧 info@epiccampus.lk
-                    </a>
-                  </li>
-                </ul>
-                <a
-                  href="https://wa.me/94912228383"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-5 flex items-center justify-center gap-2 rounded-lg bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white"
-                >
-                  <span className="ti ti-brand-whatsapp text-lg" />
-                  WhatsApp Us
-                </a>
+            {/* Contact form */}
+            <div className="lg:col-span-3">
+              <div className="rounded-2xl border border-[#DDE3EC] bg-white p-8 dark:border-white/[0.08] dark:bg-white/[0.04]">
+                <h2 className="font-jakarta text-[24px] font-black text-[#0B3D6B] dark:text-white mb-1">Send us a message</h2>
+                <p className="text-[14px] text-[#5A6A7A] dark:text-white/40 mb-8">We will get back to you within 24 hours.</p>
+                <ContactForm />
               </div>
-
-              <div className="overflow-hidden rounded-2xl border border-[#DDE3EC] bg-[#F5F7FB]">
-                <div className="flex h-48 items-center justify-center text-[#5A6A7A]">
-                  <div className="text-center">
-                    <span className="ti ti-map-pin text-4xl text-[#0B3D6B]" />
-                    <p className="mt-2 text-sm">Epic Campus, Galle</p>
-                    <p className="text-xs">Google Maps embed</p>
-                  </div>
-                </div>
-              </div>
-            </aside>
+            </div>
           </div>
         </div>
       </section>
-    </>
+    </div>
   )
 }

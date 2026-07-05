@@ -613,7 +613,7 @@ export default function MealLogPage() {
                               e.stopPropagation()
                               openEditLog(log)
                             }}
-                            className="rounded-lg p-1.5 text-[#5A6A7A] hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06] hover:text-[#0B3D6B]"
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#5A6A7A] hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06] hover:text-[#0B3D6B] transition-colors"
                           >
                             <span className="ti ti-edit text-sm" />
                           </button>

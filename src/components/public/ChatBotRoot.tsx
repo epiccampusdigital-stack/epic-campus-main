@@ -26,6 +26,8 @@ const PORTAL_PREFIXES = [
   '/overview',
   '/branches',
   '/results',
+  '/epic-wall',
+  '/book-consultation',
 ]
 
 function isPortalPath(pathname: string) {

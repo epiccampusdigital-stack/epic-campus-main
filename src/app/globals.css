@@ -1,5 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600&display=swap');
 
+html { color-scheme: light; }
+html.dark { color-scheme: dark; }
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -39,6 +42,23 @@
   --border:       rgba(255,255,255,0.08);
   --bg:           #080d18;
 }
+
+/* Fix dark mode scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1A6BAD #071428;
+}
+*::-webkit-scrollbar { width: 5px; height: 5px; }
+*::-webkit-scrollbar-track { background: #071428; }
+*::-webkit-scrollbar-thumb { background: #1A6BAD; border-radius: 3px; }
+*::-webkit-scrollbar-thumb:hover { background: #E8A020; }
+
+.light *,
+:root:not(.dark) * {
+  scrollbar-color: #1A6BAD #e5e9f0;
+}
+:root:not(.dark) *::-webkit-scrollbar-track { background: #e5e9f0; }
+:root:not(.dark) *::-webkit-scrollbar-thumb { background: #1A6BAD; }
 
 * {
   box-sizing: border-box;

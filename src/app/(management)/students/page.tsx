@@ -319,7 +319,8 @@ export default function StudentsPage() {
         <StudentTableEmpty onAdd={openAdd} />
       ) : (
         <>
-          <div className="overflow-x-auto rounded-xl border border-[#DDE3EC] bg-white">
+          <div className="overflow-x-auto -mx-4 rounded-xl border border-[#DDE3EC] bg-white sm:mx-0">
+            <div className="min-w-[600px] sm:min-w-0">
             <table className="min-w-full">
               <thead className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:border-white/[0.08] dark:bg-white/[0.02]">
                 <tr>
@@ -419,6 +420,7 @@ export default function StudentsPage() {
                     })}
               </tbody>
             </table>
+            </div>
           </div>
           {!loading && displayedStudents.length > 0 && (
             <StudentTableMeta

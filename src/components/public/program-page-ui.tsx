@@ -1,3 +1,4 @@
+
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 
@@ -25,12 +26,14 @@ export function PageHero({
   overline,
   headline,
   subtext,
+  verifiedBadge,
 }: {
   flag?: string
   accentGradient?: string
   overline: string
   headline: string
   subtext: string
+  verifiedBadge?: string
 }) {
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-[#0B3D6B] via-[#1A6BAD] to-[#0B3D6B] pb-48 pt-28">
@@ -55,6 +58,12 @@ export function PageHero({
           {overline}
         </p>
         <h1 className="mb-6 text-5xl font-bold text-white md:text-6xl">{headline}</h1>
+        {verifiedBadge && (
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#E8A020]/30 bg-white/10 px-4 py-1.5 text-sm font-semibold text-white backdrop-blur-sm">
+            <span className="ti ti-circle-check text-[#E8A020]" />
+            {verifiedBadge}
+          </div>
+        )}
         <p className="mx-auto mb-10 max-w-2xl text-lg text-white/80">{subtext}</p>
         <div className="flex flex-wrap justify-center gap-4">
           <Link

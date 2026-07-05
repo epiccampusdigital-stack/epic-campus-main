@@ -261,23 +261,21 @@ export default function StaffTable({
 
 export function StaffTableEmpty({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#DDE3EC] bg-white px-6 py-16 text-center">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#0B3D6B]/10">
-        <span className="ti ti-id-badge text-3xl text-[#0B3D6B]" aria-hidden="true" />
+    <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] py-20 text-center">
+      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0B3D6B]/10 dark:bg-white/[0.06]">
+        <span className="ti ti-id-badge text-[28px] text-[#0B3D6B] dark:text-white/30" aria-hidden="true" />
       </div>
-      <h3 className="font-jakarta text-lg font-bold text-[#0D1B2A] dark:text-white">
-        No staff members yet
-      </h3>
-      <p className="mt-2 max-w-sm font-inter text-sm text-[#5A6A7A]">
-        Invite team members and manage roles, access, and payroll details.
+      <h3 className="font-jakarta text-[18px] font-bold text-[#0B3D6B] dark:text-white mb-2">No staff members yet</h3>
+      <p className="mx-auto mb-6 max-w-xs text-[14px] text-[#5A6A7A] dark:text-white/40 leading-relaxed">
+        Add your first staff member to get started. They will receive login credentials via WhatsApp.
       </p>
       <button
         type="button"
         onClick={onAdd}
-        className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#E8A020] px-5 py-2.5 font-jakarta text-sm font-bold text-[#0B3D6B] hover:bg-[#F5B942]"
+        className="inline-flex items-center gap-2 rounded-xl bg-[#E8A020] px-6 py-3 text-[14px] font-bold text-[#0B3D6B] hover:bg-[#f0b030] transition-colors"
       >
-        <span className="ti ti-plus" aria-hidden="true" />
-        Invite / Add Staff
+        <span className="ti ti-user-plus" aria-hidden="true" />
+        Add your first staff member
       </button>
     </div>
   )

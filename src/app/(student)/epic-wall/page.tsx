@@ -451,7 +451,7 @@ export default function EpicWallPage() {
           className={`shrink-0 ${
             filterType === 'all'
               ? 'rounded-full bg-[#E8A020] text-white font-bold px-4 py-1.5 text-sm shadow-sm'
-              : 'rounded-full border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/70 px-4 py-1.5 text-sm hover:border-[#0B3D6B] transition-all'
+              : 'rounded-full border border-[#DDE3EC] dark:border-white/[0.12] text-[#5A6A7A] dark:text-white/50 px-4 py-1.5 text-sm hover:border-[#0B3D6B] dark:hover:border-white/30 transition-all'
           }`}
         >
           All
@@ -464,7 +464,7 @@ export default function EpicWallPage() {
             className={`shrink-0 capitalize ${
               filterType === t.value
                 ? 'rounded-full bg-[#E8A020] text-white font-bold px-4 py-1.5 text-sm shadow-sm'
-                : 'rounded-full border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/70 px-4 py-1.5 text-sm hover:border-[#0B3D6B] transition-all'
+                : 'rounded-full border border-[#DDE3EC] dark:border-white/[0.12] text-[#5A6A7A] dark:text-white/50 px-4 py-1.5 text-sm hover:border-[#0B3D6B] dark:hover:border-white/30 transition-all'
             }`}
           >
             {t.label}
@@ -611,7 +611,7 @@ export default function EpicWallPage() {
                         key={type}
                         type="button"
                         onClick={() => void handleReaction(post.id, type)}
-                        className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold transition-all active:scale-95 ${
+                        className={`flex items-center gap-1.5 rounded-full px-3 py-2.5 sm:py-2 text-sm font-semibold transition-all active:scale-95 min-h-[44px] sm:min-h-0 ${
                           active
                             ? 'bg-[#E8A020]/10 dark:bg-[#E8A020]/20 text-[#E8A020]'
                             : 'text-[#5A6A7A] dark:text-white/50 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06]'
@@ -626,7 +626,7 @@ export default function EpicWallPage() {
                   <button
                     type="button"
                     onClick={() => toggleComments(post.id)}
-                    className="ml-auto flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-[#5A6A7A] dark:text-white/50 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06]"
+                    className="ml-auto flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-[#5A6A7A] dark:text-white/50 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06] min-h-[44px] sm:min-h-0"
                   >
                     <span className="ti ti-message" />
                     {post.commentCount > 0 && <span>{post.commentCount}</span>}

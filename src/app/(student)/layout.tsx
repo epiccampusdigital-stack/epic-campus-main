@@ -152,7 +152,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         <StudentSidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
           <StudentTopBar />
-          <main className="flex-1 overflow-y-auto bg-[#eef2f7] dark:bg-[#080d18] p-4 pb-24 sm:p-6 md:pb-6 transition-colors duration-300">
+          <main className="flex-1 overflow-y-auto bg-[#eef2f7] dark:bg-[#080d18] p-4 pb-28 sm:p-6 md:pb-6 transition-colors duration-300">
             {children}
           </main>
         </div>

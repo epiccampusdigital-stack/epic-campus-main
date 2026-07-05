@@ -40,9 +40,10 @@ export default function StudentIDCard({
   return (
     <div
       id="student-id-card"
+      className="w-full max-w-sm"
       style={{
-        width: W,
-        height: H,
+        maxWidth: W,
+        aspectRatio: `${W} / ${H}`,
         borderRadius: fs(16),
         overflow: 'hidden',
         boxShadow: '0 12px 40px rgba(11,61,107,0.22)',
@@ -55,7 +56,7 @@ export default function StudentIDCard({
         height={H}
         viewBox={`0 0 ${W} ${H}`}
         xmlns="http://www.w3.org/2000/svg"
-        style={{ display: 'block' }}
+        style={{ display: 'block', width: '100%', height: '100%' }}
       >
         {/* ── LEFT PANEL — navy ── */}
         <rect width={split} height={H} fill="#0B3D6B" />

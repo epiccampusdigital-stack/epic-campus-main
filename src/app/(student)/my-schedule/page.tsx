@@ -434,9 +434,16 @@ export default function MySchedulePage() {
           </div>
 
           {sessionsOnDay(anchor).length === 0 ? (
-            <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] py-16 text-center">
-              <span className="ti ti-calendar-off text-4xl text-[#DDE3EC] dark:text-white/20" />
-              <p className="mt-3 text-sm text-[#5A6A7A] dark:text-white/50">No sessions this day</p>
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0B3D6B]/10 dark:bg-white/[0.06]">
+                <span className="ti ti-calendar-off text-[28px] text-[#0B3D6B] dark:text-white/30" />
+              </div>
+              <h3 className="font-jakarta text-[18px] font-bold text-[#0B3D6B] dark:text-white mb-2">
+                No sessions scheduled yet
+              </h3>
+              <p className="max-w-xs text-[14px] text-[#5A6A7A] dark:text-white/40 leading-relaxed">
+                Your upcoming classes and sessions will appear here once your teacher schedules them.
+              </p>
             </div>
           ) : (
             sessionsOnDay(anchor)
@@ -510,9 +517,16 @@ export default function MySchedulePage() {
               )
             })}
             {weekDays.every(iso => sessionsOnDay(iso).length === 0) && (
-              <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] py-16 text-center">
-                <span className="ti ti-calendar-off text-4xl text-[#DDE3EC] dark:text-white/20" />
-                <p className="mt-3 text-sm text-[#5A6A7A] dark:text-white/50">No sessions this week</p>
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0B3D6B]/10 dark:bg-white/[0.06]">
+                  <span className="ti ti-calendar-off text-[28px] text-[#0B3D6B] dark:text-white/30" />
+                </div>
+                <h3 className="font-jakarta text-[18px] font-bold text-[#0B3D6B] dark:text-white mb-2">
+                  No sessions scheduled yet
+                </h3>
+                <p className="max-w-xs text-[14px] text-[#5A6A7A] dark:text-white/40 leading-relaxed">
+                  Your upcoming classes and sessions will appear here once your teacher schedules them.
+                </p>
               </div>
             )}
           </div>

@@ -300,38 +300,39 @@ export default function MyVisaPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      {uploaded ? (
-                        <>
-                          <a
-                            href={uploaded.fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="rounded-lg border border-[#DDE3EC] dark:border-white/20 px-3 py-1.5 text-xs font-semibold text-[#0B3D6B] dark:text-white hover:bg-white dark:hover:bg-white/10"
-                          >
-                            View
-                          </a>
-                          <button
-                            type="button"
-                            disabled={isDeleting}
-                            onClick={() => void handleDelete(docItem.key, docItem.label)}
-                            className="rounded-lg border border-red-200 dark:border-red-800 px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
-                          >
-                            {isDeleting ? 'Removing…' : 'Remove'}
-                          </button>
-                        </>
-                      ) : (
+                    {uploaded && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <a
+                          href={uploaded.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-lg border border-[#DDE3EC] dark:border-white/20 px-3 py-1.5 text-xs font-semibold text-[#0B3D6B] dark:text-white hover:bg-white dark:hover:bg-white/10"
+                        >
+                          View
+                        </a>
                         <button
                           type="button"
-                          disabled={isUploading}
-                          onClick={() => fileRefs.current[docItem.key]?.click()}
-                          className="rounded-xl bg-[#0B3D6B] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#0a3460] disabled:opacity-50"
+                          disabled={isDeleting}
+                          onClick={() => void handleDelete(docItem.key, docItem.label)}
+                          className="rounded-lg border border-red-200 dark:border-red-800 px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
                         >
-                          {isUploading ? `${progress}%` : 'Upload'}
+                          {isDeleting ? 'Removing…' : 'Remove'}
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
+
+                  {!uploaded && (
+                    <button
+                      type="button"
+                      disabled={isUploading}
+                      onClick={() => fileRefs.current[docItem.key]?.click()}
+                      className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#0B3D6B] py-3.5 text-[14px] font-bold text-white hover:bg-[#1A6BAD] transition-colors disabled:opacity-50"
+                    >
+                      <span className="ti ti-upload" />
+                      {isUploading ? `Uploading ${progress}%…` : 'Upload Document'}
+                    </button>
+                  )}
 
                   {isUploading && (
                     <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#DDE3EC] dark:bg-white/10">
@@ -355,6 +356,9 @@ export default function MyVisaPage() {
                 </div>
               )
             })}
+            <p className="mt-2 text-center text-[12px] text-[#5A6A7A] dark:text-white/40">
+              Supported: PDF, JPG, PNG — Max 10MB
+            </p>
           </div>
         )}
       </div>

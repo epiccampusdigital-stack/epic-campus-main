@@ -17,11 +17,19 @@ const STATS = [
   { number: 'Jul 2027', label: 'Approved Until' },
 ]
 
-const NVQ_PROGRAMS = [
+interface NvqProgram {
+  emoji: string
+  title: string
+  badge?: string
+  desc: string
+  tags: string[]
+  comingSoon?: boolean
+}
+
+const NVQ_PROGRAMS: NvqProgram[] = [
   {
     emoji: '💻',
     title: 'Information Technology',
-    borderClass: 'border-t-4 border-green-500',
     badge: 'NEWLY UPDATED',
     desc: 'Computer applications, software basics, digital literacy, and office productivity tools.',
     tags: ['NVQ Level 3', '3-6 Months', 'TVEC Certified'],
@@ -29,37 +37,39 @@ const NVQ_PROGRAMS = [
   {
     emoji: '🏨',
     title: 'Hospitality & Hotel Management',
-    borderClass: 'border-t-4 border-blue-500',
     desc: 'Front office, food & beverage, housekeeping. Pathway to hotel careers locally and abroad.',
     tags: ['NVQ Level 3', '6 Months', 'TVEC Certified'],
   },
   {
     emoji: '🤝',
     title: 'Caregiving & Healthcare Support',
-    borderClass: 'border-t-4 border-pink-500',
     desc: 'Elderly care, patient support, and healthcare assistance. High demand in Japan and Korea.',
     tags: ['NVQ Level 3', '6 Months', 'TVEC Certified'],
   },
   {
     emoji: '🏗️',
     title: 'Construction & Technical Skills',
-    borderClass: 'border-t-4 border-orange-500',
     desc: 'Masonry, carpentry, plumbing basics, and site safety. Overseas construction pathway included.',
     tags: ['NVQ Level 3', '6 Months', 'TVEC Certified'],
   },
   {
     emoji: '🚚',
     title: 'Logistics & Driving',
-    borderClass: 'border-t-4 border-[#0B3D6B]',
     desc: 'Logistics management and driving skills. Direct pathway to Japan SSW Truck Driving category.',
     tags: ['NVQ Level 3', '6 Months', 'TVEC Certified'],
   },
   {
     emoji: '💼',
     title: 'Business & Service Sectors',
-    borderClass: 'border-t-4 border-purple-500',
     desc: 'Business administration, customer service, and retail management for local and overseas roles.',
     tags: ['NVQ Level 3', '3-6 Months', 'TVEC Certified'],
+  },
+  {
+    emoji: '🤖',
+    title: 'NVQ AI Program',
+    desc: 'First AI-integrated NVQ program in Sri Lanka — pioneered by EPIC Campus. Combining vocational skills with artificial intelligence.',
+    tags: ['First in Sri Lanka', 'AI Integration', 'Coming Soon'],
+    comingSoon: true,
   },
 ]
 
@@ -95,34 +105,55 @@ export default function NvqPage() {
         overline="NVQ & SKILL DEVELOPMENT"
         headline="Nationally Recognized Qualifications for Global Careers"
         subtext="TVEC-approved NVQ training programs. Build practical skills for local employment and international career pathways."
+        verifiedBadge="TVEC Approved — Reg. No. A13430"
       />
       <StatsBar stats={STATS} />
 
-      <section id="programs" className="bg-white py-24">
+      <section id="programs" className="bg-white py-24 dark:bg-[#04090f]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="NVQ Program Categories" />
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {NVQ_PROGRAMS.map((program) => (
-              <div key={program.title} className={`${CARD} relative ${program.borderClass}`}>
-                {program.badge && (
-                  <span className="absolute right-6 top-6 rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">
-                    {program.badge}
+              program.comingSoon ? (
+                <div key={program.title}
+                  className="relative rounded-2xl border-2 border-[#E8A020] bg-white p-8 dark:border-[#E8A020]/60 dark:bg-[#0B3D6B]/20">
+                  <span className="absolute right-6 top-6 rounded-full bg-[#E8A020] px-3 py-1 text-xs font-bold text-white">
+                    Coming Soon
                   </span>
-                )}
-                <div className="text-4xl">{program.emoji}</div>
-                <h3 className="mt-3 font-semibold text-[#0B3D6B]">{program.title}</h3>
-                <p className="mt-2 text-sm text-gray-500">{program.desc}</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {program.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600"
-                    >
-                      {tag}
-                    </span>
-                  ))}
+                  <div className="text-4xl">{program.emoji}</div>
+                  <h3 className="mt-3 font-semibold text-gray-900 dark:text-white">{program.title}</h3>
+                  <p className="mt-2 text-sm text-gray-600 dark:text-white/60">{program.desc}</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {program.tags.map((tag) => (
+                      <span key={tag} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-[#0B3D6B] dark:bg-[#0B3D6B]/30 dark:text-blue-300">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div key={program.title}
+                  className="relative rounded-2xl border border-[#0B3D6B] bg-white p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_4px_20px_rgba(11,61,107,0.2)] dark:border-[#1A6BAD]/40 dark:bg-[#0B3D6B]/20">
+                  {program.badge && (
+                    <span className="absolute right-6 top-6 rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                      {program.badge}
+                    </span>
+                  )}
+                  <div className="text-4xl">{program.emoji}</div>
+                  <h3 className="mt-3 font-semibold text-gray-900 dark:text-white">{program.title}</h3>
+                  <p className="mt-2 text-sm text-gray-600 dark:text-white/60">{program.desc}</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {program.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-[#0B3D6B] dark:bg-[#0B3D6B]/30 dark:text-blue-300"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )
             ))}
           </div>
         </div>

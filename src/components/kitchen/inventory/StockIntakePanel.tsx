@@ -341,41 +341,41 @@ export default function StockIntakePanel({
   return (
     <div className="space-y-8">
       {/* ─── NEW INTAKE FORM ─── */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-        <h2 className="mb-4 text-lg font-bold text-white">🧾 New Stock Intake</h2>
+      <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-white/5 p-6">
+        <h2 className="mb-4 text-lg font-bold text-[#0D1B2A] dark:text-white">🧾 New Stock Intake</h2>
 
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-white/70">Intake Date *</label>
+            <label className="mb-1 block text-sm font-medium text-[#5A6A7A] dark:text-white/70">Intake Date *</label>
             <input
               type="date"
               value={intakeDate}
               onChange={(e) => setIntakeDate(e.target.value)}
-              className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-white/40"
+              className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/10 px-3 py-2 text-[#0D1B2A] dark:text-white placeholder-gray-400 dark:placeholder-white/40"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-white/70">Supplier *</label>
+            <label className="mb-1 block text-sm font-medium text-[#5A6A7A] dark:text-white/70">Supplier *</label>
             <input
               type="text"
               value={supplier}
               onChange={(e) => setSupplier(e.target.value)}
               placeholder="Supplier name"
-              className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-white/40"
+              className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/10 px-3 py-2 text-[#0D1B2A] dark:text-white placeholder-gray-400 dark:placeholder-white/40"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-white/70">Invoice Number *</label>
+            <label className="mb-1 block text-sm font-medium text-[#5A6A7A] dark:text-white/70">Invoice Number *</label>
             <input
               type="text"
               value={invoiceNumber}
               onChange={(e) => setInvoiceNumber(e.target.value)}
               placeholder="INV-001"
-              className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-white/40"
+              className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/10 px-3 py-2 text-[#0D1B2A] dark:text-white placeholder-gray-400 dark:placeholder-white/40"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-white/70">Invoice Total (LKR)</label>
+            <label className="mb-1 block text-sm font-medium text-[#5A6A7A] dark:text-white/70">Invoice Total (LKR)</label>
             <input
               type="number"
               step="any"
@@ -383,7 +383,7 @@ export default function StockIntakePanel({
               value={invoiceTotal}
               onChange={(e) => setInvoiceTotal(e.target.value)}
               placeholder="0"
-              className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-white/40"
+              className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/10 px-3 py-2 text-[#0D1B2A] dark:text-white placeholder-gray-400 dark:placeholder-white/40"
             />
           </div>
         </div>
@@ -391,11 +391,11 @@ export default function StockIntakePanel({
         {/* Item rows */}
         <div className="mt-6">
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-medium text-white/70">Items Received</p>
+            <p className="text-sm font-medium text-[#5A6A7A] dark:text-white/70">Items Received</p>
             <button
               type="button"
               onClick={addRow}
-              className="rounded-xl bg-white/10 px-3 py-1.5 text-sm font-semibold text-white hover:bg-white/20"
+              className="rounded-xl bg-[#0B3D6B]/10 dark:bg-white/10 px-3 py-1.5 text-sm font-semibold text-[#0B3D6B] dark:text-white hover:bg-[#0B3D6B]/20 dark:hover:bg-white/20"
             >
               + Add Row
             </button>
@@ -405,18 +405,18 @@ export default function StockIntakePanel({
             {rows.map((row, idx) => (
               <div
                 key={idx}
-                className="grid grid-cols-1 gap-2 rounded-xl border border-white/10 bg-white/5 p-3 md:grid-cols-[2fr_1fr_1fr_1.2fr_auto]"
+                className="grid grid-cols-1 gap-2 rounded-xl border border-[#DDE3EC] dark:border-white/10 bg-[#F5F7FB] dark:bg-white/5 p-3 md:grid-cols-[2fr_1fr_1fr_1.2fr_auto]"
               >
                 <select
                   value={row.inventoryItemId}
                   onChange={(e) => updateRowItem(idx, e.target.value)}
-                  className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-white"
+                  className="rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/10 px-3 py-2 text-[#0D1B2A] dark:text-white"
                 >
-                  <option value="" className="bg-[#0d1a2e]">
+                  <option value="" className="bg-white dark:bg-[#0d1a2e] text-[#0D1B2A] dark:text-white">
                     Select item…
                   </option>
                   {inventoryItems.map((it) => (
-                    <option key={it.id} value={it.id} className="bg-[#0d1a2e]">
+                    <option key={it.id} value={it.id} className="bg-white dark:bg-[#0d1a2e] text-[#0D1B2A] dark:text-white">
                       {it.itemName} ({it.unit})
                     </option>
                   ))}
@@ -428,7 +428,7 @@ export default function StockIntakePanel({
                   value={row.quantityReceived}
                   onChange={(e) => updateRowField(idx, 'quantityReceived', e.target.value)}
                   placeholder="Qty"
-                  className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-white/40"
+                  className="rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/10 px-3 py-2 text-[#0D1B2A] dark:text-white placeholder-gray-400 dark:placeholder-white/40"
                 />
                 <input
                   type="number"
@@ -437,7 +437,7 @@ export default function StockIntakePanel({
                   value={row.unitCost}
                   onChange={(e) => updateRowField(idx, 'unitCost', e.target.value)}
                   placeholder="Unit cost"
-                  className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-white/40"
+                  className="rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/10 px-3 py-2 text-[#0D1B2A] dark:text-white placeholder-gray-400 dark:placeholder-white/40"
                 />
                 <div className="flex items-center px-2 text-sm font-semibold text-[#E8A020]">
                   {formatLKR(rowLineTotal(row))}
@@ -454,19 +454,19 @@ export default function StockIntakePanel({
             ))}
           </div>
 
-          <div className="mt-3 flex justify-end text-sm font-semibold text-white">
+          <div className="mt-3 flex justify-end text-sm font-semibold text-[#0D1B2A] dark:text-white">
             Total: <span className="ml-2 text-[#E8A020]">{formatLKR(runningTotal)}</span>
           </div>
         </div>
 
         {/* Receipt upload */}
         <div className="mt-6">
-          <label className="mb-1 block text-sm font-medium text-white/70">Receipt (image or PDF)</label>
+          <label className="mb-1 block text-sm font-medium text-[#5A6A7A] dark:text-white/70">Receipt (image or PDF)</label>
           <input
             type="file"
             accept="image/*,application/pdf"
             onChange={handleFileSelect}
-            className="block w-full text-sm text-white/70 file:mr-3 file:rounded-xl file:border-0 file:bg-white/10 file:px-4 file:py-2 file:text-white hover:file:bg-white/20"
+            className="block w-full text-sm text-[#5A6A7A] dark:text-white/70 file:mr-3 file:rounded-xl file:border-0 file:bg-[#0B3D6B]/10 dark:file:bg-white/10 file:px-4 file:py-2 file:text-[#0B3D6B] dark:file:text-white hover:file:bg-[#0B3D6B]/20 dark:hover:file:bg-white/20"
           />
           {receiptPreviewUrl && (
             <img
@@ -476,13 +476,13 @@ export default function StockIntakePanel({
             />
           )}
           {receiptFile && !receiptPreviewUrl && (
-            <div className="mt-3 flex items-center gap-2 text-sm text-white/70">
+            <div className="mt-3 flex items-center gap-2 text-sm text-[#5A6A7A] dark:text-white/70">
               <span className="text-2xl">📄</span>
               {receiptFile.name}
             </div>
           )}
           {uploadProgress !== null && (
-            <div className="mt-3 h-2 w-full overflow-hidden rounded bg-white/10">
+            <div className="mt-3 h-2 w-full overflow-hidden rounded bg-[#DDE3EC] dark:bg-white/10">
               <div
                 className="h-2 rounded bg-[#E8A020] transition-all"
                 style={{ width: `${uploadProgress}%` }}
@@ -493,13 +493,13 @@ export default function StockIntakePanel({
 
         {/* Notes */}
         <div className="mt-6">
-          <label className="mb-1 block text-sm font-medium text-white/70">Notes</label>
+          <label className="mb-1 block text-sm font-medium text-[#5A6A7A] dark:text-white/70">Notes</label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={2}
             placeholder="Optional notes…"
-            className="w-full resize-none rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-white/40"
+            className="w-full resize-none rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/10 px-3 py-2 text-[#0D1B2A] dark:text-white placeholder-gray-400 dark:placeholder-white/40"
           />
         </div>
 
@@ -517,16 +517,16 @@ export default function StockIntakePanel({
 
       {/* ─── INTAKE HISTORY ─── */}
       <div>
-        <h2 className="mb-4 text-lg font-bold text-white">Intake History</h2>
+        <h2 className="mb-4 text-lg font-bold text-[#0D1B2A] dark:text-white">Intake History</h2>
         {loadingIntakes ? (
-          <p className="text-sm text-white/50">Loading…</p>
+          <p className="text-sm text-[#5A6A7A] dark:text-white/50">Loading…</p>
         ) : intakes.length === 0 ? (
-          <p className="text-sm text-white/50">No stock intakes yet.</p>
+          <p className="text-sm text-[#5A6A7A] dark:text-white/50">No stock intakes yet.</p>
         ) : (
           intakes.map((intake) => (
             <div
               key={intake.id}
-              className="mb-3 rounded-xl border border-white/10 bg-white/5 p-4"
+              className="mb-3 rounded-xl border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-white/5 p-4"
             >
               <div
                 className="flex flex-wrap items-center justify-between gap-2"
@@ -537,19 +537,19 @@ export default function StockIntakePanel({
                   e.key === 'Enter' && setExpandedId(expandedId === intake.id ? null : intake.id)
                 }
               >
-                <div className="flex flex-wrap items-center gap-3 text-sm text-white">
+                <div className="flex flex-wrap items-center gap-3 text-sm text-[#0D1B2A] dark:text-white">
                   <span>📅 {formatIntakeDate(intake.intakeDate)}</span>
                   <span className="font-semibold">{intake.supplier}</span>
-                  <span className="text-white/60">Invoice: {intake.invoiceNumber}</span>
+                  <span className="text-[#5A6A7A] dark:text-white/60">Invoice: {intake.invoiceNumber}</span>
                   <span className="font-semibold text-[#E8A020]">
                     {formatLKR(intake.invoiceTotal)}
                   </span>
                 </div>
-                <span className="text-white/60">{expandedId === intake.id ? '▲' : '▼'}</span>
+                <span className="text-[#5A6A7A] dark:text-white/60">{expandedId === intake.id ? '▲' : '▼'}</span>
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-3">
-                <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-white/70">
+                <span className="rounded-full bg-[#0B3D6B]/10 dark:bg-white/10 px-2.5 py-0.5 text-xs font-medium text-[#0B3D6B] dark:text-white/70">
                   {intake.items.length} items
                 </span>
                 {intake.receiptUrl && (
@@ -557,7 +557,7 @@ export default function StockIntakePanel({
                     <button
                       type="button"
                       onClick={() => window.open(intake.receiptUrl!, '_blank')}
-                      className="flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/20"
+                      className="flex items-center gap-1 rounded-lg bg-[#0B3D6B]/10 dark:bg-white/10 px-2 py-1 text-xs text-[#0B3D6B] dark:text-white hover:bg-[#0B3D6B]/20 dark:hover:bg-white/20"
                     >
                       <span className="text-base">📄</span> PDF
                     </button>
@@ -574,9 +574,9 @@ export default function StockIntakePanel({
 
               {expandedId === intake.id && (
                 <div className="mt-4 overflow-x-auto">
-                  <table className="w-full text-left text-sm text-white/80">
+                  <table className="w-full text-left text-sm text-[#0D1B2A] dark:text-white/80">
                     <thead>
-                      <tr className="border-b border-white/10 text-xs uppercase text-white/40">
+                      <tr className="border-b border-[#DDE3EC] dark:border-white/10 text-xs uppercase text-[#5A6A7A] dark:text-white/40">
                         <th className="py-2 pr-3">Item</th>
                         <th className="py-2 pr-3">Qty Received</th>
                         <th className="py-2 pr-3">Unit Cost (LKR)</th>
@@ -585,7 +585,7 @@ export default function StockIntakePanel({
                     </thead>
                     <tbody>
                       {intake.items.map((it, i) => (
-                        <tr key={i} className="border-b border-white/5 last:border-0">
+                        <tr key={i} className="border-b border-[#DDE3EC] dark:border-white/5 last:border-0">
                           <td className="py-2 pr-3">{it.itemName}</td>
                           <td className="py-2 pr-3">{formatQty(it.quantityReceived)}</td>
                           <td className="py-2 pr-3">{formatLKR(it.unitCost)}</td>
@@ -595,7 +595,7 @@ export default function StockIntakePanel({
                     </tbody>
                   </table>
                   {intake.notes && (
-                    <p className="mt-3 text-sm text-white/50">Notes: {intake.notes}</p>
+                    <p className="mt-3 text-sm text-[#5A6A7A] dark:text-white/50">Notes: {intake.notes}</p>
                   )}
                 </div>
               )}
@@ -604,7 +604,7 @@ export default function StockIntakePanel({
                 <button
                   type="button"
                   onClick={() => openEdit(intake)}
-                  className="rounded-xl bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/20"
+                  className="rounded-xl bg-[#0B3D6B]/10 dark:bg-white/10 px-3 py-1.5 text-sm text-[#0B3D6B] dark:text-white hover:bg-[#0B3D6B]/20 dark:hover:bg-white/20"
                 >
                   ✏️ Edit
                 </button>
@@ -618,8 +618,8 @@ export default function StockIntakePanel({
               </div>
 
               {deleteConfirmId === intake.id && (
-                <div className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm">
-                  <p className="mb-2 text-red-200">
+                <div className="mt-3 rounded-xl border border-red-300 dark:border-red-400/30 bg-red-50 dark:bg-red-500/10 p-3 text-sm">
+                  <p className="mb-2 text-red-700 dark:text-red-200">
                     ⚠️ This will delete the intake record only. Inventory stock will NOT be reversed.
                   </p>
                   <div className="flex gap-2">
@@ -633,7 +633,7 @@ export default function StockIntakePanel({
                     <button
                       type="button"
                       onClick={() => setDeleteConfirmId(null)}
-                      className="rounded-xl bg-white/10 px-4 py-2 text-white hover:bg-white/20"
+                      className="rounded-xl bg-[#0B3D6B]/10 dark:bg-white/10 px-4 py-2 text-[#0B3D6B] dark:text-white hover:bg-[#0B3D6B]/20 dark:hover:bg-white/20"
                     >
                       Cancel
                     </button>
@@ -648,70 +648,70 @@ export default function StockIntakePanel({
       {/* ─── EDIT MODAL ─── */}
       {editingIntake && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-[#0d1a2e] p-6">
-            <h3 className="mb-4 text-lg font-bold text-white">Edit Intake</h3>
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#0d1a2e] p-6">
+            <h3 className="mb-4 text-lg font-bold text-[#0D1B2A] dark:text-white">Edit Intake</h3>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-white/70">Intake Date</label>
+                <label className="mb-1 block text-sm font-medium text-[#5A6A7A] dark:text-white/70">Intake Date</label>
                 <input
                   type="date"
                   value={editDate}
                   onChange={(e) => setEditDate(e.target.value)}
-                  className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-white"
+                  className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/10 px-3 py-2 text-[#0D1B2A] dark:text-white"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-white/70">Supplier</label>
+                <label className="mb-1 block text-sm font-medium text-[#5A6A7A] dark:text-white/70">Supplier</label>
                 <input
                   type="text"
                   value={editSupplier}
                   onChange={(e) => setEditSupplier(e.target.value)}
-                  className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-white"
+                  className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/10 px-3 py-2 text-[#0D1B2A] dark:text-white"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-white/70">Invoice Number</label>
+                <label className="mb-1 block text-sm font-medium text-[#5A6A7A] dark:text-white/70">Invoice Number</label>
                 <input
                   type="text"
                   value={editInvoiceNumber}
                   onChange={(e) => setEditInvoiceNumber(e.target.value)}
-                  className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-white"
+                  className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/10 px-3 py-2 text-[#0D1B2A] dark:text-white"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-white/70">Invoice Total (LKR)</label>
+                <label className="mb-1 block text-sm font-medium text-[#5A6A7A] dark:text-white/70">Invoice Total (LKR)</label>
                 <input
                   type="number"
                   step="any"
                   min="0"
                   value={editInvoiceTotal}
                   onChange={(e) => setEditInvoiceTotal(e.target.value)}
-                  className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-white"
+                  className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/10 px-3 py-2 text-[#0D1B2A] dark:text-white"
                 />
               </div>
             </div>
 
             <div className="mt-4">
-              <label className="mb-1 block text-sm font-medium text-white/70">Notes</label>
+              <label className="mb-1 block text-sm font-medium text-[#5A6A7A] dark:text-white/70">Notes</label>
               <textarea
                 value={editNotes}
                 onChange={(e) => setEditNotes(e.target.value)}
                 rows={2}
-                className="w-full resize-none rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-white"
+                className="w-full resize-none rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/10 px-3 py-2 text-[#0D1B2A] dark:text-white"
               />
             </div>
 
             {/* Receipt re-upload */}
             <div className="mt-4">
-              <label className="mb-1 block text-sm font-medium text-white/70">Receipt</label>
+              <label className="mb-1 block text-sm font-medium text-[#5A6A7A] dark:text-white/70">Receipt</label>
               {editReceiptUrl && (
                 <div className="mb-2">
                   {isPdf(editReceiptFileName) ? (
                     <button
                       type="button"
                       onClick={() => window.open(editReceiptUrl!, '_blank')}
-                      className="flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/20"
+                      className="flex items-center gap-1 rounded-lg bg-[#0B3D6B]/10 dark:bg-white/10 px-2 py-1 text-xs text-[#0B3D6B] dark:text-white hover:bg-[#0B3D6B]/20 dark:hover:bg-white/20"
                     >
                       <span className="text-base">📄</span> {editReceiptFileName ?? 'PDF'}
                     </button>
@@ -729,10 +729,10 @@ export default function StockIntakePanel({
                 type="file"
                 accept="image/*,application/pdf"
                 onChange={handleEditFileSelect}
-                className="block w-full text-sm text-white/70 file:mr-3 file:rounded-xl file:border-0 file:bg-white/10 file:px-4 file:py-2 file:text-white hover:file:bg-white/20"
+                className="block w-full text-sm text-[#5A6A7A] dark:text-white/70 file:mr-3 file:rounded-xl file:border-0 file:bg-[#0B3D6B]/10 dark:file:bg-white/10 file:px-4 file:py-2 file:text-[#0B3D6B] dark:file:text-white hover:file:bg-[#0B3D6B]/20 dark:hover:file:bg-white/20"
               />
               {editUploadProgress !== null && (
-                <div className="mt-2 h-2 w-full overflow-hidden rounded bg-white/10">
+                <div className="mt-2 h-2 w-full overflow-hidden rounded bg-[#DDE3EC] dark:bg-white/10">
                   <div
                     className="h-2 rounded bg-[#E8A020] transition-all"
                     style={{ width: `${editUploadProgress}%` }}
@@ -743,8 +743,8 @@ export default function StockIntakePanel({
 
             {/* Read-only items */}
             <div className="mt-4">
-              <p className="mb-2 text-xs text-white/50">Items are read-only after saving</p>
-              <div className="space-y-1 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/70">
+              <p className="mb-2 text-xs text-[#5A6A7A] dark:text-white/50">Items are read-only after saving</p>
+              <div className="space-y-1 rounded-xl border border-[#DDE3EC] dark:border-white/10 bg-[#F5F7FB] dark:bg-white/5 p-3 text-sm text-[#5A6A7A] dark:text-white/70">
                 {editingIntake.items.map((it, i) => (
                   <div key={i} className="flex justify-between">
                     <span>{it.itemName}</span>
@@ -761,7 +761,7 @@ export default function StockIntakePanel({
               <button
                 type="button"
                 onClick={closeEdit}
-                className="rounded-xl bg-white/10 px-4 py-2 text-white hover:bg-white/20"
+                className="rounded-xl bg-[#0B3D6B]/10 dark:bg-white/10 px-4 py-2 text-[#0B3D6B] dark:text-white hover:bg-[#0B3D6B]/20 dark:hover:bg-white/20"
               >
                 Cancel
               </button>

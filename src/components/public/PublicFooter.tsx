@@ -107,7 +107,7 @@ export default function PublicFooter() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={s.label}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-[#E8A020] hover:text-[#0B3D6B]"
+                  className="group flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-all duration-200 hover:scale-110 hover:bg-[#E8A020] hover:text-[#0B3D6B]"
                 >
                   <span className={`ti ${s.icon} text-lg`} />
                 </a>

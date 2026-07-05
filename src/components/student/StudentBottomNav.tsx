@@ -20,7 +20,7 @@ export default function StudentBottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.08] bg-[#080d18]/95 backdrop-blur-xl pb-[env(safe-area-inset-bottom)] md:hidden"
       aria-label="Student navigation"
     >
       <ul className="flex items-stretch justify-around">
@@ -30,12 +30,13 @@ export default function StudentBottomNav() {
             <li key={item.href} className="flex-1">
               <Link
                 href={item.href}
-                className={`flex flex-col items-center gap-0.5 px-1 py-2.5 text-[10px] font-medium transition-colors ${
+                className={`relative flex flex-col items-center gap-0.5 px-1 py-3 text-[10px] font-medium transition-colors ${
                   active ? 'text-[#E8A020] dark:text-[#E8A020]' : 'text-[#5A6A7A] dark:text-white/40'
                 }`}
               >
+                {active && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#E8A020]" />}
                 <span
-                  className={`ti ${item.icon} text-xl ${active ? 'text-[#E8A020]' : 'text-[#0B3D6B] dark:text-white/60'}`}
+                  className={`ti ${item.icon} text-[22px] ${active ? 'text-[#E8A020]' : 'text-[#0B3D6B] dark:text-white/60'}`}
                   aria-hidden="true"
                 />
                 {item.label}
