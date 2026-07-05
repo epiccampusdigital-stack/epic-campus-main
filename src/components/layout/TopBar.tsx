@@ -7,6 +7,7 @@ import { auth } from '@/lib/firebase/client'
 import { ROLE_LABELS } from '@/lib/constants/roles'
 import { useManagement } from '@/components/layout/ManagementContext'
 import DarkModeToggle from '@/components/ui/DarkModeToggle'
+import NotificationCenter from '@/components/layout/NotificationCenter'
 
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -123,13 +124,7 @@ export default function TopBar() {
       <div className="flex items-center gap-2">
         <DarkModeToggle />
 
-        <button
-          type="button"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-[#5A6A7A] dark:text-white/50 hover:bg-[#0B3D6B]/[0.06] dark:hover:bg-white/[0.06] transition-colors duration-200"
-          aria-label="Notifications"
-        >
-          <span className="ti ti-bell text-[18px]" aria-hidden="true" />
-        </button>
+        <NotificationCenter />
 
         {user && (
           <div className="relative ml-1" ref={dropdownRef}>

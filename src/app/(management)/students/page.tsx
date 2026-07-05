@@ -273,7 +273,7 @@ export default function StudentsPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search name, email, phone…"
-              className="w-full rounded-lg border border-[#DDE3EC] py-2.5 pl-10 pr-3 font-inter text-base text-[#0D1B2A] outline-none focus:border-[#E8A020] sm:text-sm"
+              className="w-full rounded-xl border-2 border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] py-2.5 pl-10 pr-3 font-inter text-base text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] transition-colors duration-200 sm:text-sm"
             />
           </div>
           <select
@@ -358,12 +358,15 @@ export default function StudentsPage() {
                       const studentIdNum = String(studentRecord.studentId ?? '').trim()
                       const hasIds = Boolean(registrationNumber && studentIdNum)
                       return (
-                        <tr key={s.id}>
+                        <tr key={s.id} className="hover:bg-[#F5F7FB] dark:hover:bg-white/[0.03] transition-colors duration-150 cursor-pointer">
                           <td className="px-4 py-3">
                             <div>
-                              <p className="font-jakarta text-sm font-semibold text-[#0D1B2A] dark:text-white">
+                              <Link
+                                href={`/students/${s.id}`}
+                                className="font-jakarta text-sm font-semibold text-[#0D1B2A] dark:text-white hover:text-[#E8A020] hover:underline transition-colors"
+                              >
                                 {s.name}
-                              </p>
+                              </Link>
                               <p className="text-xs text-[#5A6A7A] dark:text-white/50">{s.batchId || '—'}</p>
                             </div>
                           </td>

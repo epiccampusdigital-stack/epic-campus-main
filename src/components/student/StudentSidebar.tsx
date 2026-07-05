@@ -11,7 +11,18 @@ import { getCourseBadge } from '@/lib/student/portal'
 import { logAuditEvent } from '@/lib/audit/helpers'
 import { useStudentPortal } from '@/components/student/StudentContext'
 import DarkModeToggle from '@/components/ui/DarkModeToggle'
-import { isNavActive, navLinkClasses } from '@/lib/utils/nav'
+import { isNavActive } from '@/lib/utils/nav'
+
+function studentNavLinkClasses(active: boolean): string {
+  const base = 'flex items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] transition-all duration-200 min-h-[44px] sm:min-h-0'
+  return active
+    ? `${base} bg-gradient-to-r from-[#E8A020]/20 to-[#E8A020]/5 text-[#E8A020] font-bold border-r-2 border-[#E8A020]`
+    : `${base} text-[#5A6A7A] hover:bg-white/[0.06] hover:text-white transition-all duration-200`
+}
+
+function getStudentInitials(name: string): string {
+  return name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() || 'S'
+}
 
 const BASE_NAV_ITEMS = [
   { label: 'Epic Wall', href: '/epic-wall', icon: 'ti-home' },
@@ -149,7 +160,7 @@ export default function StudentSidebar() {
               key={item.href}
               href={item.href}
               onClick={() => setSidebarOpen(false)}
-              className={navLinkClasses(active)}
+              className={studentNavLinkClasses(active)}
             >
               <span className={`ti ${item.icon} text-[14px] leading-none`} aria-hidden="true" />
               {item.label}
@@ -167,18 +178,23 @@ export default function StudentSidebar() {
 
       <div className="p-3">
         {student && (
-          <div className="mb-2 px-1">
-            <p className="truncate text-[12px] font-medium text-[#0B3D6B] dark:text-white/80">{student.name}</p>
-            <span className="mt-0.5 inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[#E8A020]/15 px-2 py-0.5 text-[10px] font-medium text-[#E8A020]">
-              <span className="truncate">{courseName || courseLabel}</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setPasswordModalOpen(true)}
-              className="mt-1.5 block text-[11px] font-medium text-[#5A6A7A] dark:text-white/40 hover:text-[#0B3D6B] dark:hover:text-white/70"
-            >
-              🔒 Change Password
-            </button>
+          <div className="mb-2 flex items-start gap-2 px-1">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#E8A020] to-[#c8891a] text-[11px] font-bold text-white">
+              {getStudentInitials(student.name)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[12px] font-medium text-[#0B3D6B] dark:text-white/80">{student.name}</p>
+              <span className="mt-0.5 inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[#E8A020]/15 px-2 py-0.5 text-[10px] font-medium text-[#E8A020]">
+                <span className="truncate">{courseName || courseLabel}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setPasswordModalOpen(true)}
+                className="mt-1.5 block text-[11px] font-medium text-[#5A6A7A] dark:text-white/40 hover:text-[#0B3D6B] dark:hover:text-white/70"
+              >
+                🔒 Change Password
+              </button>
+            </div>
           </div>
         )}
         <div className="flex items-center gap-2 px-1">

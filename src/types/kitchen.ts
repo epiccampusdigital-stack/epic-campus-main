@@ -2,7 +2,7 @@ import { Timestamp } from 'firebase/firestore'
 
 export type InventoryCategory = 'grains' | 'protein' | 'vegetables' | 'dairy' | 'condiments' | 'beverages' | 'other'
 export type StockUnit = 'kg' | 'litres' | 'units' | 'grams'
-export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'tea'
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'tea' | 'morning-tea' | 'evening-tea'
 export type WasteReason = 'overcooked' | 'expired' | 'leftover' | 'spoiled' | 'dropped' | 'other'
 export type OrderStatus = 'draft' | 'submitted' | 'approved' | 'ordered' | 'received' | 'cancelled'
 

@@ -22,12 +22,14 @@ import type { DailyMenu, MealType, InventoryItem, SelectedIngredient } from '@/t
 
 const KITCHEN_LOCATION = 'Ahangama'
 
-const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'tea']
+const MEAL_TYPES: MealType[] = ['morning-tea', 'breakfast', 'lunch', 'dinner', 'evening-tea', 'tea']
 
 const MEAL_LABELS: Record<MealType, string> = {
+  'morning-tea': 'Morning Tea',
   breakfast: 'Breakfast',
   lunch: 'Lunch',
   dinner: 'Dinner',
+  'evening-tea': 'Evening Tea',
   tea: 'Tea',
 }
 

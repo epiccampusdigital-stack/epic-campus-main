@@ -1,470 +1,370 @@
+'use client'
+
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import PublicNav from '@/components/public/PublicNav'
-import PublicFooter from '@/components/public/PublicFooter'
-import OnlineTradingCard from '@/components/public/OnlineTradingCard'
-import DestinationPicker from '@/components/public/DestinationPicker'
+import AnimatedCounter from '@/components/public/AnimatedCounter'
 
-function SectionTitle({
-  title,
-  subtitle,
-}: {
-  title: string
-  subtitle?: string
-}) {
-  return (
-    <div className="text-center">
-      <h2 className="font-jakarta text-4xl font-bold text-[#0B3D6B] dark:text-white">{title}</h2>
-      <div className="mx-auto mt-4 h-1 w-16 rounded-full bg-[#E8A020]" />
-      {subtitle && (
-        <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-gray-600 dark:text-white/60">
-          {subtitle}
-        </p>
-      )}
-    </div>
-  )
-}
+const ParticleHero = dynamic(() => import('@/components/public/ParticleHero'), { ssr: false })
+const Globe3D = dynamic(() => import('@/components/public/Globe3D'), { ssr: false })
 
-function getInitials(name: string) {
-  return name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
-}
-
-const STATS = [
-  { value: '1,500+', label: 'Students Placed' },
-  { value: '15 Years', label: 'Since 2011' },
-  { value: '98%', label: 'Visa Success Rate' },
-  { value: '50+', label: 'Partner Companies' },
+const COURSES = [
+  {
+    flag: '🇯🇵',
+    country: 'Japan',
+    title: 'Japan SSW Program',
+    desc: 'Work in Japan through the Specified Skilled Worker program. No degree required.',
+    tags: ['JLPT N4', 'SSW Visa', 'Truck Driving', 'Construction'],
+    color: 'from-red-50 to-white dark:from-red-900/10',
+    border: 'border-red-100 dark:border-red-800/30',
+    accent: 'bg-red-500',
+  },
+  {
+    flag: '🇰🇷',
+    country: 'Korea',
+    title: 'Korean Language Program',
+    desc: 'Study at top Korean universities. D-4 to D-2 visa pathway with scholarships.',
+    tags: ['TOPIK', 'D-4 Visa', 'Full Scholarship', 'University'],
+    color: 'from-blue-50 to-white dark:from-blue-900/10',
+    border: 'border-blue-100 dark:border-blue-800/30',
+    accent: 'bg-blue-500',
+  },
+  {
+    flag: '🇨🇳',
+    country: 'China',
+    title: 'Chinese Language Program',
+    desc: 'Affordable world-class education with full scholarship opportunities.',
+    tags: ['HSK', 'Full Scholarship', '4-Year Degree', 'Medicine'],
+    color: 'from-yellow-50 to-white dark:from-yellow-900/10',
+    border: 'border-yellow-100 dark:border-yellow-800/30',
+    accent: 'bg-yellow-500',
+  },
+  {
+    flag: '📝',
+    country: 'IELTS',
+    title: 'IELTS Residential',
+    desc: 'Intensive 10-day residential IELTS program. Achieve your target band score.',
+    tags: ['Band 6.0+', 'Residential', 'Mock Exams', 'Daily Training'],
+    color: 'from-purple-50 to-white dark:from-purple-900/10',
+    border: 'border-purple-100 dark:border-purple-800/30',
+    accent: 'bg-purple-500',
+  },
+  {
+    flag: '🎓',
+    country: 'NVQ',
+    title: 'NVQ & Skill Development',
+    desc: 'Nationally recognized vocational qualifications for local and international jobs.',
+    tags: ['NVQ Level 3', 'IT', 'Caregiving', 'Agriculture'],
+    color: 'from-emerald-50 to-white dark:from-emerald-900/10',
+    border: 'border-emerald-100 dark:border-emerald-800/30',
+    accent: 'bg-emerald-500',
+  },
 ]
 
-const PROGRAMS = [
-  {
-    accentStyle: { background: 'linear-gradient(90deg, #bc002d, #0B3D6B)' },
-    country: 'Japan',
-    title: 'Japan SSW',
-    description:
-      'Work in Japan with the Specified Skilled Worker visa. No degree required. High-demand industries.',
-    tags: ['Truck Driving', 'Construction', 'Caregiving'],
-    href: '/japan',
-  },
-  {
-    accentStyle: { background: 'linear-gradient(90deg, #003478, #cd2e3a)' },
-    country: 'Korea',
-    title: 'Korea D2/D4',
-    description:
-      'Study at Korean universities with scholarship opportunities. Available after O/L or A/L.',
-    tags: ['Engineering', 'Business', 'Arts'],
-    href: '/korea',
-  },
-  {
-    accentStyle: { background: 'linear-gradient(90deg, #de2910, #ffde00)' },
-    country: 'China',
-    title: 'China Programs',
-    description:
-      'World-class education with full & partial scholarships. Medicine, IT, Business programs available.',
-    tags: ['Medicine', 'IT', 'Business'],
-    href: '/china',
-  },
-  {
-    accentStyle: { background: 'linear-gradient(90deg, #003087, #CF142B)' },
-    country: 'English',
-    title: 'IELTS Residential',
-    description: 'Intensive 10-day residential IELTS program. Target band 6.0 to 7.0+',
-    tags: ['Residential', 'Fast-track', 'Expert trainers'],
-    href: '/ielts',
-  },
-  {
-    accentStyle: { background: 'linear-gradient(90deg, #0B3D6B, #E8A020)' },
-    country: 'Sri Lanka',
-    title: 'NVQ Qualifications',
-    description:
-      'Nationally recognized vocational qualifications. IT, Hospitality, Caregiving, Construction.',
-    tags: ['NVQ Level 3/4', 'TVEC Approved'],
-    href: '/nvq',
-  },
+const STATS = [
+  { value: 1500, suffix: '+', label: 'Students Placed', icon: '👥' },
+  { value: 98, suffix: '%', label: 'Visa Success Rate', icon: '✅' },
+  { value: 50, suffix: '+', label: 'Partner Institutions', icon: '🏛️' },
+  { value: 15, suffix: '+', label: 'Years Experience', icon: '⭐' },
 ]
 
 const STEPS = [
-  {
-    title: 'Consultation & Assessment',
-    description: 'Personal guidance to identify the right program for your goals and eligibility.',
-  },
-  {
-    title: 'Training & Language Preparation',
-    description: 'Expert-led language and skills training tailored to your destination country.',
-  },
-  {
-    title: 'Application & Documentation',
-    description: 'Complete support preparing applications, transcripts, and required documents.',
-  },
-  {
-    title: 'Visa Processing',
-    description: 'End-to-end visa guidance with our experienced documentation team.',
-  },
-  {
-    title: 'Departure & Support',
-    description: 'Pre-departure briefing and ongoing support as you begin your global journey.',
-  },
+  { step: '01', title: 'Consultation', desc: 'Meet our experts to choose the right pathway for your goals.' },
+  { step: '02', title: 'Training', desc: 'Complete language and skill training at our campus.' },
+  { step: '03', title: 'Application', desc: 'We handle all documentation and application processes.' },
+  { step: '04', title: 'Visa Processing', desc: 'Expert handling with the highest visa success rate.' },
+  { step: '05', title: 'Departure', desc: 'Pre-departure briefing and travel coordination.' },
+  { step: '06', title: 'Settlement', desc: 'Continuous support after you arrive abroad.' },
 ]
 
-const FEATURES = [
-  {
-    icon: 'ti-award',
-    bg: 'bg-blue-50',
-    iconColor: 'text-[#1A6BAD]',
-    title: '15+ Years Experience',
-    desc: 'Established in 2011, trusted by thousands of Sri Lankan families.',
-  },
-  {
-    icon: 'ti-certificate',
-    bg: 'bg-amber-50',
-    iconColor: 'text-[#E8A020]',
-    title: 'TVEC Approved',
-    desc: 'Nationally accredited institute with recognized qualifications.',
-  },
-  {
-    icon: 'ti-route',
-    bg: 'bg-emerald-50',
-    iconColor: 'text-emerald-600',
-    title: 'End-to-End Support',
-    desc: 'From training and documentation to departure and settlement guidance.',
-  },
-  {
-    icon: 'ti-chart-line',
-    bg: 'bg-violet-50',
-    iconColor: 'text-violet-600',
-    title: '98% Success Rate',
-    desc: 'Proven visa placement record across Japan, Korea, and China programs.',
-  },
-]
-
-const TESTIMONIALS = [
-  {
-    quote:
-      "Epic Campus changed my life. I'm now working in Japan earning 5x what I made in Sri Lanka.",
-    name: 'Kasun Perera',
-    program: 'Japan SSW Graduate',
-  },
-  {
-    quote:
-      'The Korean language classes and visa support were exceptional. I got into my dream university.',
-    name: 'Dilini Fernando',
-    program: 'Korea D2 Student',
-  },
-  {
-    quote:
-      'The IELTS residential program got me from 5.5 to 7.0 in just 3 weeks. Incredible results.',
-    name: 'Nuwan Silva',
-    program: 'IELTS Graduate',
-  },
-]
-
-export default function HomePage() {
+export default function LandingPage() {
   return (
-    <div className="flex min-h-screen flex-col">
-      <PublicNav />
+    <div className="min-h-screen bg-white dark:bg-[#04090f] overflow-x-hidden">
 
-      {/* Hero */}
-      <section className="relative overflow-hidden pb-32 pt-20 sm:pt-28" style={{ background: 'linear-gradient(135deg, #0B3D6B 0%, #1A6BAD 50%, #0B3D6B 100%)' }}>
-        {/* Glowing blobs */}
-        <div
-          className="pointer-events-none absolute -left-20 top-10 h-72 w-72 rounded-full opacity-30"
-          style={{ background: '#E8A020', filter: 'blur(60px)' }}
-        />
-        <div
-          className="pointer-events-none absolute -right-20 bottom-10 h-80 w-80 rounded-full opacity-20"
-          style={{ background: '#1A6BAD', filter: 'blur(60px)' }}
-        />
+      {/* Announcement Bar */}
+      <div className="bg-gradient-to-r from-[#0B3D6B] to-[#1A6BAD] py-2.5 text-center text-xs font-semibold text-white">
+        🎌 Now accepting applications for Batch 29 —{' '}
+        <Link href="/enroll" className="underline text-[#E8A020] hover:text-yellow-300 transition-colors">
+          Apply Now →
+        </Link>
+      </div>
 
-        <div className="relative mx-auto max-w-6xl px-4 text-center sm:px-6 lg:px-8">
-          <p className="font-jakarta text-xs font-semibold uppercase tracking-[0.35em] text-[#E8A020] sm:text-sm">
-            Japan · Korea · China · IELTS · NVQ
-          </p>
-          <h1 className="mt-6 font-jakarta leading-[1.1]">
-            <span className="block text-[28px] font-semibold text-white sm:text-[42px] lg:text-[52px]">Your Future</span>
-            <span className="block text-[28px] font-bold text-[#E8A020] sm:text-[42px] lg:text-[52px]">Starts Here</span>
-          </h1>
-          <p className="mx-auto mt-6 max-w-md text-[13px] leading-relaxed text-white/70 sm:text-[15px]">
-            Epic Campus opens doors to Japan, Korea, China and beyond. Study, work, and build
-            your global career from Sri Lanka.
-          </p>
-          <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4">
-            <a
-              href="#programs"
-              className="inline-flex rounded-full bg-[#E8A020] px-6 py-3 font-semibold text-[#0B3D6B] transition-all duration-300 hover:bg-[#F5B942] hover:shadow-lg"
-            >
-              Explore Programs
-            </a>
-            <Link
-              href="/login"
-              className="inline-flex rounded-full border border-white/25 bg-white/15 px-6 py-3 font-semibold text-white backdrop-blur-sm transition-all duration-300 hover:bg-white/20"
-            >
-              Login to Portal
+      {/* Navbar */}
+      <nav className="sticky top-0 z-50 border-b border-[#DDE3EC]/50 dark:border-white/[0.06] bg-white/80 dark:bg-[#04090f]/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#0B3D6B] to-[#1A6BAD]">
+              <span className="font-jakarta text-lg font-black text-white">E</span>
+            </div>
+            <div>
+              <p className="font-jakarta text-lg font-black text-[#0B3D6B] dark:text-white leading-none">EPIC</p>
+              <p className="text-[9px] font-bold text-[#E8A020] tracking-widest leading-none">CAMPUS</p>
+            </div>
+          </Link>
+
+          <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-[#5A6A7A] dark:text-white/60">
+            <Link href="#courses" className="hover:text-[#0B3D6B] dark:hover:text-white transition-colors">Programs</Link>
+            <Link href="#about" className="hover:text-[#0B3D6B] dark:hover:text-white transition-colors">About</Link>
+            <Link href="#process" className="hover:text-[#0B3D6B] dark:hover:text-white transition-colors">Process</Link>
+            <Link href="#contact" className="hover:text-[#0B3D6B] dark:hover:text-white transition-colors">Contact</Link>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Link href="/login"
+              className="hidden sm:block rounded-xl border border-[#DDE3EC] dark:border-white/20 px-4 py-2 text-sm font-semibold text-[#0B3D6B] dark:text-white hover:bg-[#F5F7FB] dark:hover:bg-white/[0.04] transition-all">
+              Login
+            </Link>
+            <Link href="/enroll"
+              className="rounded-xl bg-gradient-to-r from-[#E8A020] to-[#c8891a] px-4 py-2 text-sm font-black text-[#0B3D6B] shadow-lg shadow-[#E8A020]/20 hover:shadow-xl hover:shadow-[#E8A020]/30 hover:-translate-y-0.5 transition-all">
+              Apply Now
             </Link>
           </div>
         </div>
+      </nav>
 
-        {/* Stats Bar */}
-        <div className="relative z-10 mx-auto -mb-16 mt-20 max-w-5xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 overflow-hidden rounded-2xl bg-white shadow-xl lg:grid-cols-4">
-            {STATS.map((s, i) => (
-              <div
-                key={s.label}
-                className={`px-6 py-8 text-center sm:px-8 sm:py-10 ${
-                  i < STATS.length - 1 ? 'lg:border-r lg:border-gray-100' : ''
-                } ${i % 2 === 0 ? 'border-r border-gray-100 lg:border-r' : ''} ${
-                  i < 2 ? 'border-b border-gray-100 lg:border-b-0' : ''
-                }`}
-              >
-                <p className="font-jakarta text-[16px] font-black text-[#0B3D6B] sm:text-[22px] lg:text-4xl">
-                  {s.value}
+      {/* Hero Section */}
+      <section className="relative min-h-[90vh] flex items-center overflow-hidden">
+        {/* Background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#F5F7FB] via-white to-blue-50/30 dark:from-[#04090f] dark:via-[#071428] dark:to-[#04090f]" />
+
+        {/* Particle animation */}
+        <ParticleHero />
+
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 py-20">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div className="space-y-8">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#E8A020]/30 bg-[#E8A020]/10 px-4 py-1.5 text-xs font-bold text-[#E8A020]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#E8A020] animate-pulse" />
+                Sri Lanka&apos;s #1 Overseas Education Institute
+              </div>
+
+              <h1 className="font-jakarta text-5xl sm:text-6xl font-black leading-tight">
+                <span className="text-[#0B3D6B] dark:text-white">Your Future</span>
+                <br />
+                <span className="bg-gradient-to-r from-[#E8A020] via-[#f0b030] to-[#E8A020] bg-clip-text text-transparent">
+                  Has No Limit
+                </span>
+              </h1>
+
+              <p className="text-lg text-[#5A6A7A] dark:text-white/60 max-w-lg leading-relaxed">
+                We help Sri Lankan youth build global careers through world-class language training,
+                visa support, and placement in Japan, Korea, and China.
+              </p>
+
+              <div className="flex flex-wrap gap-4">
+                <Link href="/enroll"
+                  className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#E8A020] to-[#c8891a] px-8 py-4 text-base font-black text-[#0B3D6B] shadow-lg shadow-[#E8A020]/30 hover:shadow-xl hover:shadow-[#E8A020]/40 hover:-translate-y-1 transition-all duration-200">
+                  Start Your Journey
+                  <span className="ti ti-arrow-right text-xl" />
+                </Link>
+                <Link href="#courses"
+                  className="flex items-center gap-2 rounded-2xl border-2 border-[#0B3D6B] dark:border-white/20 px-8 py-4 text-base font-bold text-[#0B3D6B] dark:text-white hover:bg-[#0B3D6B] hover:text-white transition-all duration-200">
+                  Explore Programs
+                </Link>
+              </div>
+
+              <div className="flex flex-wrap gap-6 pt-4">
+                {['🇯🇵 Japan SSW', '🇰🇷 Korea', '🇨🇳 China', '📝 IELTS'].map(dest => (
+                  <span key={dest} className="text-sm font-semibold text-[#5A6A7A] dark:text-white/50">{dest}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Globe */}
+            <div className="relative h-[500px] hidden lg:block">
+              <Globe3D />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Stats Section */}
+      <section className="bg-gradient-to-r from-[#0B3D6B] to-[#1A6BAD] py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+            {STATS.map((stat) => (
+              <div key={stat.label} className="text-center">
+                <div className="text-3xl mb-2">{stat.icon}</div>
+                <p className="font-jakarta text-4xl font-black text-white">
+                  <AnimatedCounter end={stat.value} suffix={stat.suffix} />
                 </p>
-                <p className="mt-2 text-xs font-medium uppercase tracking-widest text-gray-500">
-                  {s.label}
-                </p>
+                <p className="mt-1 text-sm font-semibold text-white/60">{stat.label}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Programs */}
-      <section id="programs" className="bg-[#F5F7FB] dark:bg-[#080d18] py-24 pt-32 transition-colors duration-300">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <SectionTitle
-            title="Choose Your Path"
-            subtitle="Five proven pathways to study and work abroad — each backed by Epic Campus training and visa support."
-          />
-          <div className="mt-16 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {PROGRAMS.map((p) => (
-              <div
-                key={p.href}
-                className="flex flex-col rounded-[14px] border border-[#0B3D6B]/[0.08] dark:border-white/[0.07] bg-white dark:bg-white/[0.04] p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(11,61,107,0.1)] cursor-pointer"
-              >
-                {/* Colored accent bar */}
-                <div
-                  className="mb-4 h-[3px] w-full rounded-[3px]"
-                  style={p.accentStyle}
-                />
-                <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-400 dark:text-white/40">
-                  {p.country}
-                </p>
-                <h3 className="mt-1 text-[15px] font-semibold text-[#0B3D6B] dark:text-white">
-                  {p.title}
+      {/* Programs Section */}
+      <section id="courses" className="py-24 bg-[#F5F7FB] dark:bg-[#04090f]">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="text-center mb-16">
+            <p className="text-sm font-bold text-[#E8A020] uppercase tracking-widest mb-3">Our Programs</p>
+            <h2 className="font-jakarta text-4xl font-black text-[#0B3D6B] dark:text-white">
+              Choose Your Destination
+            </h2>
+            <p className="mt-4 text-[#5A6A7A] dark:text-white/50 max-w-xl mx-auto">
+              World-class training programs designed to get you working or studying abroad
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {COURSES.map((course) => (
+              <div key={course.country}
+                className={`group rounded-3xl border bg-gradient-to-br ${course.color} ${course.border} p-6 hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 cursor-pointer`}>
+                <div className="flex items-start justify-between mb-4">
+                  <span className="text-4xl group-hover:scale-110 transition-transform duration-300 inline-block">
+                    {course.flag}
+                  </span>
+                  <div className={`h-2 w-2 rounded-full ${course.accent} animate-pulse`} />
+                </div>
+                <h3 className="font-jakarta text-xl font-bold text-[#0B3D6B] dark:text-white mb-2">
+                  {course.title}
                 </h3>
-                <p className="mt-2 flex-1 text-[12px] leading-relaxed text-gray-500 dark:text-white/55">
-                  {p.description}
+                <p className="text-sm text-[#5A6A7A] dark:text-white/50 mb-4 leading-relaxed">
+                  {course.desc}
                 </p>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {p.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-[8px] bg-[#0B3D6B]/[0.06] dark:bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-[#0B3D6B] dark:text-white/70"
-                    >
+                <div className="flex flex-wrap gap-2">
+                  {course.tags.map(tag => (
+                    <span key={tag} className="rounded-full bg-white/80 dark:bg-white/10 px-3 py-1 text-xs font-bold text-[#0B3D6B] dark:text-white/70">
                       {tag}
                     </span>
                   ))}
                 </div>
-                <Link
-                  href={p.href}
-                  className="mt-4 text-[12px] font-semibold text-[#E8A020] transition-colors hover:text-[#d4911c]"
-                >
-                  Learn More →
-                </Link>
+                <div className="mt-4 flex items-center gap-1 text-xs font-bold text-[#0B3D6B] dark:text-white/60 group-hover:text-[#E8A020] transition-colors">
+                  Learn more <span className="ti ti-arrow-right group-hover:translate-x-1 transition-transform" />
+                </div>
               </div>
             ))}
-            <OnlineTradingCard />
           </div>
         </div>
       </section>
 
-      {/* Destination Picker Quiz */}
-      <section className="bg-[#EEF3F8] py-16 px-4">
-        <div className="mx-auto mb-10 max-w-2xl text-center">
-          <h2 className="mb-3 font-jakarta text-3xl font-bold text-[#0B3D6B]">
-            Not sure which path is right for you?
-          </h2>
-          <p className="text-gray-600">
-            Answer 4 quick questions and we&apos;ll recommend the perfect program.
-          </p>
-        </div>
-        <DestinationPicker />
-      </section>
-
-      {/* Process */}
-      <section className="bg-white dark:bg-[#0d1a2e] py-24 transition-colors duration-300">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <SectionTitle
-            title="From Dream to Departure"
-            subtitle="A clear, guided pathway from your first consultation to boarding your flight abroad."
-          />
-          <div className="relative mt-20 hidden lg:block">
-            <div className="absolute left-0 right-0 top-8 h-0.5 bg-gray-200 dark:bg-white/10" />
-            <div className="relative grid grid-cols-5 gap-6">
-              {STEPS.map((step, i) => (
-                <div key={step.title} className="text-center">
-                  <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-[#E8A020] bg-white dark:bg-[#0d1a2e] shadow-sm">
-                    <span className="font-jakarta text-lg font-bold text-[#E8A020]">
-                      {i + 1}
-                    </span>
-                  </div>
-                  <p className="mt-6 font-jakarta text-sm font-semibold text-[#0B3D6B] dark:text-white">
-                    {step.title}
-                  </p>
-                  <p className="mt-2 text-sm leading-relaxed text-gray-500 dark:text-white/50">
-                    {step.description}
-                  </p>
-                </div>
-              ))}
-            </div>
+      {/* Process Section */}
+      <section id="process" className="py-24 bg-white dark:bg-[#071428]">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="text-center mb-16">
+            <p className="text-sm font-bold text-[#E8A020] uppercase tracking-widest mb-3">How It Works</p>
+            <h2 className="font-jakarta text-4xl font-black text-[#0B3D6B] dark:text-white">
+              From Dream to Departure
+            </h2>
           </div>
-          <div className="mt-12 space-y-10 lg:hidden">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {STEPS.map((step, i) => (
-              <div key={step.title} className="flex gap-5">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-[3px] border-[#E8A020] bg-white dark:bg-[#0d1a2e] shadow-sm">
-                  <span className="font-jakarta font-bold text-[#E8A020]">{i + 1}</span>
+              <div key={step.step}
+                className="group relative rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.03] p-6 hover:border-[#E8A020]/50 hover:shadow-lg transition-all duration-300">
+                <div className="font-jakarta text-5xl font-black text-[#DDE3EC] dark:text-white/10 mb-4 group-hover:text-[#E8A020]/20 transition-colors">
+                  {step.step}
+                </div>
+                <h3 className="font-jakarta text-lg font-bold text-[#0B3D6B] dark:text-white mb-2">{step.title}</h3>
+                <p className="text-sm text-[#5A6A7A] dark:text-white/50">{step.desc}</p>
+                {i < STEPS.length - 1 && (
+                  <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 z-10">
+                    <span className="ti ti-chevron-right text-[#DDE3EC] dark:text-white/20 text-xl" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-24 bg-gradient-to-br from-[#0B3D6B] to-[#071428] relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <ParticleHero />
+        </div>
+        <div className="relative z-10 mx-auto max-w-3xl px-4 sm:px-6 text-center space-y-8">
+          <h2 className="font-jakarta text-4xl sm:text-5xl font-black text-white">
+            Ready to Build Your
+            <span className="bg-gradient-to-r from-[#E8A020] to-[#f0b030] bg-clip-text text-transparent"> Global Future?</span>
+          </h2>
+          <p className="text-lg text-white/60">
+            Join 1,500+ Sri Lankan students who have successfully built careers abroad with EPIC Campus.
+          </p>
+          <div className="flex flex-wrap justify-center gap-4">
+            <Link href="/enroll"
+              className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#E8A020] to-[#c8891a] px-10 py-4 text-lg font-black text-[#0B3D6B] shadow-2xl shadow-[#E8A020]/30 hover:shadow-[#E8A020]/50 hover:-translate-y-1 transition-all duration-200">
+              Apply for Batch 29
+              <span className="ti ti-arrow-right text-xl" />
+            </Link>
+            <Link href="/login"
+              className="flex items-center gap-2 rounded-2xl border-2 border-white/20 px-10 py-4 text-lg font-bold text-white hover:bg-white/10 transition-all duration-200">
+              Student Login
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer id="contact" className="bg-[#04090f] py-16 border-t border-white/[0.06]">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="grid grid-cols-1 gap-12 md:grid-cols-4">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#0B3D6B] to-[#1A6BAD]">
+                  <span className="font-jakarta text-lg font-black text-white">E</span>
                 </div>
                 <div>
-                  <p className="font-jakarta font-semibold text-[#0B3D6B] dark:text-white">{step.title}</p>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-white/50">{step.description}</p>
+                  <p className="font-jakarta text-lg font-black text-white leading-none">EPIC</p>
+                  <p className="text-[9px] font-bold text-[#E8A020] tracking-widest leading-none">CAMPUS</p>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Why Epic Campus */}
-      <section className="bg-[#F5F7FB] dark:bg-[#080d18] py-24 transition-colors duration-300">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <SectionTitle title="Why Choose Epic Campus?" />
-          <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            {FEATURES.map((f) => (
-              <div
-                key={f.title}
-                className="rounded-2xl border border-gray-100 dark:border-white/[0.07] bg-white dark:bg-white/[0.04] p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
-              >
-                <div
-                  className={`flex h-14 w-14 items-center justify-center rounded-2xl ${f.bg}`}
-                >
-                  <span className={`ti ${f.icon} text-2xl ${f.iconColor}`} />
-                </div>
-                <h3 className="mt-6 font-jakarta text-lg font-bold text-[#0B3D6B] dark:text-white">
-                  {f.title}
-                </h3>
-                <p className="mt-3 text-sm leading-relaxed text-gray-600 dark:text-white/55">{f.desc}</p>
+              <p className="text-sm text-white/40 leading-relaxed">
+                Sri Lanka&apos;s trusted gateway to global education and employment opportunities.
+              </p>
+              <div className="flex gap-3">
+                {[
+                  { icon: 'ti-brand-facebook', href: 'https://facebook.com/epicschoolofcomputing' },
+                  { icon: 'ti-brand-instagram', href: 'https://instagram.com/epiccampusdigital' },
+                  { icon: 'ti-brand-tiktok', href: 'https://tiktok.com/@epic_campus' },
+                ].map(s => (
+                  <a key={s.icon} href={s.href} target="_blank" rel="noopener noreferrer"
+                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.06] text-white/50 hover:bg-[#E8A020]/20 hover:text-[#E8A020] transition-all">
+                    <span className={`ti ${s.icon} text-lg`} />
+                  </a>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
+            </div>
 
-      {/* Testimonials */}
-      <section className="bg-white dark:bg-[#0d1a2e] py-24 transition-colors duration-300">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <SectionTitle title="Student Success Stories" />
-          <div className="mt-16 grid gap-8 lg:grid-cols-3">
-            {TESTIMONIALS.map((t) => (
-              <blockquote
-                key={t.name}
-                className="flex flex-col rounded-2xl border border-gray-100 dark:border-white/[0.07] bg-white dark:bg-white/[0.04] p-8 shadow-sm transition-all duration-300 hover:shadow-md"
-              >
-                <span className="font-serif text-5xl leading-none text-[#E8A020]">❝</span>
-                <p className="mt-4 flex-1 text-sm italic leading-relaxed text-gray-700 dark:text-white/60">
-                  {t.quote}
-                </p>
-                <footer className="mt-8 flex items-center gap-4 border-t border-gray-100 dark:border-white/[0.06] pt-6">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0B3D6B] font-jakarta text-sm font-bold text-white">
-                    {getInitials(t.name)}
-                  </div>
-                  <div>
-                    <p className="font-jakarta font-semibold text-[#0B3D6B] dark:text-white">{t.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-white/40">{t.program}</p>
-                  </div>
-                </footer>
-              </blockquote>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Banner */}
-      <section className="bg-[#0B3D6B] py-24 text-white">
-        <div className="mx-auto max-w-6xl px-4 text-center sm:px-6">
-          <h2 className="font-jakarta text-4xl font-bold">Ready to Start Your Journey?</h2>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-white/80">
-            Join 1,500+ Sri Lankan students who have built global careers with Epic Campus.
-          </p>
-          <div className="mt-10 flex flex-wrap justify-center gap-4">
-            <Link
-              href="/enroll"
-              className="inline-flex items-center gap-2 rounded-full bg-[#E8A020] px-8 py-4 font-semibold text-white transition-all hover:bg-[#d4911c] hover:shadow-lg"
-            >
-              <span>Enroll Now</span>
-              <span className="ti ti-arrow-right" />
-            </Link>
-            <a
-              href="tel:+94912228383"
-              className="inline-flex rounded-full border-2 border-white/80 px-8 py-4 font-semibold text-white transition-all hover:bg-white/10"
-            >
-              Call Us
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* Enroll Now CTA */}
-      <section className="bg-white dark:bg-[#0d1a2e] py-20 transition-colors duration-300">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B3D6B] to-[#1A6BAD] p-10 sm:p-14">
-            <div className="flex flex-col items-center gap-6 text-center lg:flex-row lg:text-left">
-              <div className="flex-1 text-white">
-                <h2 className="font-jakarta text-3xl font-bold sm:text-4xl">
-                  Apply Online in Minutes
-                </h2>
-                <p className="mt-4 max-w-xl text-base text-white/75">
-                  Complete our simple enrollment form, choose your program, and pay securely with
-                  Stripe. Your student account will be created within 24 hours.
-                </p>
-                <ul className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-white/80 lg:justify-start">
-                  {['3 simple steps', 'Secure online payment', 'Account in 24 hours'].map(
-                    (item) => (
-                      <li key={item} className="flex items-center gap-1.5">
-                        <span className="ti ti-check text-[#E8A020]" />
-                        {item}
-                      </li>
-                    ),
-                  )}
+            {[
+              {
+                title: 'Programs',
+                links: ['Japan SSW', 'Korean Language', 'Chinese Language', 'IELTS Residential', 'NVQ Programs'],
+              },
+              {
+                title: 'Company',
+                links: ['About Us', 'Our Team', 'Facilities', 'Success Stories', 'Partner With Us'],
+              },
+              {
+                title: 'Contact',
+                links: [
+                  'No. 59/2, Sri Dewamitta Road',
+                  'China Garden, Galle',
+                  '+94 91 222 83 83',
+                  'info@epiccampus.lk',
+                  'www.epiccampus.live',
+                ],
+              },
+            ].map(col => (
+              <div key={col.title} className="space-y-4">
+                <h4 className="font-jakarta font-bold text-white">{col.title}</h4>
+                <ul className="space-y-2">
+                  {col.links.map(link => (
+                    <li key={link}>
+                      <span className="text-sm text-white/40 hover:text-white/70 transition-colors cursor-pointer">{link}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
-              <Link
-                href="/enroll"
-                className="shrink-0 rounded-2xl bg-[#E8A020] px-10 py-4 font-jakarta font-bold text-white shadow-lg transition-all hover:bg-[#d4911c] hover:shadow-xl"
-              >
-                Enroll Now →
-              </Link>
-            </div>
+            ))}
+          </div>
+
+          <div className="mt-12 border-t border-white/[0.06] pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-white/30">© {new Date().getFullYear()} EPIC Campus (Pvt) Ltd. All rights reserved.</p>
+            <p className="text-xs text-white/30">TVEC Approved · Company No. PV 00265988</p>
           </div>
         </div>
-      </section>
-
-      {/* Contact strip */}
-      <section className="border-t border-gray-100 dark:border-white/[0.06] bg-[#F5F7FB] dark:bg-[#080d18] py-12 transition-colors duration-300">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-8 px-4 text-sm text-gray-600 dark:text-white/50 sm:px-6">
-          <span>No. 59/2, Sri Dewamitta Road, China Garden, Galle</span>
-          <a href="tel:+94912228383" className="transition-colors hover:text-[#0B3D6B] dark:hover:text-white">
-            +94 91 222 83 83
-          </a>
-          <a href="mailto:info@epiccampus.lk" className="transition-colors hover:text-[#0B3D6B] dark:hover:text-white">
-            info@epiccampus.lk
-          </a>
-        </div>
-      </section>
-
-      <PublicFooter />
+      </footer>
     </div>
   )
 }

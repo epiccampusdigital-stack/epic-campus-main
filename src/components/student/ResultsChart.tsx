@@ -4,6 +4,7 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -38,6 +39,7 @@ export default function ResultsChart({ data, loading }: ResultsChartProps) {
             (payload?.[0]?.payload as { label?: string })?.label ?? ''
           }
         />
+        <ReferenceLine y={80} stroke="#10b981" strokeDasharray="4 4" label={{ value: 'Pass', fill: '#10b981', fontSize: 10 }} />
         <Line
           type="monotone"
           dataKey="score"

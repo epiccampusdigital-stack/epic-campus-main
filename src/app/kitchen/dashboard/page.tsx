@@ -13,9 +13,11 @@ import { formatLKR } from '@/lib/utils/formatCurrency'
 import type { InventoryItem, MealLog, MealType } from '@/types/kitchen'
 
 const MEAL_SESSIONS: { type: MealType; label: string }[] = [
+  { type: 'morning-tea', label: 'Morning Tea' },
   { type: 'breakfast', label: 'Breakfast' },
   { type: 'lunch', label: 'Lunch' },
   { type: 'dinner', label: 'Dinner' },
+  { type: 'evening-tea', label: 'Evening Tea' },
   { type: 'tea', label: 'Tea' },
 ]
 

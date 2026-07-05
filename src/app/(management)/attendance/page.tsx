@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { collection, getDocs, orderBy, query } from 'firebase/firestore'
+import { collection, getDocs, orderBy, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { COURSES } from '@/lib/constants/courses'
 import { parseStudent } from '@/lib/students/helpers'
@@ -58,6 +58,78 @@ export default function AttendancePage() {
   const [page, setPage] = useState(1)
   const [formOpen, setFormOpen] = useState(false)
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
+  const [reportTab, setReportTab] = useState(false)
+  const [reportData, setReportData] = useState<{
+    studentId: string
+    studentName: string
+    studentCode?: string
+    present: number
+    absent: number
+    late: number
+    total: number
+    percentage: number
+  }[]>([])
+  const [reportLoading, setReportLoading] = useState(false)
+  const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7))
+
+  const generateReport = useCallback(async () => {
+    setReportLoading(true)
+    try {
+      const startDate = `${reportMonth}-01`
+      const endDate = `${reportMonth}-31`
+      const snap = await getDocs(
+        query(
+          collection(db, 'attendance'),
+          where('date', '>=', startDate),
+          where('date', '<=', endDate),
+        )
+      ).catch(() => getDocs(collection(db, 'attendance')))
+
+      const studentMap: Record<string, {
+        studentId: string
+        studentName: string
+        studentCode?: string
+        present: number
+        absent: number
+        late: number
+      }> = {}
+
+      for (const docSnap of snap.docs) {
+        const data = docSnap.data()
+        const studentId = String(data.studentId ?? '')
+        if (!studentId) continue
+        // The date-range query filters this server-side; the fallback path (unindexed) doesn't, so re-check here.
+        if (String(data.date ?? '').slice(0, 7) !== reportMonth) continue
+
+        if (!studentMap[studentId]) {
+          studentMap[studentId] = {
+            studentId,
+            studentName: String(data.studentName ?? 'Unknown'),
+            studentCode: data.studentCode ? String(data.studentCode) : undefined,
+            present: 0,
+            absent: 0,
+            late: 0,
+          }
+        }
+        const status = String(data.status ?? '')
+        if (status === 'present') studentMap[studentId].present++
+        else if (status === 'absent') studentMap[studentId].absent++
+        else if (status === 'late') studentMap[studentId].late++
+      }
+
+      const report = Object.values(studentMap).map(s => {
+        const total = s.present + s.absent + s.late
+        const percentage = total > 0 ? Math.round((s.present / total) * 100) : 0
+        return { ...s, total, percentage }
+      }).sort((a, b) => a.percentage - b.percentage)
+
+      setReportData(report)
+    } catch (err) {
+      console.error('[AttendanceReport]', err)
+    } finally {
+      setReportLoading(false)
+    }
+  }, [reportMonth])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -150,16 +222,108 @@ export default function AttendancePage() {
           <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A]">Attendance</h2>
           <p className="font-inter text-sm text-[#5A6A7A]">Track student attendance</p>
         </div>
-        <button
-          type="button"
-          onClick={openMark}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#E8A020] px-5 py-2.5 font-jakarta text-sm font-bold text-[#0B3D6B] transition-colors hover:bg-[#F5B942]"
-        >
-          <span className="ti ti-plus" aria-hidden="true" />
-          Mark Attendance
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setReportTab(false)}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold ${!reportTab ? 'bg-[#E8A020] text-white' : 'border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/60'}`}
+          >
+            Attendance
+          </button>
+          <button
+            type="button"
+            onClick={() => { setReportTab(true); void generateReport() }}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold ${reportTab ? 'bg-[#E8A020] text-white' : 'border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/60'}`}
+          >
+            <span className="ti ti-chart-bar mr-1" /> Report
+          </button>
+          <button
+            type="button"
+            onClick={openMark}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#E8A020] px-5 py-2.5 font-jakarta text-sm font-bold text-[#0B3D6B] transition-colors hover:bg-[#F5B942]"
+          >
+            <span className="ti ti-plus" aria-hidden="true" />
+            Mark Attendance
+          </button>
+        </div>
       </div>
 
+      {reportTab && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <input
+              type="month"
+              value={reportMonth}
+              onChange={e => setReportMonth(e.target.value)}
+              className="rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] px-3 py-2 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020]"
+            />
+            <button
+              type="button"
+              onClick={() => void generateReport()}
+              className="flex items-center gap-2 rounded-xl bg-[#0B3D6B] px-4 py-2 text-sm font-bold text-white"
+            >
+              <span className="ti ti-refresh" /> Generate
+            </button>
+            {reportData.length > 0 && (
+              <div className="flex gap-3 ml-auto text-sm">
+                <span className="text-emerald-600 font-bold">{reportData.filter(r => r.percentage >= 80).length} Good (≥80%)</span>
+                <span className="text-amber-600 font-bold">{reportData.filter(r => r.percentage >= 60 && r.percentage < 80).length} At Risk (60-79%)</span>
+                <span className="text-red-600 font-bold">{reportData.filter(r => r.percentage < 60).length} Critical (&lt;60%)</span>
+              </div>
+            )}
+          </div>
+
+          {reportLoading ? (
+            <div className="space-y-2">{[1,2,3,4,5].map(i => <div key={i} className="h-12 animate-pulse rounded-xl bg-[#DDE3EC] dark:bg-white/10" />)}</div>
+          ) : reportData.length === 0 ? (
+            <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] py-12 text-center">
+              <span className="ti ti-clipboard-off text-4xl text-[#DDE3EC] dark:text-white/20" />
+              <p className="mt-3 text-sm text-[#5A6A7A] dark:text-white/50">No attendance data for this month</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#DDE3EC] dark:border-white/[0.08] bg-[#F5F7FB] dark:bg-white/[0.02]">
+                    <th className="px-4 py-3 text-left text-xs font-bold uppercase text-[#5A6A7A] dark:text-white/50">Student</th>
+                    <th className="px-4 py-3 text-center text-xs font-bold uppercase text-emerald-600">Present</th>
+                    <th className="px-4 py-3 text-center text-xs font-bold uppercase text-red-500">Absent</th>
+                    <th className="px-4 py-3 text-center text-xs font-bold uppercase text-amber-600">Late</th>
+                    <th className="px-4 py-3 text-center text-xs font-bold uppercase text-[#5A6A7A] dark:text-white/50">Total</th>
+                    <th className="px-4 py-3 text-center text-xs font-bold uppercase text-[#5A6A7A] dark:text-white/50">Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.map(r => (
+                    <tr key={r.studentId} className="border-b border-[#DDE3EC]/50 dark:border-white/[0.04] last:border-0">
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-[#0D1B2A] dark:text-white">{r.studentName}</p>
+                        {r.studentCode && <p className="text-xs font-mono text-[#5A6A7A] dark:text-white/40">{r.studentCode}</p>}
+                      </td>
+                      <td className="px-4 py-3 text-center font-bold text-emerald-600">{r.present}</td>
+                      <td className="px-4 py-3 text-center font-bold text-red-500">{r.absent}</td>
+                      <td className="px-4 py-3 text-center font-bold text-amber-600">{r.late}</td>
+                      <td className="px-4 py-3 text-center text-[#5A6A7A] dark:text-white/50">{r.total}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                          r.percentage >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' :
+                          r.percentage >= 60 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400' :
+                          'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                        }`}>
+                          {r.percentage}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!reportTab && (
+      <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Present" value={String(stats.present)} loading={loading} />
         <StatCard label="Absent" value={String(stats.absent)} loading={loading} />
@@ -259,6 +423,8 @@ export default function AttendancePage() {
             />
           )}
         </>
+      )}
+      </>
       )}
 
       <AttendanceForm

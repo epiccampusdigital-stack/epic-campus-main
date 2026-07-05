@@ -12,6 +12,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -45,8 +46,9 @@ const ACHIEVEMENT_BADGES = [
   '🇰🇷 Passed TOPIK I', '🇰🇷 Passed TOPIK II',
   '✈️ Visa Approved', '🛫 Departed to Japan', '🛫 Departed to Korea',
   '📚 IELTS 6.0+', '📚 IELTS 6.5+', '📚 IELTS 7.0+',
-  '🏆 Top of Class', '⭐ Perfect Attendance', '🎓 Course Complete',
-]
+  '🏆 Top of Class', '🎓 Course Complete', '⭐ Perfect Attendance',
+  '🇯🇵 Started Working in Japan', '🇰🇷 Started Working in Korea',
+] as const
 
 const REACTION_CONFIG: Record<EpicWallReactionType, { icon: string; label: string; color: string }> = {
   like: { icon: '👍', label: 'Like', color: 'text-[#0B3D6B] dark:text-blue-300' },
@@ -161,29 +163,40 @@ export default function EpicWallPage() {
   async function handleReaction(postId: string, type: EpicWallReactionType) {
     if (!user) return
     const reactionId = `${user.uid}_${postId}`
-    const existing = myReactions[postId]
+    const reactionRef = doc(db, 'epicWallReactions', reactionId)
+    const postRef = doc(db, 'epicWallPosts', postId)
 
     try {
-      if (existing === type) {
-        await deleteDoc(doc(db, 'epicWallReactions', reactionId))
-        await updateDoc(doc(db, 'epicWallPosts', postId), {
-          [`${type}Count`]: increment(-1),
-        })
-        setMyReactions((p) => { const n = { ...p }; delete n[postId]; return n })
-      } else {
-        if (existing) {
-          await updateDoc(doc(db, 'epicWallPosts', postId), {
-            [`${existing}Count`]: increment(-1),
-          })
+      // Read-then-write on local state is racy under rapid clicks / multi-tab use —
+      // run the toggle as a transaction so the reaction doc and count fields stay consistent.
+      const newType = await runTransaction(db, async (tx) => {
+        const reactionSnap = await tx.get(reactionRef)
+        const existingType = reactionSnap.exists()
+          ? (reactionSnap.data().type as EpicWallReactionType)
+          : undefined
+
+        if (existingType === type) {
+          tx.delete(reactionRef)
+          tx.update(postRef, { [`${type}Count`]: increment(-1) })
+          return undefined
         }
-        await setDoc(doc(db, 'epicWallReactions', reactionId), {
+
+        if (existingType) {
+          tx.update(postRef, { [`${existingType}Count`]: increment(-1) })
+        }
+        tx.set(reactionRef, {
           postId, userId: user.uid, type, createdAt: serverTimestamp(),
         })
-        await updateDoc(doc(db, 'epicWallPosts', postId), {
-          [`${type}Count`]: increment(1),
-        })
-        setMyReactions((p) => ({ ...p, [postId]: type }))
-      }
+        tx.update(postRef, { [`${type}Count`]: increment(1) })
+        return type
+      })
+
+      setMyReactions((p) => {
+        const n = { ...p }
+        if (newType) n[postId] = newType
+        else delete n[postId]
+        return n
+      })
     } catch (err) {
       console.error('[EpicWall reaction]', err)
     }
@@ -435,8 +448,10 @@ export default function EpicWallPage() {
         <button
           type="button"
           onClick={() => setFilterType('all')}
-          className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
-            filterType === 'all' ? 'bg-[#E8A020] text-white' : 'border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] text-[#5A6A7A] dark:text-white/90'
+          className={`shrink-0 ${
+            filterType === 'all'
+              ? 'rounded-full bg-[#E8A020] text-white font-bold px-4 py-1.5 text-sm shadow-sm'
+              : 'rounded-full border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/70 px-4 py-1.5 text-sm hover:border-[#0B3D6B] transition-all'
           }`}
         >
           All
@@ -446,8 +461,10 @@ export default function EpicWallPage() {
             key={t.value}
             type="button"
             onClick={() => setFilterType(t.value)}
-            className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold capitalize ${
-              filterType === t.value ? 'bg-[#0B3D6B] text-white' : 'border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] text-[#5A6A7A] dark:text-white/90'
+            className={`shrink-0 capitalize ${
+              filterType === t.value
+                ? 'rounded-full bg-[#E8A020] text-white font-bold px-4 py-1.5 text-sm shadow-sm'
+                : 'rounded-full border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/70 px-4 py-1.5 text-sm hover:border-[#0B3D6B] transition-all'
             }`}
           >
             {t.label}
@@ -480,7 +497,7 @@ export default function EpicWallPage() {
             return (
               <div
                 key={post.id}
-                className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.08] overflow-hidden"
+                className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.08] shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
               >
                 {/* Post header */}
                 <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3">
@@ -594,7 +611,7 @@ export default function EpicWallPage() {
                         key={type}
                         type="button"
                         onClick={() => void handleReaction(post.id, type)}
-                        className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                        className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold transition-all active:scale-95 ${
                           active
                             ? 'bg-[#E8A020]/10 dark:bg-[#E8A020]/20 text-[#E8A020]'
                             : 'text-[#5A6A7A] dark:text-white/50 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06]'

@@ -10,8 +10,15 @@ import { ROLE_LABELS } from '@/lib/constants/roles'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { logAuditEvent } from '@/lib/audit/helpers'
 import DarkModeToggle from '@/components/ui/DarkModeToggle'
-import { isNavActive, navLinkClasses } from '@/lib/utils/nav'
+import { isNavActive } from '@/lib/utils/nav'
 import type { Role } from '@/types'
+
+function managementNavLinkClasses(active: boolean): string {
+  const base = 'flex items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] transition-all duration-200'
+  return active
+    ? `${base} bg-gradient-to-r from-[#E8A020]/15 to-transparent text-[#E8A020] font-semibold border-r-2 border-[#E8A020]`
+    : `${base} text-[#5A6A7A] dark:text-white/50 hover:bg-white/[0.04] hover:text-[#0B3D6B] dark:hover:text-white transition-all duration-200`
+}
 
 interface NavItem {
   label: string
@@ -55,6 +62,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Broadcast', href: '/broadcast', icon: 'ti-speakerphone', roles: ['admin', 'owner', 'reception', 'teacher'] },
   { label: 'Enrollments', href: '/enrollments', icon: 'ti-clipboard-list', roles: ['admin', 'owner', 'reception'] },
   { label: 'Exam Manager', href: '/admin-exams', icon: 'ti-writing', roles: ['admin', 'owner', 'examCoordinator', 'teacher'] },
+  { label: 'AI Question Builder', href: '/admin-exams/ai-builder', icon: 'ti-sparkles', roles: ['admin', 'owner', 'teacher', 'examCoordinator'] },
+  { label: 'Exam Results', href: '/exam-results', icon: 'ti-chart-bar', roles: ['admin', 'owner', 'teacher', 'examCoordinator'] },
   { label: 'Materials', href: '/materials', icon: 'ti-book', roles: ['admin', 'owner', 'teacher'] },
   { label: 'Chat Logs', href: '/chat-logs', icon: 'ti-message-dots', roles: ['admin', 'owner'] },
   { label: 'AI Importer', href: '/admin/import', icon: 'ti-sparkles', roles: ['admin', 'owner', 'reception'] },
@@ -114,7 +123,7 @@ export default function ManagementSidebar() {
   }
 
   const sidebarContent = (
-    <div className="flex h-full w-[240px] flex-col bg-white/60 dark:bg-[#0B3D6B]/20 backdrop-blur-2xl border-r border-white/80 dark:border-white/[0.06] transition-all duration-300">
+    <div className="relative flex h-full w-[240px] flex-col bg-white/60 dark:bg-[#0B3D6B]/20 backdrop-blur-2xl border-r border-white/80 dark:border-white/[0.06] transition-all duration-300">
       {/* Logo */}
       <div className="px-4 py-4">
         <div className="flex items-center gap-2 px-2 py-1">
@@ -135,7 +144,7 @@ export default function ManagementSidebar() {
               key={item.href}
               href={item.href}
               onClick={() => setSidebarOpen(false)}
-              className={navLinkClasses(active)}
+              className={managementNavLinkClasses(active)}
             >
               <span className={`ti ${item.icon} text-[14px] leading-none`} aria-hidden="true" />
               {item.label}
@@ -153,6 +162,8 @@ export default function ManagementSidebar() {
           )
         })}
       </nav>
+
+      <div className="pointer-events-none absolute bottom-16 left-0 right-0 h-8 bg-gradient-to-t from-[#0B3D6B]/20 dark:from-black/20 to-transparent" />
 
       <div className="mx-4 border-t border-[#0B3D6B]/10 dark:border-white/[0.06]" />
 

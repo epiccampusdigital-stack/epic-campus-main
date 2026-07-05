@@ -72,6 +72,13 @@ function isTodayInMonth(monthKey: string): boolean {
   return monthKey === currentMonthKey()
 }
 
+function getGreeting(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
 interface KitchenOverview {
   monthCost: number
   lowStock: number
@@ -94,14 +101,25 @@ export default function DashboardPage() {
   const [pendingApprovals, setPendingApprovals] = useState<
     { id: string; displayName: string; email: string; requestedRole: string; createdAt: unknown }[]
   >([])
+  const [staffCount, setStaffCount] = useState(0)
+  const [pendingEnrollments, setPendingEnrollments] = useState(0)
+  const [todayExamAttempts, setTodayExamAttempts] = useState(0)
+  const [pendingConsultations, setPendingConsultations] = useState(0)
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [studentsSnap, paymentsSnap, attendanceSnap] = await Promise.all([
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+
+      const [studentsSnap, paymentsSnap, attendanceSnap, staffSnap, enrollSnap, examSnap, consultSnap] = await Promise.all([
         getDocs(collection(db, 'students')),
         getDocs(collection(db, 'payments')),
         getDocs(collection(db, 'attendance')),
+        getDocs(collection(db, 'users')),
+        getDocs(query(collection(db, 'enrollments'), where('status', '==', 'pending'))).catch(() => ({ docs: [] })),
+        getDocs(query(collection(db, 'examAttempts'), where('completedAt', '>=', todayStart))).catch(() => ({ docs: [] })),
+        getDocs(query(collection(db, 'consultationRequests'), where('status', '==', 'pending'))).catch(() => ({ docs: [] })),
       ])
       setAllStudents(
         studentsSnap.docs.map((d) =>
@@ -118,6 +136,14 @@ export default function DashboardPage() {
           parseAttendance(d.id, d.data() as Record<string, unknown>),
         ),
       )
+      const staffDocs = staffSnap.docs.filter(d => {
+        const role = String(d.data().role ?? '')
+        return role !== 'student' && role !== '' && d.data().status === 'active'
+      })
+      setStaffCount(staffDocs.length)
+      setPendingEnrollments(enrollSnap.docs.length)
+      setTodayExamAttempts(examSnap.docs.length)
+      setPendingConsultations(consultSnap.docs.length)
       if (user?.role === 'admin' || user?.role === 'owner') {
         setPartnerNotifications(await fetchUnreadPartnerNotifications())
         const appSnap = await getDocs(
@@ -353,6 +379,15 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      <div className="mb-6">
+        <h1 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white">
+          {getGreeting()}, {user?.displayName?.split(' ')[0] ?? 'there'} 👋
+        </h1>
+        <p className="text-sm text-[#5A6A7A] dark:text-white/50">
+          {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+        </p>
+      </div>
+
       <div className="flex flex-col gap-4 rounded-[12px] border border-white/90 dark:border-white/[0.08] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl p-4 transition-all duration-300 sm:flex-row sm:flex-wrap sm:items-end">
         <div>
           <label className="mb-1.5 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
@@ -419,7 +454,79 @@ export default function DashboardPage() {
                 <p className="mt-1 text-[10px] text-green-500 dark:text-green-400">{card.sub}</p>
               </div>
             ))}
+
+        {/* Staff count */}
+        <Link href="/staff" className="rounded-[12px] border border-white/90 dark:border-white/[0.08] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl p-3 sm:p-[14px] transition-all duration-300 hover:shadow-md block">
+          <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Active Staff</p>
+          {loading ? <div className="mt-2 h-8 w-16 animate-pulse rounded bg-[#DDE3EC] dark:bg-white/10" /> : (
+            <>
+              <p className="mt-1 font-jakarta text-2xl font-bold text-[#0B3D6B] dark:text-white">{staffCount}</p>
+              <p className="mt-1 font-inter text-xs text-[#5A6A7A] dark:text-white/40">Team members</p>
+            </>
+          )}
+        </Link>
+
+        {/* Pending enrollments */}
+        {(user?.role === 'admin' || user?.role === 'owner') && (
+          <Link href="/enrollments" className="rounded-[12px] border border-amber-200/80 dark:border-amber-800/50 bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-2xl p-3 sm:p-[14px] transition-all duration-300 hover:shadow-md block">
+            <p className="font-inter text-xs font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">Pending Enrollments</p>
+            {loading ? <div className="mt-2 h-8 w-16 animate-pulse rounded bg-amber-200/50" /> : (
+              <>
+                <p className="mt-1 font-jakarta text-2xl font-bold text-amber-700 dark:text-amber-300">{pendingEnrollments}</p>
+                <p className="mt-1 font-inter text-xs text-amber-600/70 dark:text-amber-400/60">Awaiting approval</p>
+              </>
+            )}
+          </Link>
+        )}
+
+        {/* Today's exam attempts */}
+        <Link href="/exam-results" className="rounded-[12px] border border-white/90 dark:border-white/[0.08] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl p-3 sm:p-[14px] transition-all duration-300 hover:shadow-md block">
+          <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Exams Today</p>
+          {loading ? <div className="mt-2 h-8 w-16 animate-pulse rounded bg-[#DDE3EC] dark:bg-white/10" /> : (
+            <>
+              <p className="mt-1 font-jakarta text-2xl font-bold text-[#0B3D6B] dark:text-white">{todayExamAttempts}</p>
+              <p className="mt-1 font-inter text-xs text-[#5A6A7A] dark:text-white/40">Attempts today</p>
+            </>
+          )}
+        </Link>
+
+        {/* Pending consultations */}
+        {(user?.role === 'admin' || user?.role === 'owner') && (
+          <Link href="/consultations/requests" className="rounded-[12px] border border-blue-200/80 dark:border-blue-800/50 bg-blue-50/80 dark:bg-blue-900/20 backdrop-blur-2xl p-3 sm:p-[14px] transition-all duration-300 hover:shadow-md block">
+            <p className="font-inter text-xs font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">Consultations</p>
+            {loading ? <div className="mt-2 h-8 w-16 animate-pulse rounded bg-blue-200/50" /> : (
+              <>
+                <p className="mt-1 font-jakarta text-2xl font-bold text-blue-700 dark:text-blue-300">{pendingConsultations}</p>
+                <p className="mt-1 font-inter text-xs text-blue-600/70 dark:text-blue-400/60">Pending requests</p>
+              </>
+            )}
+          </Link>
+        )}
       </section>
+
+      <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl p-4">
+        <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50 mb-3">Quick Actions</p>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { label: '+ Add Student', href: '/enrollments', icon: 'ti-user-plus', color: 'bg-[#0B3D6B] text-white' },
+            { label: '+ Add Staff', href: '/staff', icon: 'ti-id-badge', color: 'bg-[#1A6BAD] text-white' },
+            { label: 'Create Exam', href: '/admin-exams', icon: 'ti-writing', color: 'bg-[#E8A020] text-[#0B3D6B]' },
+            { label: 'AI Questions', href: '/admin-exams/ai-builder', icon: 'ti-sparkles', color: 'bg-purple-600 text-white' },
+            { label: 'Broadcast', href: '/broadcast', icon: 'ti-speakerphone', color: 'bg-emerald-600 text-white' },
+            { label: 'Reports', href: '/reports', icon: 'ti-chart-bar', color: 'bg-[#0B3D6B]/80 text-white' },
+          ].filter(a => {
+            if (a.href === '/staff' && user?.role !== 'admin' && user?.role !== 'owner') return false
+            if (a.href === '/broadcast' && !['admin', 'owner', 'reception'].includes(user?.role ?? '')) return false
+            return true
+          }).map(action => (
+            <Link key={action.href} href={action.href}
+              className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition-all hover:opacity-80 ${action.color}`}>
+              <span className={`ti ${action.icon}`} />
+              {action.label}
+            </Link>
+          ))}
+        </div>
+      </div>
 
       {pendingApprovals.length > 0 && (user?.role === 'admin' || user?.role === 'owner') && (
         <div className="rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4">

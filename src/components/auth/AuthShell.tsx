@@ -410,14 +410,8 @@ export function AuthSiteFooter() {
 
 export function AuthErrorBanner({ message }: { message: string }) {
   return (
-    <div
-      className="mb-5 min-w-0 break-words rounded-lg px-4 py-3 font-inter text-[13px] sm:mb-6"
-      style={{
-        color: '#DC2626',
-        background: '#FEF2F2',
-        border: '1px solid #FECACA',
-      }}
-    >
+    <div className="mb-5 flex min-w-0 items-center gap-2 break-words rounded-xl border border-red-200 bg-red-50 px-4 py-3 font-inter text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400 sm:mb-6">
+      <span className="ti ti-alert-circle shrink-0" />
       {message}
     </div>
   )

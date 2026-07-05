@@ -4,14 +4,32 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   orderBy,
   query,
+  serverTimestamp,
   updateDoc,
   writeBatch,
 } from 'firebase/firestore'
+import hotToast from 'react-hot-toast'
 import { db } from '@/lib/firebase/client'
 import { useManagement } from '@/components/layout/ManagementContext'
+
+interface PaymentReceipt {
+  id: string
+  studentId: string
+  studentName: string
+  planId: string
+  installmentIndex: number
+  receiptUrl: string
+  fileName: string
+  note: string
+  status: 'pending' | 'verified' | 'rejected'
+  createdAt: unknown
+  verifiedAt?: unknown
+  verifiedBy?: string
+}
 
 interface Installment {
   id: string
@@ -81,6 +99,8 @@ export default function PaymentTrackerPage() {
   const [marking, setMarking] = useState(false)
   const [expandedPlan, setExpandedPlan] = useState<string | null>(null)
   const [toast, setToast] = useState('')
+  const [receiptTab, setReceiptTab] = useState(false)
+  const [receipts, setReceipts] = useState<PaymentReceipt[]>([])
 
   function showToast(msg: string) {
     setToast(msg)
@@ -111,7 +131,78 @@ export default function PaymentTrackerPage() {
     }
   }, [])
 
-  useEffect(() => { void load() }, [load])
+  const loadReceipts = useCallback(async () => {
+    const snap = await getDocs(
+      query(collection(db, 'paymentReceipts'), orderBy('createdAt', 'desc'))
+    ).catch(() => getDocs(collection(db, 'paymentReceipts')))
+    setReceipts(snap.docs.map(d => ({ id: d.id, ...d.data() } as PaymentReceipt)))
+  }, [])
+
+  useEffect(() => {
+    void load()
+    void loadReceipts()
+  }, [load, loadReceipts])
+
+  async function verifyReceipt(receipt: PaymentReceipt) {
+    if (!user) return
+    try {
+      await updateDoc(doc(db, 'paymentReceipts', receipt.id), {
+        status: 'verified',
+        verifiedAt: serverTimestamp(),
+        verifiedBy: user.uid,
+      })
+      await updateDoc(doc(db, 'studentPaymentPlans', receipt.planId), {
+        [`installments.${receipt.installmentIndex}.status`]: 'paid',
+        [`installments.${receipt.installmentIndex}.paidAt`]: serverTimestamp(),
+        [`installments.${receipt.installmentIndex}.method`]: 'bank-transfer',
+        [`installments.${receipt.installmentIndex}.verifiedBy`]: user.uid,
+        updatedAt: serverTimestamp(),
+      })
+
+      // Send WhatsApp confirmation to student
+      try {
+        const studentSnap = await getDoc(doc(db, 'students', receipt.studentId))
+        if (studentSnap.exists()) {
+          const student = studentSnap.data()
+          const phone = student.phone ?? student.mobile
+          if (phone) {
+            await fetch('/api/twilio/payment-confirmed', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                phone,
+                studentName: receipt.studentName,
+                installmentNo: receipt.installmentIndex + 1,
+              }),
+            })
+          }
+        }
+      } catch (err) {
+        console.error('[PaymentWhatsApp]', err)
+      }
+
+      setReceipts(prev => prev.map(r => r.id === receipt.id ? { ...r, status: 'verified' } : r))
+      hotToast.success('Payment verified ✅')
+    } catch (err) {
+      console.error('[VerifyReceipt]', err)
+      hotToast.error('Failed to verify')
+    }
+  }
+
+  async function rejectReceipt(receipt: PaymentReceipt) {
+    if (!user) return
+    try {
+      await updateDoc(doc(db, 'paymentReceipts', receipt.id), {
+        status: 'rejected',
+        verifiedAt: serverTimestamp(),
+        verifiedBy: user.uid,
+      })
+      setReceipts(prev => prev.map(r => r.id === receipt.id ? { ...r, status: 'rejected' } : r))
+      hotToast.success('Receipt rejected')
+    } catch (err) {
+      console.error('[RejectReceipt]', err)
+    }
+  }
 
   // ── Summary stats ────────────────────────────────────────────────────────
   const stats = plans.reduce(
@@ -294,9 +385,9 @@ export default function PaymentTrackerPage() {
             <button
               key={f}
               type="button"
-              onClick={() => setStatusFilter(f)}
+              onClick={() => { setStatusFilter(f); setReceiptTab(false) }}
               className={`rounded-xl px-3 py-2 text-xs font-semibold capitalize transition-all ${
-                statusFilter === f
+                statusFilter === f && !receiptTab
                   ? 'bg-[#E8A020] text-white'
                   : 'border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/60'
               }`}
@@ -304,11 +395,103 @@ export default function PaymentTrackerPage() {
               {f}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setReceiptTab(true)}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold ${receiptTab ? 'bg-[#E8A020] text-white' : 'border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/60'}`}
+          >
+            Receipts {receipts.filter(r => r.status === 'pending').length > 0 && (
+              <span className="ml-1 rounded-full bg-red-500 px-1.5 text-xs text-white">
+                {receipts.filter(r => r.status === 'pending').length}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
+      {receiptTab && (
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            {(['pending', 'verified', 'rejected'] as const).map(status => (
+              <span key={status} className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${
+                status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                status === 'verified' ? 'bg-emerald-100 text-emerald-700' :
+                'bg-red-100 text-red-700'
+              }`}>
+                {status}: {receipts.filter(r => r.status === status).length}
+              </span>
+            ))}
+          </div>
+
+          {receipts.length === 0 ? (
+            <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] py-12 text-center">
+              <span className="ti ti-receipt-off text-4xl text-[#DDE3EC] dark:text-white/20" />
+              <p className="mt-3 text-sm text-[#5A6A7A] dark:text-white/50">No payment receipts yet</p>
+            </div>
+          ) : (
+            receipts.map(receipt => (
+              <div key={receipt.id} className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0B3D6B]/10 dark:bg-[#0B3D6B]/30">
+                      <span className="ti ti-receipt text-[#0B3D6B] dark:text-blue-300" />
+                    </div>
+                    <div>
+                      <p className="font-jakarta font-bold text-[#0D1B2A] dark:text-white">{receipt.studentName}</p>
+                      <p className="text-xs text-[#5A6A7A] dark:text-white/40">
+                        Installment {receipt.installmentIndex + 1} · {receipt.fileName}
+                      </p>
+                      {receipt.note && (
+                        <p className="text-xs text-[#5A6A7A] dark:text-white/40 italic mt-0.5">&quot;{receipt.note}&quot;</p>
+                      )}
+                      <a
+                        href={receipt.receiptUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-[#0B3D6B] dark:text-blue-300 hover:underline"
+                      >
+                        <span className="ti ti-external-link" /> View Receipt
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    {receipt.status === 'pending' ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void verifyReceipt(receipt)}
+                          className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                        >
+                          <span className="ti ti-check" /> Verify
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void rejectReceipt(receipt)}
+                          className="flex items-center gap-1.5 rounded-xl border border-red-200 dark:border-red-800 px-4 py-2 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50"
+                        >
+                          <span className="ti ti-x" /> Reject
+                        </button>
+                      </>
+                    ) : (
+                      <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${
+                        receipt.status === 'verified'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                      }`}>
+                        {receipt.status === 'verified' ? '✅ ' : '❌ '}{receipt.status}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       {/* Plans list */}
-      {loading ? (
+      {!receiptTab && (loading ? (
         <div className="space-y-3">
           {[1,2,3].map(i => (
             <div key={i} className="h-24 animate-pulse rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />
@@ -483,7 +666,7 @@ export default function PaymentTrackerPage() {
             )
           })}
         </div>
-      )}
+      ))}
     </div>
   )
 }

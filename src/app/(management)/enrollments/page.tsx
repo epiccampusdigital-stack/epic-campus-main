@@ -146,6 +146,21 @@ export default function EnrollmentsPage() {
         createdBy: user.uid,
       })
 
+      // Create users doc so the OTP verify route's users/{userId} update succeeds
+      batch.set(doc(db, 'users', studentRef.id), {
+        uid: studentRef.id,
+        displayName: approveModal.studentName,
+        email: approveModal.email,
+        phone: approveModal.phone ?? '',
+        role: 'student',
+        studentId: studentRef.id,
+        courseId: approveModal.courseId,
+        status: 'active',
+        batch: approveModal.batch ?? '',
+        location: approveModal.location ?? '',
+        createdAt: serverTimestamp(),
+      })
+
       // Create payment plan if fee entered
       if (planForm.totalFee) {
         const planRef = doc(collection(db, 'studentPaymentPlans'))
@@ -170,6 +185,23 @@ export default function EnrollmentsPage() {
       }
 
       await batch.commit()
+
+      // Send welcome + OTP if phone exists
+      try {
+        if (approveModal.phone) {
+          await fetch('/api/twilio/send-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              phone: approveModal.phone,
+              userId: studentRef.id,
+            }),
+          })
+        }
+      } catch (err) {
+        console.error('[EnrollOTP]', err)
+      }
+
       setEnrollments(prev => prev.map(e =>
         e.id === approveModal.id ? { ...e, status: 'approved' } : e
       ))

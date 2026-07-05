@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { collection, getDocs, query, where } from 'firebase/firestore'
@@ -14,6 +14,7 @@ import {
 } from '@/lib/payments/helpers'
 import { computePaymentSummary } from '@/lib/student/portal'
 import { useStudentPortal } from '@/components/student/StudentContext'
+import PayPalPayment from '@/components/payments/PayPalPayment'
 import type { Payment } from '@/types'
 
 const ReceiptModal = dynamic(() => import('@/components/payments/ReceiptModal'), {
@@ -47,6 +48,7 @@ export default function StudentPaymentsPage() {
   const [receiptPayment, setReceiptPayment] = useState<Payment | null>(null)
   const [payLoading, setPayLoading] = useState(false)
   const [selectedFee, setSelectedFee] = useState<FeeOption | null>(null)
+  const [showPayPal, setShowPayPal] = useState<number | null>(null)
 
   // Build fee options from student's feeSchedule or fall back to defaults
   const feeOptions: FeeOption[] = (() => {
@@ -65,28 +67,27 @@ export default function StudentPaymentsPage() {
   const success = searchParams.get('success') === 'true'
   const cancelled = searchParams.get('cancelled') === 'true'
 
-  useEffect(() => {
+  const loadPayments = useCallback(async () => {
     if (!student) return
-
-    async function load() {
-      setLoading(true)
-      try {
-        const snap = await getDocs(
-          query(collection(db, 'payments'), where('studentId', '==', student!.id)),
-        )
-        const list = snap.docs
-          .map((d) => parsePayment(d.id, d.data() as Record<string, unknown>))
-          .sort((a, b) => b.paymentDate.localeCompare(a.paymentDate))
-        setPayments(list)
-      } catch (err) {
-        console.error('[StudentPayments]', err)
-      } finally {
-        setLoading(false)
-      }
+    setLoading(true)
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'payments'), where('studentId', '==', student.id)),
+      )
+      const list = snap.docs
+        .map((d) => parsePayment(d.id, d.data() as Record<string, unknown>))
+        .sort((a, b) => b.paymentDate.localeCompare(a.paymentDate))
+      setPayments(list)
+    } catch (err) {
+      console.error('[StudentPayments]', err)
+    } finally {
+      setLoading(false)
     }
-
-    load()
   }, [student])
+
+  useEffect(() => {
+    void loadPayments()
+  }, [loadPayments])
 
   async function handlePay(option: FeeOption) {
     await handleStripePayment(option.amount, option.desc)
@@ -173,23 +174,58 @@ export default function StudentPaymentsPage() {
           })}
         </div>
         {selectedFee && (
-          <div className="mt-4 flex items-center gap-4 rounded-2xl border border-[#E8A020] bg-[#E8A020]/5 p-4">
-            <div className="flex-1">
-              <p className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">{selectedFee.label}</p>
-              <p className="text-sm text-[#5A6A7A] dark:text-white/50">LKR {selectedFee.amount.toLocaleString()} · {selectedFee.desc}</p>
+          <div className="mt-4 rounded-2xl border border-[#E8A020] bg-[#E8A020]/5 p-4">
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <p className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">{selectedFee.label}</p>
+                <p className="text-sm text-[#5A6A7A] dark:text-white/50">LKR {selectedFee.amount.toLocaleString()} · {selectedFee.desc}</p>
+              </div>
+              <button
+                type="button"
+                disabled={payLoading}
+                onClick={() => void handlePay(selectedFee)}
+                className="flex items-center gap-2 rounded-xl bg-[#E8A020] px-6 py-3 font-jakarta font-bold text-[#0B3D6B] shadow-lg transition-all hover:bg-[#d4911c] disabled:opacity-50"
+              >
+                {payLoading ? (
+                  <><span className="ti ti-loader-2 animate-spin" /> Processing…</>
+                ) : (
+                  <><span className="ti ti-credit-card" /> Pay Now</>
+                )}
+              </button>
             </div>
-            <button
-              type="button"
-              disabled={payLoading}
-              onClick={() => void handlePay(selectedFee)}
-              className="flex items-center gap-2 rounded-xl bg-[#E8A020] px-6 py-3 font-jakarta font-bold text-[#0B3D6B] shadow-lg transition-all hover:bg-[#d4911c] disabled:opacity-50"
-            >
-              {payLoading ? (
-                <><span className="ti ti-loader-2 animate-spin" /> Processing…</>
+
+            <div className="space-y-2 mt-3">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-px bg-[#DDE3EC]" />
+                <span className="text-xs text-[#5A6A7A]">or</span>
+                <div className="flex-1 h-px bg-[#DDE3EC]" />
+              </div>
+
+              {showPayPal === 0 ? (
+                <PayPalPayment
+                  amount={selectedFee.amount}
+                  currency="LKR"
+                  description={`EPIC Campus - ${selectedFee.label}`}
+                  onSuccess={() => {
+                    setShowPayPal(null)
+                    setSelectedFee(null)
+                    void loadPayments()
+                  }}
+                  onCancel={() => setShowPayPal(null)}
+                />
               ) : (
-                <><span className="ti ti-credit-card" /> Pay Now</>
+                <button
+                  type="button"
+                  onClick={() => setShowPayPal(0)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FFC439] py-3 text-sm font-black text-[#003087]"
+                >
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="#003087">
+                    <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 0 1 .923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z"/>
+                  </svg>
+                  Pay with PayPal
+                </button>
               )}
-            </button>
+            </div>
           </div>
         )}
         {payLoading && !selectedFee && (

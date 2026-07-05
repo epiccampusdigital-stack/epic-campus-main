@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { collection, getDocs, orderBy, query, where } from 'firebase/firestore'
+import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { useStudentPortal } from '@/components/student/StudentContext'
 
@@ -30,35 +30,23 @@ export default function MyMaterialsPage() {
     async function load() {
       setLoading(true)
       try {
-        // Fetch materials for this specific course OR 'all' courses
-        const [courseSnap, allSnap] = await Promise.all([
-          getDocs(query(
-            collection(db, 'materials'),
-            where('courseId', '==', student!.courseId),
-            orderBy('createdAt', 'desc'),
-          )).catch(() => ({ docs: [] })),
-          getDocs(query(
-            collection(db, 'materials'),
-            where('courseId', '==', 'all'),
-            orderBy('createdAt', 'desc'),
-          )).catch(() => ({ docs: [] })),
-        ])
-
-        const seen = new Set<string>()
-        const items: MaterialItem[] = []
-        for (const d of [...courseSnap.docs, ...allSnap.docs]) {
-          if (seen.has(d.id)) continue
-          seen.add(d.id)
-          const data = d.data()
-          items.push({
-            id: d.id,
+        const snap = await getDocs(collection(db, 'materials'))
+        const all = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Record<string, unknown> & { id: string }))
+        const filtered = all.filter(
+          (m) =>
+            !m.courseId ||
+            m.courseId === 'all' ||
+            m.courseId === student?.courseId,
+        )
+        setMaterials(
+          filtered.map((data) => ({
+            id: data.id,
             title: String(data.title ?? 'Material'),
             description: String(data.description ?? ''),
             type: (data.type as MaterialItem['type']) ?? 'PDF',
             url: String(data.url ?? '#'),
-          })
-        }
-        setMaterials(items)
+          })),
+        )
       } finally {
         setLoading(false)
       }

@@ -56,5 +56,12 @@ service firebase.storage {
         request.auth.token.role in ['admin','owner']
       );
     }
+
+    match /payment-receipts/{userId}/{fileName} {
+      allow read: if request.auth != null &&
+        (request.auth.uid == userId ||
+        request.auth.token.role in ['admin', 'owner', 'reception', 'accountant']);
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
   }
 }

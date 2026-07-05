@@ -19,6 +19,7 @@ import {
   ref as storageRef,
   uploadBytesResumable,
 } from 'firebase/storage'
+import hotToast from 'react-hot-toast'
 import { db, storage } from '@/lib/firebase/client'
 import { useManagement } from '@/components/layout/ManagementContext'
 
@@ -621,6 +622,27 @@ export default function AdminExamsPage() {
                         <button type="button" onClick={() => void startLiveExam(paper)}
                           className="rounded-lg bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700">
                           🔴 Start Live
+                        </button>
+                      )}
+                      {paper.isLive && paper.examDate && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const res = await fetch('/api/twilio/exam-reminder', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ paperId: paper.id }),
+                            })
+                            const data = await res.json() as { success?: boolean; sent?: number; total?: number }
+                            if (data.success) {
+                              hotToast.success(`Reminders sent to ${data.sent ?? 0} students`)
+                            } else {
+                              hotToast.error('Failed to send reminders')
+                            }
+                          }}
+                          className="flex items-center gap-1.5 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 text-xs font-bold text-amber-700 dark:text-amber-400"
+                        >
+                          <span className="ti ti-bell-ringing" /> Send Reminder
                         </button>
                       )}
                       <button type="button" onClick={() => { setSelectedPaper(paper); setActiveTab('questions'); void ensureDefaultSections(paper.id) }}

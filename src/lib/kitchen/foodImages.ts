@@ -89,6 +89,8 @@ export const MEAL_SESSION_VISUAL: Record<
   lunch: { emoji: '☀️', sinhala: 'දිවා ආහාරය', time: '12:00 PM – 1:30 PM' },
   dinner: { emoji: '🌙', sinhala: 'රාත්‍රී ආහාරය', time: '6:30 PM – 8:00 PM' },
   tea: { emoji: '☕', sinhala: 'තේ වේල', time: '3:30 PM – 4:30 PM' },
+  'morning-tea': { emoji: '☕', sinhala: 'උදෑසන තේ', time: '7:00 AM – 8:00 AM' },
+  'evening-tea': { emoji: '🍵', sinhala: 'සවස් තේ', time: '4:00 PM – 5:00 PM' },
 }
 
 export const WASTE_REASON_VISUAL: {

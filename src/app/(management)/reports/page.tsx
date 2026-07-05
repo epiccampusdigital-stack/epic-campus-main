@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   collection,
   getDocs,
@@ -86,20 +86,23 @@ export default function ReportsPage() {
   const [attempts, setAttempts] = useState<Attempt[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'overview' | 'enrollment' | 'finance' | 'exams'>('overview')
+  const [paymentPlans, setPaymentPlans] = useState<Array<{ installments?: Array<{ status: string; paidAt: unknown; amount: number }> }>>([])
 
   useEffect(() => {
     if (!user) return
     async function load() {
       setLoading(true)
       try {
-        const [studentsSnap, paymentsSnap, attemptsSnap] = await Promise.all([
+        const [studentsSnap, paymentsSnap, attemptsSnap, plansSnap] = await Promise.all([
           getDocs(collection(db, 'students')),
           getDocs(collection(db, 'payments')).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] })),
           getDocs(query(collection(db, 'examAttempts'), orderBy('finishedAt', 'desc'))).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] })),
+          getDocs(collection(db, 'studentPaymentPlans')).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] })),
         ])
         setStudents(studentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Student)))
         setPayments(paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Payment)))
         setAttempts(attemptsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Attempt)))
+        setPaymentPlans(plansSnap.docs.map(d => d.data() as { installments?: Array<{ status: string; paidAt: unknown; amount: number }> }))
       } catch (err) {
         console.error('[Reports]', err)
       } finally {
@@ -108,6 +111,26 @@ export default function ReportsPage() {
     }
     void load()
   }, [user])
+
+  const monthlyRevenue = useMemo(() => {
+    const map: Record<string, number> = {}
+    paymentPlans.forEach(plan => {
+      plan.installments?.forEach(inst => {
+        if (inst.paidAt) {
+          try {
+            const date = typeof inst.paidAt === 'object' && inst.paidAt !== null && 'toDate' in inst.paidAt
+              ? (inst.paidAt as { toDate: () => Date }).toDate()
+              : new Date(String(inst.paidAt))
+            const key = date.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })
+            map[key] = (map[key] ?? 0) + (inst.amount ?? 0)
+          } catch { /* skip */ }
+        }
+      })
+    })
+    return Object.entries(map)
+      .map(([month, revenue]) => ({ month, revenue }))
+      .slice(-6)
+  }, [paymentPlans])
 
   // ── Derived stats ────────────────────────────────────────────────────────
   const activeStudents = students.filter(s => s.status === 'active')
@@ -290,6 +313,34 @@ export default function ReportsPage() {
             <StatCard label="Total Revenue" value={`LKR ${totalRevenue.toLocaleString('en-LK')}`} icon="ti-coin" color="text-emerald-600" />
             <StatCard label="Transactions" value={payments.length} icon="ti-credit-card" color="text-[#0B3D6B]" />
           </div>
+
+          <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">Monthly Revenue</h3>
+              <span className="text-xs text-[#5A6A7A] dark:text-white/50">Last 6 months</span>
+            </div>
+            {monthlyRevenue.length === 0 ? (
+              <div className="py-8 text-center">
+                <span className="ti ti-chart-bar text-3xl text-[#DDE3EC] dark:text-white/20" />
+                <p className="mt-2 text-sm text-[#5A6A7A] dark:text-white/50">No payment data yet</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={monthlyRevenue} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#DDE3EC" opacity={0.5} />
+                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#5A6A7A' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#5A6A7A' }} tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '12px', border: '1px solid #DDE3EC', fontSize: '12px' }}
+                    formatter={(v) => [`LKR ${Number(v ?? 0).toLocaleString()}`, 'Revenue']}
+                  />
+                  <Bar dataKey="revenue" fill="#0B3D6B" radius={[6, 6, 0, 0]}
+                    label={{ position: 'top', fontSize: 9, fill: '#5A6A7A', formatter: (v) => Number(v ?? 0) > 0 ? `${(Number(v ?? 0)/1000).toFixed(0)}k` : '' }} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
           <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
             <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white mb-2">Revenue Summary</h3>
             <p className="text-xs text-[#5A6A7A] dark:text-white/50 mb-4">Connect payment data for detailed breakdown</p>

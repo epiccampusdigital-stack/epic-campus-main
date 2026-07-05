@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import {
   cancelTeacherSession,
   completeTeacherSession,
@@ -151,6 +152,10 @@ export default function SessionsTable({
                       >
                         Edit
                       </button>
+                      <Link href={`/sessions/lesson-plan/${s.id}`}
+                        className="flex items-center gap-1.5 rounded-lg border border-[#DDE3EC] dark:border-white/20 px-2.5 py-1.5 text-xs font-semibold text-[#5A6A7A] dark:text-white/60 hover:border-[#0B3D6B] hover:text-[#0B3D6B] transition-all">
+                        <span className="ti ti-notes" /> Plan
+                      </Link>
                     </div>
                   </td>
                 </tr>

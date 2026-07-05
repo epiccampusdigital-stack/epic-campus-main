@@ -23,6 +23,10 @@ function getPaymentStatus(payments: Payment[]): {
   label: string
   color: string
 } {
+  if (payments.length === 0) return {
+    label: 'Not Set Up',
+    color: 'text-white/60'
+  }
   const unpaid = payments.filter(
     (p) => p.status === 'pending' || p.status === 'partial'
   ).length
@@ -147,40 +151,62 @@ export default function DashboardHero({
       </div>
 
       <div className="grid grid-cols-3 gap-2">
-        <div className="rounded-xl bg-white/10 
+        <div className="rounded-xl bg-gradient-to-br from-emerald-500/25 to-teal-500/10
           px-3 py-2.5 text-center">
-          <p className="font-jakarta text-xl 
+          <p className="font-jakarta text-xl
             font-bold text-white">
             {attendance.length}
           </p>
-          <p className="text-[10px] text-white/50 
+          <p className="text-[10px] text-white/50
             mt-0.5 font-medium">
             Classes
           </p>
         </div>
-        <div className="rounded-xl bg-white/10 
+        <div className="rounded-xl bg-gradient-to-br from-[#0B3D6B]/40 to-[#1A6BAD]/25
           px-3 py-2.5 text-center">
-          <p className="font-jakarta text-xl 
+          <p className="font-jakarta text-xl
             font-bold text-white">
             {examCount}
           </p>
-          <p className="text-[10px] text-white/50 
+          <p className="text-[10px] text-white/50
             mt-0.5 font-medium">
             Exams Done
           </p>
         </div>
-        <div className="rounded-xl bg-white/10 
+        <div className="rounded-xl bg-gradient-to-br from-amber-500/25 to-orange-500/10
           px-3 py-2.5 text-center">
-          <p className={`font-jakarta text-xl 
+          <p className={`font-jakarta text-xl
             font-bold ${paymentStatus.color}`}>
             {paymentStatus.label}
           </p>
-          <p className="text-[10px] text-white/50 
+          <p className="text-[10px] text-white/50
             mt-0.5 font-medium">
             Payments
           </p>
         </div>
       </div>
+
+      {payments.length === 0 && (
+        <div className="mt-3 flex items-center
+          gap-2 rounded-xl bg-white/10 px-3 py-2">
+          <span className="ti ti-info-circle
+            text-[#E8A020]" aria-hidden="true" />
+          <span className="text-xs text-white/70">
+            No payment plan set up yet — contact reception
+          </span>
+        </div>
+      )}
+
+      {examCount === 0 && (
+        <div className="mt-3 flex items-center
+          gap-2 rounded-xl bg-white/10 px-3 py-2">
+          <span className="ti ti-info-circle
+            text-[#E8A020]" aria-hidden="true" />
+          <span className="text-xs text-white/70">
+            No exams taken yet — check the Exams section
+          </span>
+        </div>
+      )}
 
       {daysLeft !== null && (
         <div className="mt-3 flex items-center 

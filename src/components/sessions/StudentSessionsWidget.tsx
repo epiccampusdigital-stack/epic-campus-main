@@ -63,7 +63,10 @@ export default function StudentSessionsWidget({ studentId }: StudentSessionsWidg
             <div className="h-14 rounded bg-[#DDE3EC]/60" />
           </div>
         ) : upcoming.length === 0 ? (
-          <p className="p-6 text-center text-sm text-[#5A6A7A]">No upcoming sessions.</p>
+          <div className="py-6 text-center">
+            <span className="ti ti-calendar-off text-3xl text-[#DDE3EC]" aria-hidden="true" />
+            <p className="mt-2 text-sm text-[#5A6A7A]">No upcoming sessions scheduled</p>
+          </div>
         ) : (
           <ul className="divide-y divide-[#DDE3EC]">
             {upcoming.map((s) => {

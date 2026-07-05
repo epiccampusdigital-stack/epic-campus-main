@@ -67,7 +67,7 @@ export default function IngredientGrid({
   function updateQty(itemId: string, qty: number) {
     onChange(
       selected.map((s) =>
-        s.itemId === itemId ? { ...s, qty: Math.max(0, Math.round(qty * 10) / 10) } : s,
+        s.itemId === itemId ? { ...s, qty: Math.max(0, parseFloat(qty.toFixed(4))) } : s,
       ),
     )
   }
@@ -75,7 +75,7 @@ export default function IngredientGrid({
   function adjustQty(itemId: string, delta: number) {
     const row = selected.find((s) => s.itemId === itemId)
     if (!row) return
-    updateQty(itemId, row.qty + delta)
+    updateQty(itemId, parseFloat((row.qty + delta).toFixed(4)))
   }
 
   return (
@@ -158,7 +158,7 @@ export default function IngredientGrid({
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => adjustQty(row.itemId, -0.5)}
+                    onClick={() => adjustQty(row.itemId, -0.1)}
                     className="flex h-11 w-11 items-center justify-center rounded-lg border border-[#DDE3EC] bg-white text-lg font-bold dark:border-gray-600 dark:bg-gray-800"
                   >
                     −
@@ -166,7 +166,7 @@ export default function IngredientGrid({
                   <input
                     type="number"
                     min="0"
-                    step="0.1"
+                    step="0.001"
                     value={row.qty}
                     onChange={(e) => updateQty(row.itemId, parseFloat(e.target.value) || 0)}
                     className="h-11 w-16 rounded-lg border border-[#DDE3EC] bg-white text-center text-sm font-semibold dark:border-gray-600 dark:bg-gray-900 dark:text-white"
@@ -174,7 +174,7 @@ export default function IngredientGrid({
                   <span className="w-10 text-center text-xs text-gray-500">{row.unit}</span>
                   <button
                     type="button"
-                    onClick={() => adjustQty(row.itemId, 0.5)}
+                    onClick={() => adjustQty(row.itemId, 0.1)}
                     className="flex h-11 w-11 items-center justify-center rounded-lg border border-[#DDE3EC] bg-white text-lg font-bold dark:border-gray-600 dark:bg-gray-800"
                   >
                     +

@@ -4,9 +4,12 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   collection,
   addDoc,
+  doc,
+  getDoc,
   getDocs,
   query,
   orderBy,
+  updateDoc,
   where,
   serverTimestamp,
 } from 'firebase/firestore'
@@ -133,6 +136,24 @@ export default function WastePage() {
         loggedByName: user?.displayName ?? '',
         createdAt: serverTimestamp(),
       })
+
+      try {
+        const invRef = doc(db, 'inventory', fItemId)
+        const invSnap = await getDoc(invRef)
+        if (invSnap.exists()) {
+          const current = parseFloat(String(invSnap.data().currentStock ?? 0))
+          const newStock = parseFloat(Math.max(0, current - Number(fQty)).toFixed(4))
+          await updateDoc(invRef, {
+            currentStock: newStock,
+            lastUpdated: serverTimestamp(),
+            updatedBy: user?.uid ?? '',
+            updatedByName: user?.displayName ?? '',
+          })
+        }
+      } catch (err) {
+        console.error('[WasteDeduct]', err)
+      }
+
       setShowSlide(false)
       setFDate(today()); setFItemId(''); setFQty(''); setFReason('leftover'); setFMealLogId(''); setFNotes('')
       showToast('Waste entry logged')

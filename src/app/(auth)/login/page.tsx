@@ -63,7 +63,15 @@ function getErrorMessage(code: string): string {
   }
 }
 
-async function completeSignIn(user: User): Promise<string> {
+interface SignInResult {
+  redirectPath: string
+  role: string
+  phone: string
+  uid: string
+  displayName: string
+}
+
+async function completeSignIn(user: User): Promise<SignInResult> {
   const token = await user.getIdToken()
 
   let res: Response
@@ -95,6 +103,7 @@ async function completeSignIn(user: User): Promise<string> {
 
     try {
       const userDoc = await getDoc(doc(db, 'users', user.uid))
+    const userData = userDoc.exists() ? userDoc.data() : {}
     const role: Role | string = userDoc.exists()
       ? (userDoc.data().role as Role)
       : 'student'
@@ -109,7 +118,13 @@ async function completeSignIn(user: User): Promise<string> {
       details: 'User signed in',
     })
 
-    return getRedirectPath(role)
+    return {
+      redirectPath: getRedirectPath(role),
+      role: String(role),
+      phone: String(userData.phone ?? ''),
+      uid: user.uid,
+      displayName: String(userData.displayName ?? user.displayName ?? 'Staff'),
+    }
   } catch (err) {
     console.error('[login] Firestore user lookup failed:', err)
     throw new Error(
@@ -119,6 +134,8 @@ async function completeSignIn(user: User): Promise<string> {
     )
   }
 }
+
+const STAFF_ROLES = ['admin', 'owner', 'teacher', 'reception', 'accountant', 'examCoordinator', 'kitchen']
 
 export default function LoginPage() {
   const router = useRouter()
@@ -133,8 +150,43 @@ export default function LoginPage() {
   const [resetSent, setResetSent] = useState(false)
   const [googleUser, setGoogleUser] = useState<User | null>(null)
   const [showRoleSelect, setShowRoleSelect] = useState(false)
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false)
+  const [twoFactorCode, setTwoFactorCode] = useState('')
+  const [twoFactorUserId, setTwoFactorUserId] = useState('')
+  const [twoFactorRole, setTwoFactorRole] = useState('')
+  const [twoFactorPhone, setTwoFactorPhone] = useState('')
+  const [twoFactorName, setTwoFactorName] = useState('')
+  const [twoFactorError, setTwoFactorError] = useState('')
+  const [twoFactorLoading, setTwoFactorLoading] = useState(false)
+  const [pendingRedirect, setPendingRedirect] = useState('')
 
   const isLoading = loadingGoogle || loadingEmail
+
+  async function handleVerify2FA() {
+    if (!twoFactorCode || twoFactorCode.length !== 6) {
+      setTwoFactorError('Please enter the 6-digit code')
+      return
+    }
+    setTwoFactorLoading(true)
+    setTwoFactorError('')
+    try {
+      const res = await fetch('/api/twilio/verify-2fa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: twoFactorUserId, code: twoFactorCode }),
+      })
+      const data = await res.json() as { success?: boolean; error?: string }
+      if (data.success) {
+        router.push(pendingRedirect)
+      } else {
+        setTwoFactorError(data.error ?? 'Invalid code. Please try again.')
+      }
+    } catch {
+      setTwoFactorError('Something went wrong. Please try again.')
+    } finally {
+      setTwoFactorLoading(false)
+    }
+  }
 
   async function handleGoogleSignIn() {
     setError('')
@@ -143,8 +195,8 @@ export default function LoginPage() {
       const result = await signInWithPopup(auth, googleProvider)
       const userDoc = await getDoc(doc(db, 'users', result.user.uid))
       if (userDoc.exists()) {
-        const path = await completeSignIn(result.user)
-        router.push(path)
+        const info = await completeSignIn(result.user)
+        router.push(info.redirectPath)
       } else {
         setGoogleUser(result.user)
         setShowRoleSelect(true)
@@ -170,8 +222,28 @@ export default function LoginPage() {
     setLoadingEmail(true)
     try {
       const result = await signInWithEmailAndPassword(auth, email, password)
-      const path = await completeSignIn(result.user)
-      router.push(path)
+      const info = await completeSignIn(result.user)
+
+      if (STAFF_ROLES.includes(info.role) && info.phone) {
+        await fetch('/api/twilio/send-2fa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: info.uid,
+            phone: info.phone,
+            name: info.displayName,
+          }),
+        })
+        setTwoFactorUserId(info.uid)
+        setTwoFactorRole(info.role)
+        setTwoFactorPhone(info.phone)
+        setTwoFactorName(info.displayName)
+        setPendingRedirect(info.redirectPath)
+        setTwoFactorRequired(true)
+        return
+      }
+
+      router.push(info.redirectPath)
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''
       if (code) {
@@ -185,6 +257,78 @@ export default function LoginPage() {
       setLoadingEmail(false)
     }
   }
+
+  if (twoFactorRequired) return (
+    <div className="flex min-h-screen items-center justify-center bg-[#F5F7FB] p-4">
+      <div className="w-full max-w-sm space-y-6">
+        <div className="text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0B3D6B]">
+            <span className="ti ti-shield-check text-2xl text-[#E8A020]" />
+          </div>
+          <h1 className="font-jakarta text-2xl font-bold text-[#0B3D6B]">2-Step Verification</h1>
+          <p className="mt-1 text-sm text-[#5A6A7A]">We sent a 6-digit code to your WhatsApp</p>
+        </div>
+
+        <div className="rounded-2xl border border-[#DDE3EC] bg-white p-6 space-y-4">
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase text-[#5A6A7A] tracking-wider">
+              Verification Code
+            </label>
+            <input
+              type="number"
+              maxLength={6}
+              value={twoFactorCode}
+              onChange={e => { setTwoFactorCode(e.target.value.slice(0, 6)); setTwoFactorError('') }}
+              onKeyDown={e => e.key === 'Enter' && void handleVerify2FA()}
+              placeholder="000000"
+              className="w-full rounded-xl border-2 border-[#DDE3EC] bg-[#F5F7FB] px-4 py-4 text-center font-mono text-3xl font-black text-[#0B3D6B] outline-none focus:border-[#E8A020] tracking-[0.5em]"
+              autoFocus
+            />
+          </div>
+
+          {twoFactorError && (
+            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              {twoFactorError}
+            </div>
+          )}
+
+          <button
+            type="button"
+            disabled={twoFactorCode.length !== 6 || twoFactorLoading}
+            onClick={() => void handleVerify2FA()}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#E8A020] py-3.5 text-sm font-bold text-[#0B3D6B] disabled:opacity-40"
+          >
+            {twoFactorLoading
+              ? <><span className="ti ti-loader animate-spin" /> Verifying...</>
+              : <><span className="ti ti-arrow-right" /> Verify & Login</>
+            }
+          </button>
+
+          <button
+            type="button"
+            onClick={async () => {
+              await fetch('/api/twilio/send-2fa', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: twoFactorUserId, phone: twoFactorPhone, name: twoFactorName }),
+              })
+            }}
+            className="w-full text-center text-xs text-[#5A6A7A] hover:text-[#0B3D6B]"
+          >
+            Didn&apos;t receive it? Resend code
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setTwoFactorRequired(false); setTwoFactorCode('') }}
+            className="w-full text-center text-xs text-[#5A6A7A] hover:text-[#0B3D6B]"
+          >
+            ← Back to login
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="flex min-h-screen min-h-[100dvh] overflow-hidden">
@@ -228,7 +372,13 @@ export default function LoginPage() {
       </div>
 
       {/* Right panel — login form */}
-      <div className="flex w-full flex-col items-center justify-center bg-[#eef2f7] dark:bg-[#080d18] px-4 py-8 lg:w-1/2 lg:px-12 transition-colors duration-300">
+      <div
+        className="relative flex w-full flex-col items-center justify-center overflow-hidden bg-[#eef2f7] dark:bg-[#080d18] px-4 py-8 lg:w-1/2 lg:px-12 transition-colors duration-300"
+        style={{
+          backgroundImage: 'radial-gradient(circle, rgba(11,61,107,0.06) 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+      >
         <div className="w-full max-w-[420px]">
           {/* Mobile logo */}
           <div className="mb-8 flex items-center justify-center gap-2 lg:hidden">
@@ -276,11 +426,11 @@ export default function LoginPage() {
                 onToggleShow={() => setShowPassword((v) => !v)}
               />
 
-              <div className="-mt-3 mb-4 text-right">
+              <div className="-mt-3 mb-4">
                 <button
                   type="button"
                   onClick={() => setShowReset(true)}
-                  className="text-xs text-[#0B3D6B] hover:underline"
+                  className="text-xs text-[#0B3D6B] dark:text-blue-300 hover:underline mt-1 block text-right"
                 >
                   Forgot password?
                 </button>

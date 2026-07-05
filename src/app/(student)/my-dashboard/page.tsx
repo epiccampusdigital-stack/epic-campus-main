@@ -212,10 +212,10 @@ export default function MyDashboardPage() {
   if (!activeStudent) {
     if (loading) {
       return (
-        <div className="animate-pulse space-y-4 p-4">
-          <div className="h-32 rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />
-          <div className="h-20 rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />
-          <div className="h-20 rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />
+        <div className="space-y-4 p-4">
+          <div className="animate-pulse h-32 rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />
+          <div className="animate-pulse h-20 rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />
+          <div className="animate-pulse h-20 rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />
         </div>
       )
     }
@@ -224,16 +224,46 @@ export default function MyDashboardPage() {
 
   if (loading) {
     return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-10 w-64 rounded bg-[#DDE3EC]" />
-        <div className="h-24 rounded-xl bg-[#DDE3EC]" />
+      <div className="space-y-4">
+        <div className="animate-pulse h-10 w-64 rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />
+        <div className="animate-pulse h-24 rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-20 rounded-xl bg-[#DDE3EC]" />
+            <div key={i} className="animate-pulse h-20 rounded-2xl bg-[#DDE3EC] dark:bg-white/10" />
           ))}
         </div>
       </div>
     )
+  }
+
+  const COURSE_DURATIONS: Record<string, number> = {
+    'japan-ssw': 45,
+    'korea': 365,
+    'china': 365,
+    'ielts': 90,
+    'nvq': 180,
+  }
+
+  const courseId = activeStudent?.courseId ?? ''
+  const duration = COURSE_DURATIONS[courseId] ?? 45
+  const startRaw = (activeStudent as Record<string, unknown>)?.enrollmentDate ??
+    (activeStudent as Record<string, unknown>)?.batchStartDate ??
+    (activeStudent as Record<string, unknown>)?.createdAt
+  const startMs = startRaw
+    ? (typeof startRaw === 'object' && startRaw !== null && 'toDate' in startRaw
+        ? (startRaw as { toDate: () => Date }).toDate().getTime()
+        : new Date(String(startRaw)).getTime())
+    : null
+  const daysElapsed = startMs ? Math.max(0, Math.floor((Date.now() - startMs) / (1000 * 60 * 60 * 24))) : 0
+  const daysRemaining = Math.max(0, duration - daysElapsed)
+  const progressPct = Math.min(100, Math.round((daysElapsed / duration) * 100))
+
+  const COURSE_LABELS: Record<string, string> = {
+    'japan-ssw': '🇯🇵 Japan SSW',
+    'korea': '🇰🇷 Korea',
+    'china': '🇨🇳 China',
+    'ielts': '📝 IELTS',
+    'nvq': '🎓 NVQ',
   }
 
   return (
@@ -244,6 +274,28 @@ export default function MyDashboardPage() {
         payments={payments}
         examCount={examCount}
       />
+
+      {startMs && (
+        <div className="rounded-2xl bg-gradient-to-r from-[#0B3D6B] to-[#1A6BAD] p-5 text-white">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <p className="text-xs text-white/60 font-bold uppercase tracking-wider">Course Progress</p>
+              <p className="font-jakarta text-3xl font-black mt-1">
+                {daysRemaining > 0 ? `${daysRemaining} days left` : '🎓 Course Complete!'}
+              </p>
+              <p className="text-sm text-white/70 mt-0.5">
+                Day {Math.min(daysElapsed, duration)} of {duration} · {progressPct}% complete
+              </p>
+            </div>
+            <p className="text-sm text-white/60">{COURSE_LABELS[courseId] ?? courseId}</p>
+          </div>
+          <div className="mt-4 h-2 rounded-full bg-white/20 overflow-hidden">
+            <div className="h-full rounded-full bg-[#E8A020] transition-all duration-1000"
+              style={{ width: `${progressPct}%` }} />
+          </div>
+        </div>
+      )}
+
       <QuickActions />
       {milestones.length > 0 && (
         <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">

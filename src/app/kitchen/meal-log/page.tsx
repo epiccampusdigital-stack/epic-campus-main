@@ -32,9 +32,11 @@ import { formatLKR } from '@/lib/utils/formatCurrency'
 import type { DailyMenu, MealLog, MealType, InventoryItem, SelectedIngredient } from '@/types/kitchen'
 
 const MEAL_TYPES: { value: MealType; label: string }[] = [
+  { value: 'morning-tea', label: 'Morning Tea' },
   { value: 'breakfast', label: 'Breakfast' },
   { value: 'lunch', label: 'Lunch' },
   { value: 'dinner', label: 'Dinner' },
+  { value: 'evening-tea', label: 'Evening Tea' },
   { value: 'tea', label: 'Tea' },
 ]
 
@@ -125,6 +127,7 @@ export default function MealLogPage() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
   const [toastKind, setToastKind] = useState<'success' | 'warning'>('success')
+  const [editingLogId, setEditingLogId] = useState<string | null>(null)
 
   const [step, setStep] = useState<WizardStep>(1)
   const [fDate, setFDate] = useState(today())
@@ -234,11 +237,33 @@ export default function MealLogPage() {
     setAppliedMenu(null)
     setAppliedTemplateId(null)
     setMenuTodayCount(0)
+    setEditingLogId(null)
   }
 
   function openLogSlide() {
     resetWizard()
     void loadInventory()
+    setShowSlide(true)
+  }
+
+  function openEditLog(log: MealLog) {
+    setFDate(log.date)
+    setFType(log.mealType)
+    setFStudents(String(log.studentCount))
+    setFStaff(String(log.staffCount))
+    setFNotes(log.notes ?? '')
+    setSelected(
+      log.ingredientsUsed.map((ing) => ({
+        itemId: ing.itemId,
+        itemName: ing.itemName,
+        emoji: getFoodEmoji(ing.itemName),
+        qty: ing.qtyUsed,
+        unit: ing.unit,
+        unitCost: ing.unitCost,
+      })),
+    )
+    setEditingLogId(log.id)
+    setStep(2)
     setShowSlide(true)
   }
 
@@ -298,7 +323,7 @@ export default function MealLogPage() {
       const totalCost = usedIngredients.reduce((s, i) => s + i.totalCost, 0)
       const costPerPerson = totalServings > 0 ? totalCost / totalServings : 0
 
-      await addDoc(collection(db, 'mealLogs'), {
+      const logPayload = {
         date: fDate,
         mealType: fType,
         studentCount: Number(fStudents) || 0,
@@ -313,8 +338,19 @@ export default function MealLogPage() {
         templateId: appliedTemplateId,
         loggedBy: user?.uid ?? '',
         loggedByName: user?.displayName ?? '',
-        createdAt: serverTimestamp(),
-      })
+      }
+
+      if (editingLogId) {
+        await updateDoc(doc(db, 'mealLogs', editingLogId), {
+          ...logPayload,
+          updatedAt: serverTimestamp(),
+        })
+      } else {
+        await addDoc(collection(db, 'mealLogs'), {
+          ...logPayload,
+          createdAt: serverTimestamp(),
+        })
+      }
 
       if (appliedTemplateId) {
         try {
@@ -570,16 +606,28 @@ export default function MealLogPage() {
                           </div>
                         </div>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setDeleteLogId(log.id)
-                          }}
-                          className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
-                        >
-                          🗑️ Delete Log
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openEditLog(log)
+                            }}
+                            className="rounded-lg p-1.5 text-[#5A6A7A] hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06] hover:text-[#0B3D6B]"
+                          >
+                            <span className="ti ti-edit text-sm" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDeleteLogId(log.id)
+                            }}
+                            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
+                          >
+                            🗑️ Delete Log
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -592,8 +640,11 @@ export default function MealLogPage() {
 
       <KitchenBottomSheet
         open={showSlide}
-        onClose={() => setShowSlide(false)}
-        title="Log Meal"
+        onClose={() => {
+          setShowSlide(false)
+          setEditingLogId(null)
+        }}
+        title={editingLogId ? 'Edit Meal Log' : 'Log Meal'}
         footer={slideFooter}
       >
         <StepIndicator step={step} />

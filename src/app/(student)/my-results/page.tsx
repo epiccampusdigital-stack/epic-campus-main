@@ -29,9 +29,11 @@ const GRADE_LEGEND = [
 ]
 
 export default function MyResultsPage() {
-  const { student } = useStudentPortal()
+  const { student, user } = useStudentPortal()
   const [attempts, setAttempts] = useState<ParsedExamAttempt[]>([])
   const [loading, setLoading] = useState(true)
+  const [certLoading, setCertLoading] = useState(false)
+  const [certNumber, setCertNumber] = useState<string | null>(null)
 
   useEffect(() => {
     if (!student) return
@@ -87,6 +89,38 @@ export default function MyResultsPage() {
       latest: attempts[0]?.grade ?? '—',
     }
   }, [attempts])
+
+  async function downloadCertificate() {
+    if (!user) return
+    setCertLoading(true)
+    try {
+      const res = await fetch('/api/certificates/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId: user.uid }),
+      })
+      const data = await res.json() as { success?: boolean; pdfBase64?: string; certificateNumber?: string; error?: string }
+      if (data.pdfBase64) {
+        const bytes = Uint8Array.from(atob(data.pdfBase64), c => c.charCodeAt(0))
+        const blob = new Blob([bytes], { type: 'application/pdf' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `EPIC-Certificate-${data.certificateNumber ?? 'certificate'}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        setCertNumber(data.certificateNumber ?? null)
+      } else {
+        alert(data.error ?? 'Could not generate certificate')
+      }
+    } catch (err) {
+      console.error('[DownloadCert]', err)
+    } finally {
+      setCertLoading(false)
+    }
+  }
 
   if (!student) return null
 
@@ -228,6 +262,34 @@ export default function MyResultsPage() {
             </table>
           </div>
         )}
+      </div>
+
+      <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E8A020]/10">
+            <span className="ti ti-certificate text-[#E8A020] text-xl" />
+          </div>
+          <div>
+            <p className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">Course Certificate</p>
+            <p className="text-xs text-[#5A6A7A] dark:text-white/50">Download your completion certificate</p>
+          </div>
+        </div>
+        {certNumber && (
+          <div className="mb-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 px-4 py-2">
+            <p className="text-xs font-bold text-emerald-700">Certificate: {certNumber}</p>
+          </div>
+        )}
+        <button
+          type="button"
+          disabled={certLoading}
+          onClick={() => void downloadCertificate()}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#E8A020] py-3 text-sm font-bold text-[#0B3D6B] disabled:opacity-40"
+        >
+          {certLoading
+            ? <><span className="ti ti-loader animate-spin" /> Generating...</>
+            : <><span className="ti ti-download" /> Download Certificate</>
+          }
+        </button>
       </div>
     </div>
   )

@@ -7,8 +7,8 @@ import {
   getDocs,
   query,
   orderBy,
-  where,
   serverTimestamp,
+  where,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { useKitchen } from '@/app/kitchen/context'
@@ -45,13 +45,17 @@ export default function OrdersPage() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
   const [generated, setGenerated] = useState(false)
+  const [studentTarget, setStudentTarget] = useState('130')
+  const [generating, setGenerating] = useState(false)
 
   async function loadData() {
     setLoading(true)
     try {
       const [orderSnap, invSnap] = await Promise.all([
         getDocs(query(collection(db, 'kitchenOrders'), orderBy('createdAt', 'desc'))),
-        getDocs(query(collection(db, 'inventory'), where('isActive', '==', true), orderBy('itemName'))),
+        getDocs(query(collection(db, 'inventory'), orderBy('itemName'))).catch(() =>
+          getDocs(collection(db, 'inventory'))
+        ),
       ])
       setOrders(orderSnap.docs.map((d) => ({ id: d.id, ...d.data() } as KitchenOrder)))
       setInventoryItems(invSnap.docs.map((d) => ({ id: d.id, ...d.data() } as InventoryItem)))
@@ -72,19 +76,82 @@ export default function OrdersPage() {
   }
 
   function generateOrderList() {
-    const lowItems = inventoryItems.filter((i) => i.currentStock < i.minStockLevel)
+    const lowItems = inventoryItems.filter(
+      (i) => i.currentStock <= i.minStockLevel
+    )
+    if (lowItems.length === 0) {
+      showToast('All items are sufficiently stocked!')
+      setGenerated(true)
+      setOrderItems([])
+      return
+    }
     const rows: OrderItem[] = lowItems.map((i) => ({
       itemId: i.id,
       itemName: i.itemName,
       unit: i.unit,
       currentStock: i.currentStock,
       minStockLevel: i.minStockLevel,
-      orderQty: Math.max(i.minStockLevel * 2 - i.currentStock, 0),
-      unitCost: i.unitCost,
-      totalCost: Math.max(i.minStockLevel * 2 - i.currentStock, 0) * i.unitCost,
+      orderQty: parseFloat(Math.max(0, (i.minStockLevel * 3) - i.currentStock).toFixed(4)),
+      unitCost: i.unitCost ?? 0,
+      totalCost: parseFloat((Math.max(0, (i.minStockLevel * 3) - i.currentStock) * (i.unitCost ?? 0)).toFixed(2)),
     }))
     setOrderItems(rows)
     setGenerated(true)
+  }
+
+  async function generateSmartOrder() {
+    setGenerating(true)
+    try {
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      const dateStr = thirtyDaysAgo.toISOString().slice(0, 10)
+
+      const logsSnap = await getDocs(
+        query(collection(db, 'mealLogs'), where('date', '>=', dateStr))
+      ).catch(() => getDocs(collection(db, 'mealLogs')))
+
+      const usageMap: Record<string, { itemName: string; unit: string; totalUsed: number; days: Set<string> }> = {}
+
+      for (const logDoc of logsSnap.docs) {
+        const log = logDoc.data()
+        const ings = log.ingredientsUsed as Array<{ itemId: string; itemName: string; unit: string; qtyUsed: number }> ?? []
+        for (const ing of ings) {
+          if (!usageMap[ing.itemId]) {
+            usageMap[ing.itemId] = { itemName: ing.itemName, unit: ing.unit, totalUsed: 0, days: new Set() }
+          }
+          usageMap[ing.itemId].totalUsed += ing.qtyUsed
+          usageMap[ing.itemId].days.add(String(log.date))
+        }
+      }
+
+      const target = parseInt(studentTarget) || 130
+      const rows: OrderItem[] = inventoryItems
+        .map(item => {
+          const usage = usageMap[item.id]
+          const daysOfData = usage?.days.size ?? 0
+          const dailyAvg = daysOfData > 0 ? (usage.totalUsed / daysOfData) : 0
+          const scaledAvg = dailyAvg * (target / 100)
+          const recommended = parseFloat(Math.max(0, (scaledAvg * 35) - item.currentStock).toFixed(4))
+          return {
+            itemId: item.id,
+            itemName: item.itemName,
+            unit: item.unit,
+            currentStock: item.currentStock,
+            minStockLevel: item.minStockLevel,
+            orderQty: recommended,
+            unitCost: item.unitCost ?? 0,
+            totalCost: parseFloat((recommended * (item.unitCost ?? 0)).toFixed(2)),
+          }
+        })
+        .filter(r => r.orderQty > 0)
+
+      setOrderItems(rows)
+      setGenerated(true)
+    } catch (err) {
+      console.error('[SmartOrder]', err)
+    } finally {
+      setGenerating(false)
+    }
   }
 
   function updateQty(idx: number, qty: string) {
@@ -182,6 +249,27 @@ export default function OrdersPage() {
         >
           <span className="ti ti-refresh" /> Generate Order List
         </button>
+
+        <div className="flex items-center gap-3 flex-wrap mb-4">
+          <div>
+            <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">Student Target</label>
+            <input
+              type="number"
+              value={studentTarget}
+              onChange={e => setStudentTarget(e.target.value)}
+              className="w-24 rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] px-3 py-2 text-sm outline-none"
+              placeholder="130"
+            />
+          </div>
+          <button
+            type="button"
+            disabled={generating}
+            onClick={() => void generateSmartOrder()}
+            className="mt-4 flex items-center gap-2 rounded-xl bg-[#0B3D6B] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+          >
+            <span className="ti ti-sparkles" /> {generating ? 'Generating…' : 'Smart Order (30-day avg)'}
+          </button>
+        </div>
       </div>
 
       {generated && (
