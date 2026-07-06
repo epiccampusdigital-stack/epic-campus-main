@@ -17,6 +17,7 @@ import {
 import { db } from '@/lib/firebase/client'
 import { formatLKR } from '@/lib/utility-bills/helpers'
 import { useManagement } from '@/components/layout/ManagementContext'
+import type { Role } from '@/types'
 
 const LOCATION_OPTIONS = [
   { value: 'Ahangama', label: 'Ahangama' },
@@ -95,7 +96,7 @@ function emptyForm(): HouseForm {
 }
 
 function AccommodationPageContent() {
-  const { user } = useManagement()
+  const { user, hasRole } = useManagement()
   const [houses, setHouses] = useState<House[]>([])
   const [loading, setLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)
@@ -105,7 +106,7 @@ function AccommodationPageContent() {
   const [toast, setToast] = useState('')
   const [toastKind, setToastKind] = useState<ToastKind>('success')
 
-  const allowed = ['admin', 'owner', 'accountant', 'reception', 'teacher', 'examCoordinator'].includes(user?.role ?? '')
+  const allowed = (['admin', 'owner', 'accountant', 'reception', 'teacher', 'examCoordinator'] as Role[]).some((r) => hasRole(r))
 
   const showToast = useCallback((msg: string, kind: ToastKind = 'success') => {
     setToastKind(kind)
@@ -116,7 +117,7 @@ function AccommodationPageContent() {
   const loadHouses = useCallback(async () => {
     setLoading(true)
     try {
-      const snap = await getDocs(query(collection(db, 'accommodation'), orderBy('createdAt', 'desc')))
+      const snap = await getDocs(query(collection(db, 'accommodations'), orderBy('createdAt', 'desc')))
       const data = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<House, 'id'>) }))
       setHouses(data)
     } catch (err) {
@@ -181,10 +182,10 @@ function AccommodationPageContent() {
       }
 
       if (editTarget) {
-        await updateDoc(doc(db, 'accommodation', editTarget.id), payload)
+        await updateDoc(doc(db, 'accommodations', editTarget.id), payload)
         showToast('House updated successfully')
       } else {
-        await addDoc(collection(db, 'accommodation'), {
+        await addDoc(collection(db, 'accommodations'), {
           ...payload,
           createdAt: serverTimestamp(),
           createdBy: user.uid,
@@ -205,10 +206,10 @@ function AccommodationPageContent() {
   }
 
   async function handleDeleteHouse(house: House) {
-    if (!(user?.role === 'admin' || user?.role === 'owner')) return
+    if (!(hasRole('admin') || hasRole('owner'))) return
     if (!window.confirm(`Delete ${house.name}?`)) return
     try {
-      await deleteDoc(doc(db, 'accommodation', house.id))
+      await deleteDoc(doc(db, 'accommodations', house.id))
       showToast('House deleted successfully')
       await loadHouses()
     } catch (err) {
@@ -329,7 +330,7 @@ function AccommodationPageContent() {
                 >
                   View Bills
                 </Link>
-                {user?.role !== 'teacher' && (
+                {(user?.roles?.some((r) => r !== 'teacher') ?? false) && (
                   <button
                     type="button"
                     onClick={() => openEditModal(house)}
@@ -338,7 +339,7 @@ function AccommodationPageContent() {
                     Edit
                   </button>
                 )}
-                {(user?.role === 'admin' || user?.role === 'owner') && (
+                {(hasRole('admin') || hasRole('owner')) && (
                   <button
                     type="button"
                     onClick={() => void handleDeleteHouse(house)}

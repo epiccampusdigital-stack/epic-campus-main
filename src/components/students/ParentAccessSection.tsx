@@ -23,7 +23,7 @@ export default function ParentAccessSection({
   student,
   onUpdated,
 }: ParentAccessSectionProps) {
-  const { user } = useManagement()
+  const { user, hasRole } = useManagement()
   const [code, setCode] = useState(student.parentAccessCode ?? '')
   const [enabled, setEnabled] = useState(student.parentAccessEnabled !== false)
   const [linkedParent, setLinkedParent] = useState<ParentAccount | null>(null)
@@ -31,7 +31,7 @@ export default function ParentAccessSection({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'owner'
+  const isAdmin = hasRole('admin') || hasRole('owner')
 
   const loadParent = useCallback(async () => {
     setLoading(true)

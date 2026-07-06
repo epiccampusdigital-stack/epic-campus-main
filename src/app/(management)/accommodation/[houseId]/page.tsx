@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { useManagement } from '@/components/layout/ManagementContext'
+import type { Role } from '@/types'
 
 interface House {
   id: string
@@ -65,10 +66,14 @@ interface HouseInventoryItem {
 
 const COURSE_LABELS: Record<string, string> = {
   'japan-ssw': '🇯🇵 Japan SSW',
-  'korea': '🇰🇷 Korea',
+  'korea-d2d4': '🇰🇷 Korea',
   'china': '🇨🇳 China',
   'ielts': '📝 IELTS',
-  'nvq': '🎓 NVQ',
+  'nvq-it': '🎓 NVQ IT',
+  'nvq-hospitality': '🎓 NVQ Hospitality',
+  'nvq-caregiving': '🎓 NVQ Caregiving',
+  'nvq-construction': '🎓 NVQ Construction',
+  'nvq-logistics': '🎓 NVQ Logistics',
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -97,7 +102,7 @@ type Tab = 'overview' | 'bills' | 'inventory'
 export default function HouseDetailPage() {
   const { houseId } = useParams<{ houseId: string }>()
   const router = useRouter()
-  const { user } = useManagement()
+  const { user, hasRole } = useManagement()
 
   const [tab, setTab] = useState<Tab>('overview')
   const [house, setHouse] = useState<House | null>(null)
@@ -119,20 +124,15 @@ export default function HouseDetailPage() {
   const [toast, setToast] = useState('')
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
-  const canEdit = ['admin', 'owner', 'accountant', 'reception'].includes(user?.role ?? '')
+  const canEdit = (['admin', 'owner', 'accountant', 'reception'] as Role[]).some((r) => hasRole(r))
 
   const load = useCallback(async () => {
     if (!houseId) return
     setLoading(true)
     try {
       let houseData: House | null = null
-      const snap1 = await getDoc(doc(db, 'accommodation', houseId)).catch(() => null)
-      if (snap1?.exists()) {
-        houseData = { id: snap1.id, ...snap1.data() } as House
-      } else {
-        const snap2 = await getDoc(doc(db, 'accommodations', houseId)).catch(() => null)
-        if (snap2?.exists()) houseData = { id: snap2.id, ...snap2.data() } as House
-      }
+      const houseSnap = await getDoc(doc(db, 'accommodations', houseId)).catch(() => null)
+      if (houseSnap?.exists()) houseData = { id: houseSnap.id, ...houseSnap.data() } as House
       setHouse(houseData)
 
       if (houseData) {
@@ -154,8 +154,8 @@ export default function HouseDetailPage() {
             })
         )
 
-        const invSnap = await getDocs(collection(db, 'accommodation', houseId, 'inventory'))
-          .catch(() => getDocs(collection(db, 'accommodations', houseId, 'inventory')).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] })))
+        const invSnap = await getDocs(collection(db, 'accommodations', houseId, 'inventory'))
+          .catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] }))
         setInventory(invSnap.docs.map(d => ({ id: d.id, ...d.data() } as HouseInventoryItem)))
       }
     } catch (err) {
@@ -217,7 +217,7 @@ export default function HouseDetailPage() {
     if (!houseId || !invForm.itemName.trim()) return
     setSavingInv(true)
     try {
-      await addDoc(collection(db, 'accommodation', houseId, 'inventory'), {
+      await addDoc(collection(db, 'accommodations', houseId, 'inventory'), {
         itemName: invForm.itemName.trim(),
         category: invForm.category,
         quantity: parseFloat(invForm.quantity || '1'),
@@ -242,7 +242,7 @@ export default function HouseDetailPage() {
   async function deleteInventoryItem(item: HouseInventoryItem) {
     if (!houseId || !confirm(`Delete ${item.itemName}?`)) return
     try {
-      await deleteDoc(doc(db, 'accommodation', houseId, 'inventory', item.id))
+      await deleteDoc(doc(db, 'accommodations', houseId, 'inventory', item.id))
       setInventory(prev => prev.filter(i => i.id !== item.id))
       showToast('Item deleted')
     } catch (err) { console.error('[DeleteInv]', err) }

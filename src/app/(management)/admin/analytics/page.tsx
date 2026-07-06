@@ -113,7 +113,7 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 
 export default function AnalyticsPage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useManagement()
+  const { user, loading: authLoading, hasRole } = useManagement()
   const [loading, setLoading] = useState(true)
   const [totalStudents, setTotalStudents] = useState(0)
   const [totalRevenue, setTotalRevenue] = useState(0)
@@ -127,13 +127,13 @@ export default function AnalyticsPage() {
   useEffect(() => {
     if (authLoading) return
     if (!user) return
-    if (user.role !== 'admin' && user.role !== 'owner') {
+    if (!(hasRole('admin') || hasRole('owner'))) {
       router.replace('/dashboard')
     }
-  }, [user, authLoading, router])
+  }, [user, authLoading, router, hasRole])
 
   useEffect(() => {
-    if (authLoading || !user || (user.role !== 'admin' && user.role !== 'owner')) return
+    if (authLoading || !user || !(hasRole('admin') || hasRole('owner'))) return
 
     async function load() {
       setLoading(true)
@@ -246,9 +246,9 @@ export default function AnalyticsPage() {
     }
 
     load()
-  }, [user, authLoading])
+  }, [user, authLoading, hasRole])
 
-  const isAuthorized = user && (user.role === 'admin' || user.role === 'owner')
+  const isAuthorized = user && (hasRole('admin') || hasRole('owner'))
 
   const chartEmpty = useMemo(
     () => ({

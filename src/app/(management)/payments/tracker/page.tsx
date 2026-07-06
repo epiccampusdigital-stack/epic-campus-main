@@ -13,8 +13,13 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import hotToast from 'react-hot-toast'
-import { db } from '@/lib/firebase/client'
+import { auth, db } from '@/lib/firebase/client'
 import { useManagement } from '@/components/layout/ManagementContext'
+
+/** A 'payments' doc is a payment plan (not a flat transaction receipt) when it carries an installments array. */
+function isPlanDoc(data: Record<string, unknown>): boolean {
+  return Array.isArray(data.installments)
+}
 
 interface PaymentReceipt {
   id: string
@@ -90,7 +95,8 @@ function StatusBadge({ installment }: { installment: Installment }) {
 }
 
 export default function PaymentTrackerPage() {
-  const { user } = useManagement()
+  const { user, hasRole } = useManagement()
+  const canMarkPaid = hasRole('admin') || hasRole('owner') || hasRole('accountant')
   const [plans, setPlans] = useState<PaymentPlan[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -101,6 +107,30 @@ export default function PaymentTrackerPage() {
   const [toast, setToast] = useState('')
   const [receiptTab, setReceiptTab] = useState(false)
   const [receipts, setReceipts] = useState<PaymentReceipt[]>([])
+  const [migrating, setMigrating] = useState(false)
+  const isAdmin = hasRole('admin') || hasRole('owner')
+
+  async function migrateLegacyPlans() {
+    if (!auth.currentUser) return
+    setMigrating(true)
+    try {
+      const token = await auth.currentUser.getIdToken()
+      const res = await fetch('/api/admin/migrate-payment-plans', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = (await res.json()) as { migrated?: number; skipped?: string[]; errors?: string[]; error?: string }
+      if (!res.ok) throw new Error(data.error ?? 'Migration failed')
+      hotToast.success(`Migrated ${data.migrated ?? 0} legacy payment plan(s)`)
+      if (data.skipped?.length) console.warn('[migrate-payment-plans] skipped:', data.skipped)
+      if (data.errors?.length) console.error('[migrate-payment-plans] errors:', data.errors)
+      await load()
+    } catch (err) {
+      hotToast.error(err instanceof Error ? err.message : 'Migration failed')
+    } finally {
+      setMigrating(false)
+    }
+  }
 
   function showToast(msg: string) {
     setToast(msg)
@@ -111,20 +141,26 @@ export default function PaymentTrackerPage() {
     setLoading(true)
     try {
       const snap = await getDocs(
-        query(collection(db, 'studentPaymentPlans'), orderBy('createdAt', 'desc'))
+        query(collection(db, 'payments'), orderBy('createdAt', 'desc'))
       )
       setPlans(
-        snap.docs.map(d => ({
-          id: d.id,
-          ...(d.data() as Omit<PaymentPlan, 'id'>),
-        }))
+        snap.docs
+          .filter(d => isPlanDoc(d.data()))
+          .map(d => ({
+            id: d.id,
+            ...(d.data() as Omit<PaymentPlan, 'id'>),
+          }))
       )
     } catch (err) {
       console.error('[PaymentTracker]', err)
       // fallback without orderBy
       try {
-        const snap2 = await getDocs(collection(db, 'studentPaymentPlans'))
-        setPlans(snap2.docs.map(d => ({ id: d.id, ...(d.data() as Omit<PaymentPlan, 'id'>) })))
+        const snap2 = await getDocs(collection(db, 'payments'))
+        setPlans(
+          snap2.docs
+            .filter(d => isPlanDoc(d.data()))
+            .map(d => ({ id: d.id, ...(d.data() as Omit<PaymentPlan, 'id'>) }))
+        )
       } catch { setPlans([]) }
     } finally {
       setLoading(false)
@@ -151,7 +187,7 @@ export default function PaymentTrackerPage() {
         verifiedAt: serverTimestamp(),
         verifiedBy: user.uid,
       })
-      await updateDoc(doc(db, 'studentPaymentPlans', receipt.planId), {
+      await updateDoc(doc(db, 'payments', receipt.planId), {
         [`installments.${receipt.installmentIndex}.status`]: 'paid',
         [`installments.${receipt.installmentIndex}.paidAt`]: serverTimestamp(),
         [`installments.${receipt.installmentIndex}.method`]: 'bank-transfer',
@@ -251,7 +287,7 @@ export default function PaymentTrackerPage() {
         ? { ...i, paidAt: new Date().toISOString(), paidBy: user.uid }
         : i
     )
-    await updateDoc(doc(db, 'studentPaymentPlans', planId), { installments: updated })
+    await updateDoc(doc(db, 'payments', planId), { installments: updated })
     setPlans(prev => prev.map(p => p.id === planId ? { ...p, installments: updated } : p))
     showToast('Installment marked as paid ✓')
   }
@@ -265,7 +301,7 @@ export default function PaymentTrackerPage() {
         ? { ...i, paidAt: undefined, paidBy: undefined }
         : i
     )
-    await updateDoc(doc(db, 'studentPaymentPlans', planId), { installments: updated })
+    await updateDoc(doc(db, 'payments', planId), { installments: updated })
     setPlans(prev => prev.map(p => p.id === planId ? { ...p, installments: updated } : p))
     showToast('Installment unmarked')
   }
@@ -292,7 +328,7 @@ export default function PaymentTrackerPage() {
             ? { ...i, paidAt: now, paidBy: user.uid }
             : i
         )
-        batch.update(doc(db, 'studentPaymentPlans', plan.id), { installments: updated })
+        batch.update(doc(db, 'payments', plan.id), { installments: updated })
         return { ...plan, installments: updated }
       })
 
@@ -341,7 +377,19 @@ export default function PaymentTrackerPage() {
             Installment schedules — mark payments as received
           </p>
         </div>
-        {unpaidSelected.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          {isAdmin && (
+            <button
+              type="button"
+              disabled={migrating}
+              onClick={() => void migrateLegacyPlans()}
+              className="rounded-xl border border-[#DDE3EC] dark:border-white/20 px-4 py-2.5 text-sm font-semibold text-[#0B3D6B] dark:text-white/70 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.05] disabled:opacity-60"
+              title="One-time: copy any legacy studentPaymentPlans docs into payments"
+            >
+              {migrating ? 'Migrating…' : 'Migrate legacy plans'}
+            </button>
+          )}
+        {canMarkPaid && unpaidSelected.length > 0 && (
           <button
             type="button"
             disabled={marking}
@@ -352,6 +400,7 @@ export default function PaymentTrackerPage() {
             Mark {unpaidSelected.length} as Paid
           </button>
         )}
+        </div>
       </div>
 
       {/* Stats row */}
@@ -457,6 +506,7 @@ export default function PaymentTrackerPage() {
 
                   <div className="flex shrink-0 items-center gap-2">
                     {receipt.status === 'pending' ? (
+                      canMarkPaid ? (
                       <>
                         <button
                           type="button"
@@ -473,6 +523,11 @@ export default function PaymentTrackerPage() {
                           <span className="ti ti-x" /> Reject
                         </button>
                       </>
+                      ) : (
+                        <span className="rounded-full bg-amber-100 dark:bg-amber-900/30 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-400">
+                          Pending review
+                        </span>
+                      )
                     ) : (
                       <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${
                         receipt.status === 'verified'
@@ -590,7 +645,7 @@ export default function PaymentTrackerPage() {
                             }`}
                           >
                             {/* Checkbox */}
-                            {!inst.paidAt && (
+                            {!inst.paidAt && canMarkPaid && (
                               <input
                                 type="checkbox"
                                 checked={isChecked}
@@ -639,7 +694,7 @@ export default function PaymentTrackerPage() {
                             <StatusBadge installment={inst} />
 
                             {/* Action button */}
-                            {inst.paidAt ? (
+                            {canMarkPaid && (inst.paidAt ? (
                               <button
                                 type="button"
                                 onClick={() => void markUnpaid(plan.id, inst.id)}
@@ -655,7 +710,7 @@ export default function PaymentTrackerPage() {
                               >
                                 Mark Paid
                               </button>
-                            )}
+                            ))}
                           </div>
                         )
                       })}

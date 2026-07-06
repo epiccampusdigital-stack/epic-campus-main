@@ -45,6 +45,8 @@ interface PaperDoc {
   examBatch?: string
   accessCode?: string
   codeGeneratedAt?: string
+  isUnlocked?: boolean
+  unlockedAt?: unknown
 }
 
 interface SectionDoc {
@@ -212,10 +214,36 @@ export default function AdminExamsPage() {
       if (editingPaper) {
         await updateDoc(doc(db, 'examPapers', editingPaper.id), payload)
         setToast('Paper updated')
+
+        const existingScheduleSnap = await getDocs(
+          query(collection(db, 'schedule'), where('paperId', '==', editingPaper.id))
+        )
+        if (paperForm.isLive && paperForm.examDate && paperForm.examTime) {
+          const scheduleData = {
+            title: paperForm.title + ' (Exam)',
+            date: paperForm.examDate,
+            startTime: paperForm.examTime,
+            endTime: paperForm.examTime,
+            type: 'exam',
+            courseId: paperForm.examCourseId ?? '',
+            batch: paperForm.examBatch ?? '',
+            notes: 'Live exam — requires access code',
+            paperId: editingPaper.id,
+            updatedAt: serverTimestamp(),
+          }
+          if (existingScheduleSnap.empty) {
+            await addDoc(collection(db, 'schedule'), { ...scheduleData, createdAt: serverTimestamp(), createdBy: user.uid })
+          } else {
+            await updateDoc(existingScheduleSnap.docs[0].ref, scheduleData)
+          }
+        } else if (!existingScheduleSnap.empty) {
+          await Promise.all(existingScheduleSnap.docs.map(d => deleteDoc(d.ref)))
+        }
       } else {
         const paperRef = await addDoc(collection(db, 'examPapers'), {
           ...payload,
           isPublished: false,
+          isUnlocked: false,
           createdAt: serverTimestamp(),
         })
         setToast('Paper created')
@@ -247,6 +275,22 @@ export default function AdminExamsPage() {
     await updateDoc(doc(db, 'examPapers', paper.id), { isPublished: !paper.isPublished })
     setToast(paper.isPublished ? 'Paper unpublished' : 'Paper published — students can now see it')
     await loadPapers()
+  }
+
+  async function handleToggleUnlock(paper: PaperDoc) {
+    const nextUnlocked = !paper.isUnlocked
+    setPapers(prev => prev.map(p => (p.id === paper.id ? { ...p, isUnlocked: nextUnlocked } : p)))
+    setToast(nextUnlocked ? 'Paper unlocked for students' : 'Paper locked')
+    try {
+      await updateDoc(doc(db, 'examPapers', paper.id), {
+        isUnlocked: nextUnlocked,
+        unlockedAt: serverTimestamp(),
+      })
+    } catch (err) {
+      console.error('[AdminExams] toggle unlock failed:', err)
+      setPapers(prev => prev.map(p => (p.id === paper.id ? { ...p, isUnlocked: paper.isUnlocked } : p)))
+      setToast('Failed to update student access — please try again')
+    }
   }
 
   async function handleDeletePaper(paper: PaperDoc) {
@@ -366,6 +410,8 @@ export default function AdminExamsPage() {
     if (!paper) return
     await deleteDoc(doc(db, 'examQuestions', q.id))
     await updateDoc(doc(db, 'examPapers', paper.id), { totalQuestions: Math.max(0, questions.length - 1) })
+    const secQs = questions.filter(x => x.sectionId === q.sectionId && x.id !== q.id)
+    await updateDoc(doc(db, 'examSections', q.sectionId), { questionCount: secQs.length })
     setToast('Question deleted')
     await loadSectionsAndQuestions(paper.id)
   }
@@ -617,7 +663,25 @@ export default function AdminExamsPage() {
                         {paper.totalQuestions}Q · {Math.round((paper.timeLimitSeconds ?? 3600)/60)}min · Pass {paper.passMark}% · Order #{paper.order}
                       </p>
                     </div>
-                    <div className="flex shrink-0 gap-1 flex-wrap justify-end">
+                    <div className="flex shrink-0 gap-1 flex-wrap justify-end items-center">
+                      <div className="flex flex-col items-end gap-0.5 mr-1">
+                        <span className="text-[9px] font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">Student Access</span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={paper.isUnlocked === true}
+                          onClick={() => void handleToggleUnlock(paper)}
+                          className={`relative h-5 w-9 rounded-full transition-colors ${
+                            paper.isUnlocked ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-white/15'
+                          }`}
+                        >
+                          <span
+                            className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                              paper.isUnlocked ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
                       {paper.isLive && (
                         <button type="button" onClick={() => void startLiveExam(paper)}
                           className="rounded-lg bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700">

@@ -15,6 +15,7 @@ const PROGRAMS = [
 
 const NAV_LINKS = [
   { label: 'Home', href: '/' },
+  { label: 'Epic Wall', href: '/wall' },
   { label: 'About', href: '/about' },
   { label: 'Contact', href: '/contact' },
 ]
@@ -38,10 +39,10 @@ export default function PublicNav() {
 
   return (
     <header
-      className={`sticky top-0 z-50 h-[58px] border-b transition-all duration-300 bg-white/85 dark:bg-[#080d18]/85 backdrop-blur-xl ${
+      className={`sticky top-0 z-50 h-[58px] border-b transition-all duration-300 bg-white dark:bg-[#080d18]/85 backdrop-blur-xl ${
         scrolled
-          ? 'border-[#0B3D6B]/[0.12] dark:border-white/[0.06] shadow-sm'
-          : 'border-[#0B3D6B]/[0.07] dark:border-white/[0.04]'
+          ? 'border-gray-100 dark:border-white/[0.06] shadow-sm'
+          : 'border-gray-100 dark:border-white/[0.04]'
       }`}
     >
       <div className="mx-auto flex h-full max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -55,7 +56,7 @@ export default function PublicNav() {
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-8 lg:flex">
-          {NAV_LINKS.slice(0, 1).map((link) => (
+          {NAV_LINKS.slice(0, 2).map((link) => (
             <Link
               key={link.href}
               href={link.href}
@@ -109,7 +110,7 @@ export default function PublicNav() {
             )}
           </div>
 
-          {NAV_LINKS.slice(1).map((link) => (
+          {NAV_LINKS.slice(2).map((link) => (
             <Link
               key={link.href}
               href={link.href}

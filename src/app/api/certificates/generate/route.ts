@@ -6,10 +6,14 @@ export const dynamic = 'force-dynamic'
 
 const COURSE_NAMES: Record<string, string> = {
   'japan-ssw': 'Japanese Language & SSW Program',
-  'korea': 'Korean Language Program',
+  'korea-d2d4': 'Korean Language Program',
   'china': 'Chinese Language Program',
   'ielts': 'IELTS Preparation Program',
-  'nvq': 'National Vocational Qualification',
+  'nvq-it': 'National Vocational Qualification — Information Technology',
+  'nvq-hospitality': 'National Vocational Qualification — Hospitality',
+  'nvq-caregiving': 'National Vocational Qualification — Caregiving',
+  'nvq-construction': 'National Vocational Qualification — Construction',
+  'nvq-logistics': 'National Vocational Qualification — Logistics & Driving',
 }
 
 export async function POST(req: NextRequest) {

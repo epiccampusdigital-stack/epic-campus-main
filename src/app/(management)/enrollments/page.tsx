@@ -47,10 +47,14 @@ interface PaymentPlanForm {
 
 const COURSE_LABELS: Record<string, string> = {
   'japan-ssw': '🇯🇵 Japan SSW',
-  'korea': '🇰🇷 Korea',
+  'korea-d2d4': '🇰🇷 Korea',
   'china': '🇨🇳 China',
   'ielts': '📝 IELTS',
-  'nvq': '🎓 NVQ',
+  'nvq-it': '🎓 NVQ IT',
+  'nvq-hospitality': '🎓 NVQ Hospitality',
+  'nvq-caregiving': '🎓 NVQ Caregiving',
+  'nvq-construction': '🎓 NVQ Construction',
+  'nvq-logistics': '🎓 NVQ Logistics',
 }
 
 function formatDate(val: unknown): string {
@@ -105,9 +109,27 @@ export default function EnrollmentsPage() {
     setLoading(true)
     try {
       const snap = await getDocs(
-        query(collection(db, 'enrollments'), orderBy('createdAt', 'desc'))
-      ).catch(() => getDocs(collection(db, 'enrollments')))
-      setEnrollments(snap.docs.map(d => ({ id: d.id, ...d.data() } as Enrollment)))
+        query(collection(db, 'enrollmentApplications'), orderBy('createdAt', 'desc'))
+      ).catch(() => getDocs(collection(db, 'enrollmentApplications')))
+      setEnrollments(snap.docs.map(d => {
+        const data = d.data() as Record<string, unknown>
+        return {
+          id: d.id,
+          studentName: String(data.name ?? data.studentName ?? `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim()),
+          email: String(data.email ?? ''),
+          phone: String(data.phone ?? ''),
+          courseId: String(data.program ?? data.courseId ?? ''),
+          location: String(data.location ?? ''),
+          status: (data.status as Enrollment['status']) ?? 'pending',
+          createdAt: data.createdAt,
+          submittedAt: data.submittedAt,
+          notes: data.notes ? String(data.notes) : undefined,
+          agentId: data.agentId ? String(data.agentId) : undefined,
+          totalFee: typeof data.totalFee === 'number' ? data.totalFee : undefined,
+          paymentPlan: data.paymentPlan ? String(data.paymentPlan) : undefined,
+          batch: data.batch ? String(data.batch) : (data.batchDuration ? String(data.batchDuration) : undefined),
+        } as Enrollment
+      }))
     } catch (err) {
       console.error('[Enrollments]', err)
       setEnrollments([])
@@ -126,7 +148,7 @@ export default function EnrollmentsPage() {
       const batch = writeBatch(db)
 
       // Update enrollment status
-      batch.update(doc(db, 'enrollments', approveModal.id), {
+      batch.update(doc(db, 'enrollmentApplications', approveModal.id), {
         status: 'approved',
         approvedAt: serverTimestamp(),
         approvedBy: user.uid,
@@ -161,14 +183,17 @@ export default function EnrollmentsPage() {
         createdAt: serverTimestamp(),
       })
 
-      // Create payment plan if fee entered
+      // Create payment plan if fee entered — one plan doc per student, keyed by student id,
+      // stored in 'payments' (the single payments collection; distinguished from flat
+      // transaction receipts by the presence of an installments array).
       if (planForm.totalFee) {
-        const planRef = doc(collection(db, 'studentPaymentPlans'))
-        batch.set(planRef, {
+        batch.set(doc(db, 'payments', studentRef.id), {
           studentId: studentRef.id,
           studentName: approveModal.studentName,
           courseId: approveModal.courseId,
+          program: COURSE_LABELS[approveModal.courseId] ?? approveModal.courseId,
           location: approveModal.location,
+          branch: approveModal.location,
           totalFee: Number(planForm.totalFee),
           currency: 'LKR',
           installments: planForm.installments
@@ -225,7 +250,7 @@ export default function EnrollmentsPage() {
     if (!user || !rejectModal) return
     setSaving(true)
     try {
-      await updateDoc(doc(db, 'enrollments', rejectModal.id), {
+      await updateDoc(doc(db, 'enrollmentApplications', rejectModal.id), {
         status: 'rejected',
         rejectedAt: serverTimestamp(),
         rejectedBy: user.uid,

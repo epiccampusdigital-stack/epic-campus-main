@@ -22,12 +22,26 @@ export function toDate(value: unknown): Date | null {
   return null
 }
 
+/** All assigned roles for a staff member, falling back to [role] for legacy documents. */
+export function getStaffRoles(member: Pick<StaffMember, 'role' | 'roles'>): StaffRole[] {
+  return member.roles && member.roles.length > 0 ? member.roles : [member.role]
+}
+
+/** Whether a staff member has a given role — checks the roles array if present, else the legacy role string. */
+export function staffHasRole(member: Pick<StaffMember, 'role' | 'roles'>, role: StaffRole): boolean {
+  return getStaffRoles(member).includes(role)
+}
+
 export function parseStaff(id: string, data: Record<string, unknown>): StaffMember | null {
   const hasIdentity = !!(data.name || data.displayName || data.email || data.uid)
   if (!hasIdentity) return null
   const rawRole = String(data.role ?? '')
   if (rawRole === 'student' && !data.baseSalary && !data.startDate) return null
   const role = (STAFF_ROLES.includes(rawRole as StaffRole) ? rawRole : 'teacher') as Role
+
+  const rawRoles = Array.isArray(data.roles)
+    ? data.roles.filter((r): r is StaffRole => STAFF_ROLES.includes(r as StaffRole))
+    : []
 
   const created = toDate(data.createdAt)
   const approved = toDate(data.approvedAt)
@@ -39,6 +53,7 @@ export function parseStaff(id: string, data: Record<string, unknown>): StaffMemb
     email: String(data.email ?? ''),
     displayName: String(data.displayName ?? data.name ?? ''),
     role: role as StaffRole,
+    roles: rawRoles.length > 0 ? rawRoles : undefined,
     status: (data.status as StaffStatus) ?? 'active',
     phone: String(data.phone ?? data.mobile ?? ''),
     nic: String(data.nic ?? ''),
@@ -131,7 +146,7 @@ export function formatJoinDate(date: string): string {
 export function computeStaffStats(staff: StaffMember[]) {
   const byRole = STAFF_ROLES.reduce(
     (acc, role) => {
-      acc[role] = staff.filter((s) => s.role === role).length
+      acc[role] = staff.filter((s) => staffHasRole(s, role)).length
       return acc
     },
     {} as Record<StaffRole, number>,

@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { collection, getDocs } from 'firebase/firestore'
-import { db } from '@/lib/firebase/client'
+import { auth, db } from '@/lib/firebase/client'
 import {
   computeStaffStats,
   getRoleLabel,
   parseStaff,
+  staffHasRole,
 } from '@/lib/staff/helpers'
 import { sendCredentialsEmail } from '@/lib/students/helpers'
 import { logAuditEvent } from '@/lib/audit/helpers'
@@ -51,7 +52,7 @@ function StatCard({
 }
 
 export default function StaffPage() {
-  const { user } = useManagement()
+  const { user, hasRole } = useManagement()
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -108,7 +109,7 @@ export default function StaffPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return staff.filter((s) => {
-      if (roleFilter && s.role !== roleFilter) return false
+      if (roleFilter && !staffHasRole(s, roleFilter)) return false
       if (statusFilter && s.status !== statusFilter) return false
       if (!q) return true
       return (
@@ -150,9 +151,10 @@ export default function StaffPage() {
     if (!user) return
     setApprovingId(member.id)
     try {
+      const token = await auth.currentUser?.getIdToken()
       const res = await fetch('/api/staff/approve', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ staffId: member.id, approvedBy: user.uid }),
       })
       const data = (await res.json()) as { error?: string; password?: string; uid?: string }
@@ -182,12 +184,13 @@ export default function StaffPage() {
   }
 
   async function handleDelete(member: StaffMember) {
-    if (!user || !['admin', 'owner'].includes(user.role)) return
+    if (!user || !(hasRole('admin') || hasRole('owner'))) return
     if (!confirm(`Delete ${member.displayName}? This will remove their account.`)) return
     try {
+      const token = await auth.currentUser?.getIdToken()
       const res = await fetch('/api/staff/delete-account', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ staffId: member.id, uid: member.uid }),
       })
       if (res.ok) {

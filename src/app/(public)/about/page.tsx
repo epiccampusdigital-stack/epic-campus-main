@@ -44,7 +44,7 @@ export default function AboutPage() {
                 desc: 'To create overseas education and employment opportunities for thousands of Sri Lankan students, equipping them with language proficiency and career-focused training.',
               },
             ].map(item => (
-              <div key={item.title} className="rounded-2xl border border-[#DDE3EC] bg-white p-8 dark:border-white/[0.08] dark:bg-white/[0.03]">
+              <div key={item.title} className="rounded-2xl border border-gray-100 border-l-4 border-l-[#0B3D6B] shadow-sm bg-white p-8 dark:border-white/[0.08] dark:bg-white/[0.03]">
                 <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0B3D6B]/10 dark:bg-[#0B3D6B]/30">
                   <span className={`ti ${item.icon} text-[22px] text-[#0B3D6B] dark:text-blue-300`} />
                 </div>

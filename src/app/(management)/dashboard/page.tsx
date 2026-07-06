@@ -88,7 +88,10 @@ interface KitchenOverview {
 }
 
 export default function DashboardPage() {
-  const { user } = useManagement()
+  const { user, hasRole } = useManagement()
+  const userRoles = user?.roles ?? []
+  const isPureTeacher = userRoles.length > 0 && userRoles.every((r) => r === 'teacher')
+  const isPureReception = userRoles.length > 0 && userRoles.every((r) => r === 'reception')
   const [loading, setLoading] = useState(true)
   const [kitchenOverview, setKitchenOverview] = useState<KitchenOverview | null>(null)
   const [courseFilter, setCourseFilter] = useState<CourseId | ''>('')
@@ -117,7 +120,7 @@ export default function DashboardPage() {
         getDocs(collection(db, 'payments')),
         getDocs(collection(db, 'attendance')),
         getDocs(collection(db, 'users')),
-        getDocs(query(collection(db, 'enrollments'), where('status', '==', 'pending'))).catch(() => ({ docs: [] })),
+        getDocs(query(collection(db, 'enrollmentApplications'), where('status', '==', 'pending'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'examAttempts'), where('completedAt', '>=', todayStart))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'consultationRequests'), where('status', '==', 'pending'))).catch(() => ({ docs: [] })),
       ])
@@ -144,7 +147,7 @@ export default function DashboardPage() {
       setPendingEnrollments(enrollSnap.docs.length)
       setTodayExamAttempts(examSnap.docs.length)
       setPendingConsultations(consultSnap.docs.length)
-      if (user?.role === 'admin' || user?.role === 'owner') {
+      if (hasRole('admin') || hasRole('owner')) {
         setPartnerNotifications(await fetchUnreadPartnerNotifications())
         const appSnap = await getDocs(
           query(collection(db, 'pendingApprovals'), where('status', '==', 'pending'))
@@ -167,18 +170,18 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }, [user?.role])
+  }, [hasRole])
 
   useEffect(() => {
-    if (user?.role === 'teacher') {
+    if (isPureTeacher) {
       setLoading(false)
       return
     }
     loadData()
-  }, [loadData, user?.role])
+  }, [loadData, isPureTeacher])
 
   useEffect(() => {
-    if (!user || (user.role !== 'admin' && user.role !== 'owner')) return
+    if (!user || !(hasRole('admin') || hasRole('owner'))) return
     async function loadKitchen() {
       try {
         const today = new Date()
@@ -222,17 +225,17 @@ export default function DashboardPage() {
       } catch {}
     }
     loadKitchen()
-  }, [user?.role])
+  }, [user, hasRole])
 
   useEffect(() => {
     if (
       user &&
-      (user.role === 'reception' || user.role === 'teacher') &&
+      (hasRole('reception') || hasRole('teacher')) &&
       user.locationAssigned
     ) {
       setLocationFilter(user.locationAssigned)
     }
-  }, [user?.role, user?.locationAssigned])
+  }, [user, hasRole])
 
   const filteredStudents = useMemo(
     () => filterStudents(allStudents, courseFilter, locationFilter),
@@ -332,11 +335,11 @@ export default function DashboardPage() {
 
   const monthOptions = useMemo(() => getMonthPickerOptions(12), [])
 
-  if (user?.role === 'teacher') {
+  if (isPureTeacher) {
     return <TeacherDashboard />
   }
 
-  if (user?.role === 'reception') {
+  if (isPureReception) {
     return <ReceptionDashboard />
   }
 
@@ -467,7 +470,7 @@ export default function DashboardPage() {
         </Link>
 
         {/* Pending enrollments */}
-        {(user?.role === 'admin' || user?.role === 'owner') && (
+        {(hasRole('admin') || hasRole('owner')) && (
           <Link href="/enrollments" className="rounded-[12px] border border-amber-200/80 dark:border-amber-800/50 bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-2xl p-3 sm:p-[14px] transition-all duration-300 hover:shadow-md block">
             <p className="font-inter text-xs font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">Pending Enrollments</p>
             {loading ? <div className="mt-2 h-8 w-16 animate-pulse rounded bg-amber-200/50" /> : (
@@ -491,7 +494,7 @@ export default function DashboardPage() {
         </Link>
 
         {/* Pending consultations */}
-        {(user?.role === 'admin' || user?.role === 'owner') && (
+        {(hasRole('admin') || hasRole('owner')) && (
           <Link href="/consultations/requests" className="rounded-[12px] border border-blue-200/80 dark:border-blue-800/50 bg-blue-50/80 dark:bg-blue-900/20 backdrop-blur-2xl p-3 sm:p-[14px] transition-all duration-300 hover:shadow-md block">
             <p className="font-inter text-xs font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">Consultations</p>
             {loading ? <div className="mt-2 h-8 w-16 animate-pulse rounded bg-blue-200/50" /> : (
@@ -515,8 +518,8 @@ export default function DashboardPage() {
             { label: 'Broadcast', href: '/broadcast', icon: 'ti-speakerphone', color: 'bg-emerald-600 text-white' },
             { label: 'Reports', href: '/reports', icon: 'ti-chart-bar', color: 'bg-[#0B3D6B]/80 text-white' },
           ].filter(a => {
-            if (a.href === '/staff' && user?.role !== 'admin' && user?.role !== 'owner') return false
-            if (a.href === '/broadcast' && !['admin', 'owner', 'reception'].includes(user?.role ?? '')) return false
+            if (a.href === '/staff' && !(hasRole('admin') || hasRole('owner'))) return false
+            if (a.href === '/broadcast' && !(hasRole('admin') || hasRole('owner') || hasRole('reception'))) return false
             return true
           }).map(action => (
             <Link key={action.href} href={action.href}
@@ -528,7 +531,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {pendingApprovals.length > 0 && (user?.role === 'admin' || user?.role === 'owner') && (
+      {pendingApprovals.length > 0 && (hasRole('admin') || hasRole('owner')) && (
         <div className="rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4">
           <div className="flex items-center gap-3 mb-3">
             <span className="ti ti-user-check text-xl text-amber-600" />
@@ -581,7 +584,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {(user?.role === 'admin' || user?.role === 'owner') && (
+      {(hasRole('admin') || hasRole('owner')) && (
         <StudentRiskAlertsWidget />
       )}
 
@@ -792,7 +795,7 @@ export default function DashboardPage() {
       </section>
 
       {/* Kitchen Overview Widget — admin/owner only */}
-      {(user?.role === 'admin' || user?.role === 'owner') && kitchenOverview && (
+      {(hasRole('admin') || hasRole('owner')) && kitchenOverview && (
         <section>
           <div className="rounded-xl border border-white/90 bg-white/65 p-5 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05]">
             <div className="mb-4 flex items-center justify-between">

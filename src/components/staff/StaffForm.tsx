@@ -9,11 +9,12 @@ import {
   serverTimestamp,
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { db, storage } from '@/lib/firebase/client'
+import { auth, db, storage } from '@/lib/firebase/client'
 import {
   STAFF_ROLES,
   formatSalary,
   getRoleLabel,
+  getStaffRoles,
   sendStaffWhatsApp,
 } from '@/lib/staff/helpers'
 import { generateTempPassword, sendCredentialsEmail } from '@/lib/students/helpers'
@@ -30,7 +31,7 @@ export interface StaffFormValues {
   phone: string
   email: string
   address: string
-  role: StaffRole
+  roles: StaffRole[]
   status: StaffStatus
   startDate: string
   salaryType: SalaryType
@@ -46,7 +47,7 @@ const EMPTY: StaffFormValues = {
   phone: '',
   email: '',
   address: '',
-  role: 'teacher',
+  roles: ['teacher'],
   status: 'active',
   startDate: new Date().toISOString().slice(0, 10),
   salaryType: 'fixed',
@@ -71,7 +72,7 @@ function staffToForm(s: StaffMember): StaffFormValues {
     phone: s.phone,
     email: s.email,
     address: s.address ?? '',
-    role: s.role,
+    roles: getStaffRoles(s),
     status: s.status,
     startDate: s.startDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
     salaryType: s.salaryType,
@@ -83,7 +84,7 @@ function staffToForm(s: StaffMember): StaffFormValues {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="mb-1.5 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+    <label className="mb-1.5 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-gray-300">
       {children}
     </label>
   )
@@ -91,7 +92,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 
 function SectionTitle({ icon, title }: { icon: string; title: string }) {
   return (
-    <h3 className="mb-4 flex items-center gap-2 font-jakarta text-sm font-bold text-[#0B3D6B]">
+    <h3 className="mb-4 flex items-center gap-2 font-jakarta text-sm font-bold text-[#0B3D6B] dark:text-white">
       <span className={`ti ${icon} text-lg`} aria-hidden="true" />
       {title}
     </h3>
@@ -129,6 +130,15 @@ export default function StaffForm({
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
+  function toggleRole(role: StaffRole) {
+    setForm((prev) => ({
+      ...prev,
+      roles: prev.roles.includes(role)
+        ? prev.roles.filter((r) => r !== role)
+        : [...prev.roles, role],
+    }))
+  }
+
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -149,14 +159,16 @@ export default function StaffForm({
     displayName: string,
   ): Promise<{ uid: string; password: string }> {
     const password = generateTempPassword()
+    const token = await auth.currentUser?.getIdToken()
     const res = await fetch('/api/staff/create-account', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         email,
         password,
         displayName,
-        role: form.role,
+        role: form.roles[0],
+        roles: form.roles,
         phone: form.phone.trim(),
         nic: form.nic.trim(),
         dateOfBirth: form.dateOfBirth || null,
@@ -167,7 +179,7 @@ export default function StaffForm({
         salaryType: form.salaryType,
         baseSalary: form.baseSalary ? Number(form.baseSalary) : 0,
         commissionRate:
-          (form.role === 'agent' || form.salaryType === 'commission') && form.commissionRate
+          (form.roles.includes('agent') || form.salaryType === 'commission') && form.commissionRate
             ? Number(form.commissionRate)
             : null,
         status: 'active',
@@ -193,6 +205,11 @@ export default function StaffForm({
       return
     }
 
+    if (form.roles.length === 0) {
+      setError('Please select at least one role')
+      return
+    }
+
     setSaving(true)
     setError('')
 
@@ -208,14 +225,15 @@ export default function StaffForm({
         email: form.email.trim(),
         address: form.address.trim() || null,
         photoUrl: photoUrl ?? null,
-        role: form.role,
+        role: form.roles[0],
+        roles: form.roles,
         status: form.status,
         branchId: user.branchId ?? 'galle-main',
         startDate: form.startDate || null,
         salaryType: form.salaryType,
         baseSalary: form.baseSalary ? Number(form.baseSalary) : 0,
         commissionRate:
-          (form.role === 'agent' || form.salaryType === 'commission') && form.commissionRate
+          (form.roles.includes('agent') || form.salaryType === 'commission') && form.commissionRate
             ? Number(form.commissionRate)
             : null,
         locationAssigned: form.locationAssigned || null,
@@ -276,7 +294,7 @@ export default function StaffForm({
   if (!open) return null
 
   const inputClass =
-    'w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2.5 font-inter text-base text-[#0D1B2A] outline-none focus:border-[#E8A020] sm:text-sm disabled:bg-[#F5F7FB] disabled:text-[#5A6A7A]'
+    'w-full rounded-lg border border-[#DDE3EC] dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2.5 font-inter text-base text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] sm:text-sm placeholder-gray-400 dark:placeholder-gray-500 disabled:bg-[#F5F7FB] dark:disabled:bg-white/[0.03] disabled:text-[#5A6A7A] dark:disabled:text-white/40'
 
   return (
     <>
@@ -290,13 +308,13 @@ export default function StaffForm({
         role="dialog"
         aria-modal="true"
       >
-        <div className="flex items-center justify-between border-b border-[#DDE3EC] px-6 py-4">
+        <div className="flex items-center justify-between border-b border-[#DDE3EC] dark:border-white/[0.08] px-6 py-4">
           <div>
-            <h2 className="font-jakarta text-lg font-bold text-[#0D1B2A]">
+            <h2 className="font-jakarta text-lg font-bold text-[#0D1B2A] dark:text-white">
               {isView ? 'Staff Profile' : isEdit ? 'Edit Staff' : 'Invite / Add Staff'}
             </h2>
             {staff && (
-              <p className="text-xs text-[#5A6A7A]">{getRoleLabel(staff.role)}</p>
+              <p className="text-xs text-[#5A6A7A]">{getStaffRoles(staff).map(getRoleLabel).join(', ')}</p>
             )}
           </div>
           <button
@@ -414,23 +432,32 @@ export default function StaffForm({
 
             <SectionTitle icon="ti-shield-lock" title="Role & Access" />
             <div className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <FieldLabel>Role *</FieldLabel>
-                  <select
-                    value={form.role}
-                    onChange={(e) => setField('role', e.target.value as StaffRole)}
-                    required
-                    disabled={isView}
-                    className={inputClass}
-                  >
-                    {STAFF_ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {getRoleLabel(r)}
-                      </option>
-                    ))}
-                  </select>
+              <div>
+                <FieldLabel>Role * (select all that apply)</FieldLabel>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {STAFF_ROLES.map((r) => (
+                    <label
+                      key={r}
+                      className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+                        form.roles.includes(r)
+                          ? 'border-[#E8A020] bg-[#E8A020]/5'
+                          : 'border-[#DDE3EC] dark:border-gray-600 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.04]'
+                      } ${isView ? 'pointer-events-none opacity-70' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.roles.includes(r)}
+                        disabled={isView}
+                        onChange={() => toggleRole(r)}
+                        className="h-4 w-4 rounded border-[#DDE3EC] text-[#E8A020] focus:ring-[#E8A020]"
+                      />
+                      <span className="text-[#0D1B2A] dark:text-white">{getRoleLabel(r)}</span>
+                    </label>
+                  ))}
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <FieldLabel>Status</FieldLabel>
                   <select
@@ -515,7 +542,7 @@ export default function StaffForm({
                 </div>
               </div>
 
-              {(form.salaryType === 'commission' || form.role === 'agent') && (
+              {(form.salaryType === 'commission' || form.roles.includes('agent')) && (
                 <div>
                   <FieldLabel>Commission Rate (%)</FieldLabel>
                   <input

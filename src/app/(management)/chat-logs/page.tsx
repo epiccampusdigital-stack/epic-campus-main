@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { onAuthStateChanged } from 'firebase/auth'
 import {
   collection,
   collectionGroup,
@@ -14,11 +13,11 @@ import {
   type DocumentData,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore'
-import { auth, db } from '@/lib/firebase/client'
+import { db } from '@/lib/firebase/client'
 import { useRouter } from 'next/navigation'
+import { useManagement } from '@/components/layout/ManagementContext'
 
 const PAGE_SIZE = 20
-const ALLOWED_ROLES = ['admin', 'owner']
 
 interface StudentSession {
   studentId: string
@@ -42,7 +41,8 @@ type Tab = 'student' | 'public'
 
 export default function ChatLogsPage() {
   const router = useRouter()
-  const [authorized, setAuthorized] = useState(false)
+  const { hasRole, loading: authLoading } = useManagement()
+  const authorized = hasRole('admin') || hasRole('owner')
   const [tab, setTab] = useState<Tab>('student')
 
   // Student AI tab state
@@ -63,14 +63,9 @@ export default function ChatLogsPage() {
   const [expandedLog, setExpandedLog] = useState<string | null>(null)
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) { router.replace('/login'); return }
-      const token = await u.getIdTokenResult()
-      if (!ALLOWED_ROLES.includes(token.claims.role as string)) { router.replace('/dashboard'); return }
-      setAuthorized(true)
-    })
-    return () => unsub()
-  }, [router])
+    if (authLoading) return
+    if (!authorized) router.replace('/dashboard')
+  }, [authLoading, authorized, router])
 
   // Load student sessions from aiChatHistory (collectionGroup)
   useEffect(() => {

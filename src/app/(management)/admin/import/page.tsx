@@ -83,7 +83,7 @@ Return ONLY the JSON array, no explanation, no markdown, no backticks.`,
   {
     id: 'payments',
     label: 'Payment Plans',
-    collection: 'studentPaymentPlans',
+    collection: 'payments',
     icon: 'ti-credit-card',
     color: 'text-emerald-600',
     bg: 'bg-emerald-50 dark:bg-emerald-900/20',

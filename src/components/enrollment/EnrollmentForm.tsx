@@ -48,22 +48,22 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
                   done
                     ? "bg-[#0B3D6B] text-white"
                     : active
-                    ? "border-2 border-[#E8A020] bg-white text-[#E8A020]"
-                    : "border-2 border-gray-200 bg-white text-gray-400"
+                    ? "border-2 border-[#E8A020] bg-white dark:bg-gray-800 text-[#E8A020]"
+                    : "border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-400 dark:text-gray-500"
                 }`}
               >
                 {done ? <span className="ti ti-check text-sm" /> : i + 1}
               </div>
               <span
                 className={`hidden text-xs font-medium sm:block ${
-                  active ? "text-[#0B3D6B]" : done ? "text-gray-600" : "text-gray-400"
+                  active ? "text-[#0B3D6B] dark:text-white" : done ? "text-gray-600 dark:text-gray-300" : "text-gray-400 dark:text-gray-500"
                 }`}
               >
                 {STEP_LABELS[i]}
               </span>
             </div>
             {i < total - 1 && (
-              <div className={`h-px w-10 ${done ? "bg-[#0B3D6B]" : "bg-gray-200"}`} />
+              <div className={`h-px w-10 ${done ? "bg-[#0B3D6B]" : "bg-gray-200 dark:bg-gray-600"}`} />
             )}
           </div>
         )
@@ -85,7 +85,7 @@ function FormField({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium text-gray-700">
+      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       {children}
@@ -95,7 +95,7 @@ function FormField({
 }
 
 const inputCls =
-  "w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-[#0B3D6B] focus:ring-2 focus:ring-[#0B3D6B]/10 disabled:bg-gray-50 disabled:text-gray-400"
+  "w-full rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-3 text-sm text-gray-900 dark:text-white outline-none transition focus:border-[#0B3D6B] focus:ring-2 focus:ring-[#0B3D6B]/10 placeholder-gray-400 dark:placeholder-gray-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-400"
 
 export default function EnrollmentForm() {
   const [step, setStep] = useState(0)
@@ -176,11 +176,11 @@ export default function EnrollmentForm() {
     <div className="mx-auto w-full max-w-2xl">
       <StepIndicator current={step} total={3} />
 
-      <div className="mt-8 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
+      <div className="mt-8 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm sm:p-8">
         {/* Step 0 — Personal Details */}
         {step === 0 && (
           <div className="space-y-5">
-            <h2 className="font-jakarta text-xl font-bold text-[#0B3D6B]">Personal Details</h2>
+            <h2 className="font-jakarta text-xl font-bold text-[#0B3D6B] dark:text-white">Personal Details</h2>
             <div className="grid gap-5 sm:grid-cols-2">
               <FormField label="First Name" required error={errors.firstName}>
                 <input
@@ -212,12 +212,12 @@ export default function EnrollmentForm() {
               />
             </FormField>
             <FormField label="Phone Number" required error={errors.phone}>
-              <div className="flex overflow-hidden rounded-xl border border-gray-200 focus-within:border-[#0B3D6B] focus-within:ring-2 focus-within:ring-[#0B3D6B]/10">
-                <span className="flex items-center border-r border-gray-200 bg-gray-50 px-4 text-sm font-medium text-gray-500">
+              <div className="flex overflow-hidden rounded-xl border border-gray-200 dark:border-gray-600 focus-within:border-[#0B3D6B] focus-within:ring-2 focus-within:ring-[#0B3D6B]/10">
+                <span className="flex items-center border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
                   +94
                 </span>
                 <input
-                  className="flex-1 px-4 py-3 text-sm text-gray-900 outline-none"
+                  className="flex-1 bg-white dark:bg-gray-700 px-4 py-3 text-sm text-gray-900 dark:text-white outline-none"
                   value={form.phone.replace(/^\+94/, "").replace(/^0/, "")}
                   onChange={(e) => set("phone", e.target.value.replace(/\D/g, ""))}
                   placeholder="771234567"
@@ -251,10 +251,10 @@ export default function EnrollmentForm() {
         {/* Step 1 — Program Selection */}
         {step === 1 && (
           <div className="space-y-6">
-            <h2 className="font-jakarta text-xl font-bold text-[#0B3D6B]">Program Selection</h2>
+            <h2 className="font-jakarta text-xl font-bold text-[#0B3D6B] dark:text-white">Program Selection</h2>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Choose a Program <span className="text-red-500">*</span>
               </label>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -265,14 +265,14 @@ export default function EnrollmentForm() {
                     onClick={() => set("program", p.id)}
                     className={`flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
                       form.program === p.id
-                        ? "border-[#0B3D6B] bg-[#0B3D6B]/5"
-                        : "border-gray-200 hover:border-gray-300"
+                        ? "border-[#0B3D6B] bg-[#0B3D6B]/5 dark:bg-[#0B3D6B]/20"
+                        : "border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
                     }`}
                   >
-                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#0B3D6B]/10 text-[10px] font-bold text-[#0B3D6B]">{p.flag}</span>
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#0B3D6B]/10 dark:bg-[#0B3D6B]/40 text-[10px] font-bold text-[#0B3D6B] dark:text-blue-300">{p.flag}</span>
                     <div>
-                      <p className="font-semibold text-[#0B3D6B]">{p.label}</p>
-                      <p className="mt-0.5 text-xs text-gray-500">{p.subtitle}</p>
+                      <p className="font-semibold text-[#0B3D6B] dark:text-white">{p.label}</p>
+                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{p.subtitle}</p>
                     </div>
                   </button>
                 ))}
@@ -296,7 +296,7 @@ export default function EnrollmentForm() {
             </FormField>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Batch Duration <span className="text-red-500">*</span>
               </label>
               <div className="flex gap-3">
@@ -307,8 +307,8 @@ export default function EnrollmentForm() {
                     onClick={() => set("batchDuration", b.value)}
                     className={`flex-1 rounded-xl border-2 py-3 text-sm font-medium transition-all ${
                       form.batchDuration === b.value
-                        ? "border-[#0B3D6B] bg-[#0B3D6B]/5 text-[#0B3D6B]"
-                        : "border-gray-200 text-gray-600 hover:border-gray-300"
+                        ? "border-[#0B3D6B] bg-[#0B3D6B]/5 dark:bg-[#0B3D6B]/20 text-[#0B3D6B] dark:text-white"
+                        : "border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500"
                     }`}
                   >
                     {b.label}
@@ -339,33 +339,33 @@ export default function EnrollmentForm() {
         {/* Step 2 — Confirmation */}
         {step === 2 && (
           <div className="space-y-6">
-            <h2 className="font-jakarta text-xl font-bold text-[#0B3D6B]">
+            <h2 className="font-jakarta text-xl font-bold text-[#0B3D6B] dark:text-white">
               Confirm Your Application
             </h2>
-            <div className="rounded-xl border border-gray-100 bg-[#F5F7FB] p-5 space-y-3 text-sm">
+            <div className="rounded-xl border border-gray-100 dark:border-gray-700 bg-[#F5F7FB] dark:bg-gray-900/50 p-5 space-y-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500">Name</span>
-                <span className="font-medium text-[#0D1B2A]">{form.firstName} {form.lastName}</span>
+                <span className="text-gray-500 dark:text-gray-400">Name</span>
+                <span className="font-medium text-[#0D1B2A] dark:text-white">{form.firstName} {form.lastName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Email</span>
-                <span className="font-medium text-[#0D1B2A]">{form.email}</span>
+                <span className="text-gray-500 dark:text-gray-400">Email</span>
+                <span className="font-medium text-[#0D1B2A] dark:text-white">{form.email}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Phone</span>
-                <span className="font-medium text-[#0D1B2A]">+94{form.phone}</span>
+                <span className="text-gray-500 dark:text-gray-400">Phone</span>
+                <span className="font-medium text-[#0D1B2A] dark:text-white">+94{form.phone}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Program</span>
-                <span className="font-medium text-[#0D1B2A]">{form.program}</span>
+                <span className="text-gray-500 dark:text-gray-400">Program</span>
+                <span className="font-medium text-[#0D1B2A] dark:text-white">{form.program}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Campus</span>
-                <span className="font-medium text-[#0D1B2A]">{form.location}</span>
+                <span className="text-gray-500 dark:text-gray-400">Campus</span>
+                <span className="font-medium text-[#0D1B2A] dark:text-white">{form.location}</span>
               </div>
             </div>
-            <div className="rounded-xl border border-[#0B3D6B]/20 bg-[#0B3D6B]/5 px-5 py-4">
-              <p className="text-sm text-gray-700">
+            <div className="rounded-xl border border-[#0B3D6B]/20 dark:border-[#1A6BAD]/30 bg-[#0B3D6B]/5 dark:bg-[#0B3D6B]/20 px-5 py-4">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
                 Our team will review your application and contact you within{' '}
                 <strong className="text-[#0B3D6B]">24 hours</strong> to confirm
                 your enrollment.
@@ -380,7 +380,7 @@ export default function EnrollmentForm() {
             <button
               type="button"
               onClick={() => setStep((s) => s - 1)}
-              className="flex items-center gap-2 rounded-xl border border-gray-200 px-6 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              className="flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 px-6 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 transition hover:bg-gray-50 dark:hover:bg-gray-700"
             >
               <span className="ti ti-arrow-left" />
               Back

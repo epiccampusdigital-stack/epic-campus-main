@@ -46,7 +46,7 @@ function StatCard({
 }
 
 export default function AttendancePage() {
-  const { user } = useManagement()
+  const { user, hasRole } = useManagement()
   const [records, setRecords] = useState<AttendanceRecord[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
@@ -163,12 +163,12 @@ export default function AttendancePage() {
   useEffect(() => {
     if (
       user &&
-      (user.role === 'reception' || user.role === 'teacher') &&
+      (hasRole('reception') || hasRole('teacher')) &&
       user.locationAssigned
     ) {
       setLocationFilter(user.locationAssigned)
     }
-  }, [user?.role, user?.locationAssigned])
+  }, [user, hasRole])
 
   const locationStudentIds = useMemo(
     () => studentIdSetForLocation(students, locationFilter),

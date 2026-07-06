@@ -210,7 +210,7 @@ function getStudentRow(
 
 export default function PaymentsPage() {
   const router = useRouter()
-  const { user } = useManagement()
+  const { user, hasRole } = useManagement()
   const [students, setStudents] = useState<Student[]>([])
   const [plans, setPlans] = useState<StudentPaymentPlan[]>([])
   const [loading, setLoading] = useState(true)
@@ -236,11 +236,13 @@ export default function PaymentsPage() {
     dueDate: new Date().toISOString().slice(0, 10),
   })
 
-  const canMarkPaid = user && (user.role === 'admin' || user.role === 'owner' || user.role === 'reception')
-  const canAddInstallment = user && (user.role === 'admin' || user.role === 'owner')
+  const canMarkPaid = user && (hasRole('admin') || hasRole('owner') || hasRole('accountant'))
+  const canAddInstallment = user && (hasRole('admin') || hasRole('owner'))
   const canBulkPay = canMarkPaid
-  const isViewOnly = user?.role === 'accountant'
-  const isForbiddenRole = user?.role === 'teacher' || user?.role === 'student'
+  const isViewOnly = hasRole('accountant') && !canMarkPaid
+  // Forbidden only if every one of the user's roles is teacher/student — any other role grants access.
+  const userRolesList = user?.roles ?? []
+  const isForbiddenRole = userRolesList.length > 0 && userRolesList.every((r) => r === 'teacher' || r === 'student')
 
   useEffect(() => {
     if (isForbiddenRole) {
@@ -366,7 +368,9 @@ export default function PaymentsPage() {
       await setDoc(doc(db, 'payments', student.id), {
         studentId: student.id,
         studentName: student.name,
+        courseId: student.courseId,
         program: COURSE_MAP[student.courseId]?.label ?? student.courseId,
+        location: student.branchId ?? '',
         branch: student.branchId ?? '',
         totalFee,
         currency: 'LKR',

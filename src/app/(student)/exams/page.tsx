@@ -26,6 +26,32 @@ interface ExamPaperDoc {
   passMark?: number
   isPublished?: boolean
   order?: number
+  isUnlocked?: boolean
+}
+
+type ExamCategoryId = 'jft-basic' | 'general' | 'irodori'
+
+const EXAM_CATEGORIES: {
+  id: ExamCategoryId
+  label: string
+  desc: string
+  color: string
+  icon: string
+}[] = [
+  { id: 'jft-basic', label: 'JFT Basic', desc: 'Japan Foundation Test preparation papers', color: '#0B3D6B', icon: 'ti-certificate' },
+  { id: 'general', label: 'General Papers', desc: 'General language and skill practice papers', color: '#E8A020', icon: 'ti-books' },
+  { id: 'irodori', label: 'Irodori', desc: 'Irodori Japanese language course papers', color: '#059669', icon: 'ti-book-2' },
+]
+
+/** Bucket a paper into one of the three exam categories. Explicit categoryId wins;
+ *  otherwise Irodori is inferred from the title and everything else is General. */
+function paperCategory(p: ExamPaperDoc): ExamCategoryId {
+  const cat = (p.categoryId ?? '').toLowerCase().replace(/_/g, '-')
+  if (cat === 'jft-basic') return 'jft-basic'
+  if (cat === 'irodori') return 'irodori'
+  if (cat === 'general') return 'general'
+  if ((p.title ?? '').trim().toLowerCase().startsWith('irodori')) return 'irodori'
+  return 'general'
 }
 
 function daysSinceCourseStart(startDate: string | undefined): number | null {
@@ -65,6 +91,7 @@ export default function ExamsListPage() {
   const [papers, setPapers] = useState<ExamPaperDoc[]>([])
   const [attempts, setAttempts] = useState<Record<string, { pct: number; count: number }>>({})
   const [loading, setLoading] = useState(true)
+  const [selectedCat, setSelectedCat] = useState<ExamCategoryId | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -86,6 +113,7 @@ export default function ExamsListPage() {
         setPapers(
           list.filter((p) => {
             if (p.isPublished === false) return false
+            if (p.isUnlocked !== true) return false
             if (p.courseTag === 'japan-ssw-45day') return student?.courseId === 'japan-ssw'
             return true
           }),
@@ -118,12 +146,116 @@ export default function ExamsListPage() {
     void load()
   }, [user, student])
 
-  const categoryGroups = papers.reduce<Record<string, ExamPaperDoc[]>>((acc, p) => {
-    const cat = p.categoryId ?? 'general'
-    if (!acc[cat]) acc[cat] = []
-    acc[cat].push(p)
-    return acc
-  }, {})
+  const papersByCategory = papers.reduce<Record<ExamCategoryId, ExamPaperDoc[]>>(
+    (acc, p) => {
+      acc[paperCategory(p)].push(p)
+      return acc
+    },
+    { 'jft-basic': [], general: [], irodori: [] },
+  )
+  const selectedPapers = selectedCat ? papersByCategory[selectedCat] : []
+
+  function renderPaper(paper: ExamPaperDoc) {
+    const att = attempts[paper.id]
+    const isPassed = att && att.pct >= (paper.passMark ?? 80)
+    const isFortyFiveDay = paper.courseTag === 'japan-ssw-45day'
+    const locked =
+      isFortyFiveDay &&
+      (daysSinceStart === null || (paper.unlockDay ?? 0) > daysSinceStart)
+    const completed45 = isFortyFiveDay && !!att
+
+    if (locked) {
+      return (
+        <div
+          key={paper.id}
+          className="flex w-full items-center gap-4 rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-[#F5F7FB] dark:bg-white/[0.02] p-4 text-left opacity-70"
+        >
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-200 dark:bg-white/[0.06] text-xl text-gray-400">
+            <span className="ti ti-lock" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-jakarta font-bold text-gray-500 dark:text-white/40">
+              {paper.title}
+            </p>
+            <p className="mt-1 text-xs text-gray-400 dark:text-white/30">
+              Unlocks on Day {paper.unlockDay}
+            </p>
+          </div>
+          <span className="ti ti-lock text-gray-300" />
+        </div>
+      )
+    }
+
+    if (completed45) {
+      return (
+        <div
+          key={paper.id}
+          className="flex w-full items-center gap-4 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-4 text-left"
+        >
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30 text-xl">
+            <span className="ti ti-check text-emerald-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-jakarta font-bold text-[#0D1B2A] dark:text-white">
+              {paper.title}
+            </p>
+            <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">Completed</p>
+          </div>
+          {att && <ScoreRing pct={Math.round(att.pct)} />}
+        </div>
+      )
+    }
+
+    return (
+      <button
+        key={paper.id}
+        type="button"
+        onClick={() => router.push(`/exams/${paper.id}`)}
+        className="flex w-full items-center gap-4 rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-4 text-left transition-all hover:border-[#E8A020] hover:shadow-sm"
+      >
+        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl ${
+          isPassed ? 'bg-emerald-50 dark:bg-emerald-900/20' :
+          att ? 'bg-amber-50 dark:bg-amber-900/20' :
+          'bg-[#F5F7FB] dark:bg-white/[0.06]'
+        }`}>
+          {isPassed ? '🏆' : att ? '📝' : '📄'}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-jakarta font-bold text-[#0D1B2A] dark:text-white">
+            {paper.title}
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#5A6A7A] dark:text-white/50">
+            <span className="ti ti-clock mr-0.5" />
+            {Math.round((paper.timeLimitSeconds ?? 3600) / 60)} min
+            <span>·</span>
+            <span className="ti ti-list-numbers mr-0.5" />
+            {paper.totalQuestions ?? 48} questions
+            <span>·</span>
+            Pass: {paper.passMark ?? 80}%
+            {att && (
+              <>
+                <span>·</span>
+                <span>{att.count} attempt{att.count > 1 ? 's' : ''}</span>
+              </>
+            )}
+          </div>
+          {paper.description && (
+            <p className="mt-1 truncate text-xs text-[#5A6A7A] dark:text-white/40">
+              {paper.description}
+            </p>
+          )}
+        </div>
+        {att ? (
+          <ScoreRing pct={Math.round(att.pct)} />
+        ) : (
+          <div className="flex items-center gap-1 rounded-xl bg-[#E8A020] px-3 py-1.5 text-xs font-bold text-[#0B3D6B]">
+            Start
+            <span className="ti ti-chevron-right" />
+          </div>
+        )}
+      </button>
+    )
+  }
 
   if (!user) return null
 
@@ -163,117 +295,67 @@ export default function ExamsListPage() {
           <p className="mt-3 text-sm text-[#5A6A7A]">No exam papers published yet</p>
           <p className="mt-1 text-xs text-[#5A6A7A]/60">Check back soon — your teacher is preparing papers</p>
         </div>
-      ) : (
-        Object.entries(categoryGroups).map(([cat, catPapers]) => (
-          <div key={cat}>
-            <h2 className="mb-3 font-jakarta text-sm font-bold uppercase tracking-wider text-[#5A6A7A] dark:text-white/50">
-              {cat.replace(/-/g, ' ')}
-            </h2>
-            <div className="space-y-3">
-              {catPapers.map((paper) => {
-                const att = attempts[paper.id]
-                const isPassed = att && att.pct >= (paper.passMark ?? 80)
-                const isFortyFiveDay = paper.courseTag === 'japan-ssw-45day'
-                const locked =
-                  isFortyFiveDay &&
-                  (daysSinceStart === null || (paper.unlockDay ?? 0) > daysSinceStart)
-                const completed45 = isFortyFiveDay && !!att
-
-                if (locked) {
-                  return (
-                    <div
-                      key={paper.id}
-                      className="flex w-full items-center gap-4 rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-[#F5F7FB] dark:bg-white/[0.02] p-4 text-left opacity-70"
-                    >
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-200 dark:bg-white/[0.06] text-xl text-gray-400">
-                        <span className="ti ti-lock" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-jakarta font-bold text-gray-500 dark:text-white/40">
-                          {paper.title}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-400 dark:text-white/30">
-                          Unlocks on Day {paper.unlockDay}
-                        </p>
-                      </div>
-                      <span className="ti ti-lock text-gray-300" />
-                    </div>
-                  )
-                }
-
-                if (completed45) {
-                  return (
-                    <div
-                      key={paper.id}
-                      className="flex w-full items-center gap-4 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-4 text-left"
-                    >
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30 text-xl">
-                        <span className="ti ti-check text-emerald-600" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-jakarta font-bold text-[#0D1B2A] dark:text-white">
-                          {paper.title}
-                        </p>
-                        <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">Completed</p>
-                      </div>
-                      {att && <ScoreRing pct={Math.round(att.pct)} />}
-                    </div>
-                  )
-                }
-
-                return (
-                  <button
-                    key={paper.id}
-                    type="button"
-                    onClick={() => router.push(`/exams/${paper.id}`)}
-                    className="flex w-full items-center gap-4 rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-4 text-left transition-all hover:border-[#E8A020] hover:shadow-sm"
+      ) : selectedCat === null ? (
+        /* Category tiles */
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {EXAM_CATEGORIES.map((cat) => {
+            const count = papersByCategory[cat.id].length
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setSelectedCat(cat.id)}
+                className="group flex flex-col rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5 text-left transition-all hover:-translate-y-0.5 hover:border-[#E8A020] hover:shadow-md"
+              >
+                <div className="flex items-center justify-between">
+                  <div
+                    className="flex h-12 w-12 items-center justify-center rounded-xl text-2xl text-white"
+                    style={{ backgroundColor: cat.color }}
                   >
-                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl ${
-                      isPassed ? 'bg-emerald-50 dark:bg-emerald-900/20' :
-                      att ? 'bg-amber-50 dark:bg-amber-900/20' :
-                      'bg-[#F5F7FB] dark:bg-white/[0.06]'
-                    }`}>
-                      {isPassed ? '🏆' : att ? '📝' : '📄'}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-jakarta font-bold text-[#0D1B2A] dark:text-white">
-                        {paper.title}
-                      </p>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#5A6A7A] dark:text-white/50">
-                        <span className="ti ti-clock mr-0.5" />
-                        {Math.round((paper.timeLimitSeconds ?? 3600) / 60)} min
-                        <span>·</span>
-                        <span className="ti ti-list-numbers mr-0.5" />
-                        {paper.totalQuestions ?? 48} questions
-                        <span>·</span>
-                        Pass: {paper.passMark ?? 80}%
-                        {att && (
-                          <>
-                            <span>·</span>
-                            <span>{att.count} attempt{att.count > 1 ? 's' : ''}</span>
-                          </>
-                        )}
-                      </div>
-                      {paper.description && (
-                        <p className="mt-1 truncate text-xs text-[#5A6A7A] dark:text-white/40">
-                          {paper.description}
-                        </p>
-                      )}
-                    </div>
-                    {att ? (
-                      <ScoreRing pct={Math.round(att.pct)} />
-                    ) : (
-                      <div className="flex items-center gap-1 rounded-xl bg-[#E8A020] px-3 py-1.5 text-xs font-bold text-[#0B3D6B]">
-                        Start
-                        <span className="ti ti-chevron-right" />
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
+                    <span className={`ti ${cat.icon}`} />
+                  </div>
+                  <span
+                    className="rounded-full px-2.5 py-1 text-xs font-bold text-white"
+                    style={{ backgroundColor: cat.color }}
+                  >
+                    {count} {count === 1 ? 'paper' : 'papers'}
+                  </span>
+                </div>
+                <h2 className="mt-4 font-jakarta text-lg font-bold text-[#0D1B2A] dark:text-white">
+                  {cat.label}
+                </h2>
+                <p className="mt-1 text-sm text-[#5A6A7A] dark:text-white/50">{cat.desc}</p>
+                <span className="mt-3 flex items-center gap-1 text-xs font-bold text-[#E8A020]">
+                  View papers <span className="ti ti-chevron-right transition-transform group-hover:translate-x-0.5" />
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      ) : (
+        /* Selected category — paper list */
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => setSelectedCat(null)}
+            className="flex items-center gap-1.5 text-sm font-semibold text-[#5A6A7A] dark:text-white/60 hover:text-[#0B3D6B] dark:hover:text-white transition-colors"
+          >
+            <span className="ti ti-arrow-left" /> Back to categories
+          </button>
+          <h2 className="font-jakarta text-lg font-bold text-[#0D1B2A] dark:text-white">
+            {EXAM_CATEGORIES.find((c) => c.id === selectedCat)?.label}
+          </h2>
+          {selectedPapers.length === 0 ? (
+            <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] py-12 text-center">
+              <span className="ti ti-file-off text-3xl text-[#DDE3EC] dark:text-white/20" />
+              <p className="mt-2 text-sm text-[#5A6A7A] dark:text-white/50">No papers in this category yet</p>
             </div>
-          </div>
-        ))
+          ) : (
+            <div className="space-y-3">
+              {selectedPapers.map(renderPaper)}
+            </div>
+          )}
+        </div>
       )}
 
       <div className="flex items-center justify-center gap-2 py-4 text-xs text-[#5A6A7A]/50 dark:text-white/20">

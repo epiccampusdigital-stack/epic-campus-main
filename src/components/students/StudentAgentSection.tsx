@@ -14,7 +14,7 @@ interface StudentAgentSectionProps {
 }
 
 export default function StudentAgentSection({ student, onUpdated }: StudentAgentSectionProps) {
-  const { user } = useManagement()
+  const { user, hasRole } = useManagement()
   const [agents, setAgents] = useState<{ uid: string; displayName: string; role: Role }[]>([])
   const [staffReferrers, setStaffReferrers] = useState<{ uid: string; displayName: string; role: Role }[]>([])
   const [agentRole, setAgentRole] = useState<string>('')
@@ -25,7 +25,7 @@ export default function StudentAgentSection({ student, onUpdated }: StudentAgent
   const [saving, setSaving] = useState(false)
   const [savingReferral, setSavingReferral] = useState(false)
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'owner'
+  const isAdmin = hasRole('admin') || hasRole('owner')
 
   useEffect(() => {
     void getDocs(collection(db, 'users')).then((snap) => {

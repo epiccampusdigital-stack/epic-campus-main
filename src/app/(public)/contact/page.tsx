@@ -31,7 +31,7 @@ export default function ContactPage() {
       </section>
 
       {/* Main content */}
-      <section className="bg-[#F5F7FB] py-20 dark:bg-[#04090f]">
+      <section className="bg-white py-20 dark:bg-[#04090f]">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
 
           {/* Prominent WhatsApp CTA — above the form */}

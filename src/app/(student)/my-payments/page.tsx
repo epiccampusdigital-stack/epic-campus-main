@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { collection, getDocs, query, where } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import {
   formatAmount,
@@ -65,29 +65,19 @@ export default function MyPaymentsPage() {
             where('studentId', '==', student!.id),
           ),
         )
+        // A 'payments' doc that carries an installments array is the student's payment
+        // plan, not a flat transaction receipt — keep those out of the receipt history.
         const list = snap.docs
+          .filter((d) => !Array.isArray(d.data().installments))
           .map((d) => parsePayment(d.id, d.data() as Record<string, unknown>))
           .sort((a, b) => b.paymentDate.localeCompare(a.paymentDate))
         setPayments(list)
 
         try {
-          const [planSnap1, planSnap2] = await Promise.all([
-            getDocs(
-              query(
-                collection(db, 'studentPaymentPlans'),
-                where('studentId', '==', student!.id),
-              ),
-            ).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] })),
-            getDocs(
-              query(
-                collection(db, 'studentPaymentPlans'),
-                where('userId', '==', student!.id),
-              ),
-            ).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] })),
-          ])
-          const planDocs = [...planSnap1.docs, ...planSnap2.docs]
-          if (planDocs.length > 0) {
-            const planData = planDocs[0].data() as {
+          // Payment plans are keyed by student id in the same 'payments' collection.
+          const planSnap = await getDoc(doc(db, 'payments', student!.id))
+          if (planSnap.exists() && Array.isArray(planSnap.data().installments)) {
+            const planData = planSnap.data() as {
               totalFee: number
               currency: string
               installments: {
@@ -98,7 +88,7 @@ export default function MyPaymentsPage() {
                 paidAt?: string
               }[]
             }
-            setPaymentPlan({ id: planDocs[0].id, ...planData })
+            setPaymentPlan({ id: planSnap.id, ...planData })
           }
         } catch {
           // payment plan is optional — fail silently

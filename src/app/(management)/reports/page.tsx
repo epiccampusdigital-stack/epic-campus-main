@@ -50,13 +50,17 @@ interface Attempt {
 
 const COURSE_LABELS: Record<string, string> = {
   'japan-ssw': 'Japan SSW',
-  'korea': 'Korea',
+  'korea-d2d4': 'Korea',
   'china': 'China',
   'ielts': 'IELTS',
-  'nvq': 'NVQ',
+  'nvq-it': 'NVQ IT',
+  'nvq-hospitality': 'NVQ Hospitality',
+  'nvq-caregiving': 'NVQ Caregiving',
+  'nvq-construction': 'NVQ Construction',
+  'nvq-logistics': 'NVQ Logistics',
 }
 
-const COURSE_COLORS = ['#0B3D6B', '#E8A020', '#1A6BAD', '#10b981', '#8b5cf6']
+const COURSE_COLORS = ['#0B3D6B', '#E8A020', '#1A6BAD', '#10b981', '#8b5cf6', '#f97316', '#ec4899', '#06b6d4', '#84cc16']
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -97,7 +101,7 @@ export default function ReportsPage() {
           getDocs(collection(db, 'students')),
           getDocs(collection(db, 'payments')).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] })),
           getDocs(query(collection(db, 'examAttempts'), orderBy('finishedAt', 'desc'))).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] })),
-          getDocs(collection(db, 'studentPaymentPlans')).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] })),
+          getDocs(collection(db, 'payments')).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] })),
         ])
         setStudents(studentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Student)))
         setPayments(paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Payment)))

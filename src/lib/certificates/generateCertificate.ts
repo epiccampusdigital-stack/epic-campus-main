@@ -12,10 +12,14 @@ export interface CertificateData {
 
 const COURSE_FULL_NAMES: Record<string, string> = {
   'japan-ssw': 'Japanese Language & Specified Skilled Worker Program',
-  'korea': 'Korean Language Program',
+  'korea-d2d4': 'Korean Language Program',
   'china': 'Chinese Language Program',
   'ielts': 'IELTS Preparation Program',
-  'nvq': 'National Vocational Qualification Program',
+  'nvq-it': 'National Vocational Qualification Program — Information Technology',
+  'nvq-hospitality': 'National Vocational Qualification Program — Hospitality',
+  'nvq-caregiving': 'National Vocational Qualification Program — Caregiving',
+  'nvq-construction': 'National Vocational Qualification Program — Construction',
+  'nvq-logistics': 'National Vocational Qualification Program — Logistics & Driving',
 }
 
 export async function generateCertificatePDF(data: CertificateData): Promise<Uint8Array> {

@@ -26,6 +26,7 @@ interface ExamPaper {
   passMark?: number
   hasAudioCheck?: boolean
   isPublished?: boolean
+  isUnlocked?: boolean
 }
 
 interface ExamSection {
@@ -52,7 +53,7 @@ interface ExamQuestion {
   languageMode?: 'en' | 'jp' | 'both'
 }
 
-type Phase = 'loading' | 'start' | 'audio-check' | 'exam' | 'submitting' | 'results'
+type Phase = 'loading' | 'start' | 'locked' | 'audio-check' | 'exam' | 'submitting' | 'results'
 
 function formatTime(s: number) {
   const m = Math.floor(s / 60)
@@ -152,6 +153,11 @@ export default function ExamPage() {
       setPaper(p)
       setTimeLeft(p.timeLimitSeconds ?? 3600)
 
+      if (p.isUnlocked !== true) {
+        setPhase('locked')
+        return
+      }
+
       const secsSnap = await getDocs(
         query(collection(db, 'examSections'), where('paperId', '==', paperId), orderBy('order', 'asc'))
       ).catch(() => getDocs(query(collection(db, 'examSections'), where('paperId', '==', paperId))))
@@ -229,6 +235,28 @@ export default function ExamPage() {
       <div className="text-center">
         <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-[#0B3D6B] border-t-transparent" />
         <p className="mt-4 text-sm text-[#5A6A7A]">Loading exam...</p>
+      </div>
+    </div>
+  )
+
+  // ── LOCKED ──
+  if (phase === 'locked') return (
+    <div className="flex min-h-screen items-center justify-center bg-[#F5F7FB] p-4">
+      <div className="w-full max-w-md space-y-5 text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#0B3D6B]/10">
+          <span className="ti ti-lock text-3xl text-[#0B3D6B]" />
+        </div>
+        <div>
+          <h1 className="font-jakarta text-xl font-bold text-[#0B3D6B]">This exam is not currently available</h1>
+          <p className="mt-2 text-sm text-[#5A6A7A]">Check back later or ask your teacher to unlock it.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => router.push('/exams')}
+          className="mx-auto flex items-center gap-2 rounded-xl border border-[#DDE3EC] bg-white px-6 py-3 text-sm font-semibold text-[#5A6A7A]"
+        >
+          <span className="ti ti-arrow-left" /> Back to exam list
+        </button>
       </div>
     </div>
   )
@@ -404,9 +432,9 @@ export default function ExamPage() {
 
   // ── EXAM ──
   return (
-    <div className="flex h-screen flex-col bg-[#F5F7FB]">
+    <div className="flex h-screen flex-col overflow-hidden bg-[#F5F7FB] dark:bg-[#04090f]">
       {/* Top bar */}
-      <div className={`flex items-center justify-between px-4 py-3 ${timerWarn ? 'bg-red-600' : 'bg-[#0B3D6B]'}`}>
+      <div className={`flex shrink-0 items-center justify-between px-4 py-3 ${timerWarn ? 'bg-red-600' : 'bg-[#0B3D6B]'}`}>
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -433,56 +461,64 @@ export default function ExamPage() {
       </div>
 
       {/* Progress */}
-      <div className="h-1 bg-white/10">
+      <div className="h-1 shrink-0 bg-white/10">
         <div className="h-full bg-[#E8A020] transition-all" style={{ width: `${questions.length > 0 ? (answered / questions.length) * 100 : 0}%` }} />
       </div>
 
-      {/* Question area */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {q ? (
-          <div className="mx-auto max-w-2xl space-y-4">
-            <div className="rounded-2xl bg-white border border-[#DDE3EC] p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  {/* Question image — above question text */}
-                  {(q.questionImageUrl || q.imageUrl) && (
-                    <div className="mb-4 overflow-hidden rounded-xl border border-[#DDE3EC] dark:border-white/20">
-                      <img
-                        src={q.questionImageUrl ?? q.imageUrl}
-                        alt="Question"
-                        className="w-full max-h-64 object-contain bg-white dark:bg-white/[0.04]"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                      />
-                    </div>
-                  )}
-
-                  {/* Question text */}
-                  {q.questionText && (
-                    <p className="text-base font-semibold text-[#0D1B2A] dark:text-white">{q.questionText}</p>
-                  )}
-                  {q.questionTextJP && (
-                    <p className="mt-2 text-lg text-[#0B3D6B] dark:text-blue-300">{q.questionTextJP}</p>
-                  )}
-
-                  {/* Audio player */}
-                  {(q.questionAudioUrl || q.audioUrl) && (
-                    <AudioPlayer
-                      src={q.questionAudioUrl ?? q.audioUrl ?? ''}
-                      playLimit={q.audioPlayLimit}
+      {/* Split content — left: question, right: options */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+        {/* Left panel — question content */}
+        <div className="flex-[2] overflow-y-auto bg-gray-50 p-6 dark:bg-gray-900 md:w-[55%] md:flex-none md:p-8">
+          {q ? (
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                {/* Question image — above question text */}
+                {(q.questionImageUrl || q.imageUrl) && (
+                  <div className="mb-4 overflow-hidden rounded-xl border border-[#DDE3EC] dark:border-white/20">
+                    <img
+                      src={q.questionImageUrl ?? q.imageUrl}
+                      alt="Question"
+                      className="max-h-[280px] w-full object-contain bg-white dark:bg-white/[0.04]"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                     />
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => toggleFlag(q.id)}
-                  className={`shrink-0 rounded-xl p-2 ${flagged.has(q.id) ? 'bg-amber-100 text-amber-600' : 'bg-[#F5F7FB] text-[#5A6A7A]'}`}
-                >
-                  <span className="ti ti-flag text-lg" />
-                </button>
-              </div>
-            </div>
+                  </div>
+                )}
 
-            <div className="space-y-2">
+                {/* Question text */}
+                {q.questionText && (
+                  <p className="text-base leading-relaxed font-semibold text-[#0D1B2A] dark:text-white">{q.questionText}</p>
+                )}
+                {q.questionTextJP && (
+                  <p className="mt-2 text-sm text-blue-600 dark:text-blue-300">{q.questionTextJP}</p>
+                )}
+
+                {/* Audio player */}
+                {(q.questionAudioUrl || q.audioUrl) && (
+                  <AudioPlayer
+                    src={q.questionAudioUrl ?? q.audioUrl ?? ''}
+                    playLimit={q.audioPlayLimit}
+                  />
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => toggleFlag(q.id)}
+                className={`shrink-0 rounded-xl p-2 ${flagged.has(q.id) ? 'bg-amber-100 text-amber-600' : 'bg-white dark:bg-white/[0.06] text-[#5A6A7A] dark:text-white/50'}`}
+              >
+                <span className="ti ti-flag text-lg" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              <p className="text-[#5A6A7A]">No questions found</p>
+            </div>
+          )}
+        </div>
+
+        {/* Right panel — answer options */}
+        <div className="flex-[3] overflow-y-auto border-t border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800 md:w-[45%] md:flex-none md:border-l md:border-t-0 md:p-8">
+          {q && (
+            <div className="space-y-3">
               {q.options.map(opt => {
                 const selected = answers[q.id] === opt.index
                 return (
@@ -490,19 +526,21 @@ export default function ExamPage() {
                     key={opt.index}
                     type="button"
                     onClick={() => setAnswers(prev => ({ ...prev, [q.id]: Number(opt.index) }))}
-                    className={`flex w-full items-center gap-3 rounded-xl border-2 p-4 text-left transition-all ${
-                      selected ? 'border-[#E8A020] bg-[#E8A020]/10' : 'border-[#DDE3EC] bg-white dark:bg-white/[0.04] hover:border-[#0B3D6B]/30 dark:border-white/20'
+                    className={`flex min-h-[52px] w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all ${
+                      selected
+                        ? 'border-[#E8A020] bg-[#FEF3E2] dark:bg-[#0B3D6B]/40 text-gray-900 dark:text-white'
+                        : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600'
                     }`}
                   >
                     <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold ${
-                      selected ? 'border-[#E8A020] bg-[#E8A020] text-white' : 'border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/40'
+                      selected ? 'border-[#E8A020] bg-[#E8A020] text-white' : 'border-gray-300 dark:border-gray-500 text-[#5A6A7A] dark:text-white/60'
                     }`}>
                       {opt.index}
                     </div>
                     {opt.imageUrl ? (
                       <img src={opt.imageUrl} alt={`Option ${opt.index}`} className="h-16 w-auto rounded-lg object-contain" />
                     ) : (
-                      <span className={`text-sm font-medium ${selected ? 'text-[#0B3D6B] dark:text-white' : 'text-[#0D1B2A] dark:text-white'}`}>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
                         {opt.text}
                       </span>
                     )}
@@ -510,58 +548,54 @@ export default function ExamPage() {
                 )
               })}
             </div>
-
-            {/* Section question tiles */}
-            {sections.length > 1 && (
-              <div className="rounded-2xl border border-[#DDE3EC] bg-white p-4">
-                <p className="text-xs font-bold uppercase text-[#5A6A7A] mb-2">All Questions</p>
-                <div className="flex flex-wrap gap-1">
-                  {questions.map((qs, i) => (
-                    <button
-                      key={qs.id}
-                      type="button"
-                      onClick={() => setCurrentQ(i)}
-                      className={`h-7 w-7 rounded-lg text-xs font-bold ${
-                        i === currentQ ? 'bg-[#0B3D6B] text-white' :
-                        flagged.has(qs.id) ? 'bg-amber-100 text-amber-700' :
-                        answers[qs.id] !== undefined ? 'bg-emerald-100 text-emerald-700' :
-                        'bg-[#F5F7FB] text-[#5A6A7A]'
-                      }`}
-                    >
-                      {i + 1}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-[#5A6A7A]">No questions found</p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Bottom nav */}
-      <div className="border-t border-[#DDE3EC] bg-white px-4 py-3">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
+      {/* Bottom bar */}
+      <div className="shrink-0 border-t border-[#DDE3EC] bg-white px-4 py-2 dark:border-white/[0.08] dark:bg-gray-900">
+        <div className="flex items-center justify-between gap-3">
           <button
             type="button"
             disabled={currentQ === 0}
             onClick={() => setCurrentQ(i => i - 1)}
-            className="flex items-center gap-2 rounded-xl border border-[#DDE3EC] px-4 py-2.5 text-sm font-semibold text-[#5A6A7A] disabled:opacity-40"
+            className="flex items-center gap-2 rounded-xl border border-[#DDE3EC] dark:border-white/20 px-4 py-2 text-sm font-semibold text-[#5A6A7A] dark:text-white/60 disabled:opacity-40"
           >
             <span className="ti ti-arrow-left" /> Previous
           </button>
-          <span className="text-xs text-[#5A6A7A]">{answered} of {questions.length} answered</span>
+          <span className="whitespace-nowrap text-xs text-[#5A6A7A] dark:text-white/50">{answered} of {questions.length} answered</span>
           <button
             type="button"
             disabled={currentQ === questions.length - 1}
             onClick={() => setCurrentQ(i => i + 1)}
-            className="flex items-center gap-2 rounded-xl border border-[#DDE3EC] px-4 py-2.5 text-sm font-semibold text-[#5A6A7A] disabled:opacity-40"
+            className="flex items-center gap-2 rounded-xl border border-[#DDE3EC] dark:border-white/20 px-4 py-2 text-sm font-semibold text-[#5A6A7A] dark:text-white/60 disabled:opacity-40"
           >
             Next <span className="ti ti-arrow-right" />
           </button>
+        </div>
+
+        {/* Question number pills */}
+        <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
+          {questions.map((qs, i) => {
+            const isAnswered = answers[qs.id] !== undefined
+            const isCurrent = i === currentQ
+            return (
+              <button
+                key={qs.id}
+                type="button"
+                onClick={() => setCurrentQ(i)}
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold transition-colors ${
+                  isCurrent
+                    ? 'border-[#E8A020] bg-[#E8A020] text-[#0B3D6B]'
+                    : isAnswered
+                    ? 'border-[#0B3D6B] bg-[#0B3D6B] text-white'
+                    : 'border-gray-300 bg-transparent text-[#5A6A7A] dark:border-gray-600 dark:text-white/50'
+                } ${flagged.has(qs.id) ? 'ring-2 ring-amber-400 ring-offset-1 ring-offset-white dark:ring-offset-gray-900' : ''}`}
+              >
+                {i + 1}
+              </button>
+            )
+          })}
         </div>
       </div>
     </div>

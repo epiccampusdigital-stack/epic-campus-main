@@ -12,7 +12,8 @@ export const LOCATION_OPTIONS: { id: StudentLocation | ''; label: string }[] = [
 /** Default location filter by role */
 export function getDefaultLocationFilter(user: EpicUser | null): StudentLocation | '' {
   if (!user) return ''
-  if (user.role === 'reception' || user.role === 'teacher') {
+  const roles = user.roles ?? [user.role]
+  if (roles.includes('reception') || roles.includes('teacher')) {
     return user.locationAssigned ?? ''
   }
   return ''

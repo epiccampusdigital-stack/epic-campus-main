@@ -1,16 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { useStudentPortal } from '@/components/student/StudentContext'
 
-const ALL_ACTIONS = [
+const ACTIONS = [
   {
     label: 'Take Exam',
     href: '/exams',
     icon: 'ti-pencil',
     bg: '#E8A020',
     color: '#0B3D6B',
-    japanOnly: true,
   },
   {
     label: 'Messages',
@@ -18,7 +16,6 @@ const ALL_ACTIONS = [
     icon: 'ti-message',
     bg: '#0B3D6B',
     color: '#ffffff',
-    japanOnly: false,
   },
   {
     label: 'Schedule',
@@ -26,7 +23,6 @@ const ALL_ACTIONS = [
     icon: 'ti-calendar',
     bg: '#0B3D6B',
     color: '#ffffff',
-    japanOnly: false,
   },
   {
     label: 'My ID Card',
@@ -34,7 +30,6 @@ const ALL_ACTIONS = [
     icon: 'ti-id-badge-2',
     bg: '#0B3D6B',
     color: '#ffffff',
-    japanOnly: false,
   },
   {
     label: 'My Visa',
@@ -42,7 +37,6 @@ const ALL_ACTIONS = [
     icon: 'ti-plane',
     bg: '#0B3D6B',
     color: '#ffffff',
-    japanOnly: false,
   },
   {
     label: 'Study AI',
@@ -50,24 +44,13 @@ const ALL_ACTIONS = [
     icon: 'ti-robot',
     bg: '#1A6BAD',
     color: '#ffffff',
-    japanOnly: false,
   },
 ]
 
 export default function QuickActions() {
-  const { student } = useStudentPortal()
-
-  const isJapan =
-    student?.courseId === 'japan-ssw' ||
-    String(student?.courseId ?? '').includes('japan')
-
-  const actions = ALL_ACTIONS.filter(
-    (a) => !a.japanOnly || isJapan
-  )
-
   return (
     <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-      {actions.map((a) => (
+      {ACTIONS.map((a) => (
         <Link
           key={a.href}
           href={a.href}

@@ -15,7 +15,7 @@ import {
 } from '@/lib/commissions/helpers'
 import { currentMonthKey, getMonthPickerOptions } from '@/lib/dashboard/helpers'
 import { formatLKR } from '@/lib/payments/helpers'
-import { parseStaff } from '@/lib/staff/helpers'
+import { parseStaff, staffHasRole } from '@/lib/staff/helpers'
 import EmptyState from '@/components/ui/EmptyState'
 import LocationFilterSelect from '@/components/ui/LocationFilterSelect'
 import { useManagement } from '@/components/layout/ManagementContext'
@@ -62,7 +62,7 @@ export default function AgentCommissionReportsPage() {
       setAgents(
         usersSnap.docs
           .map((d) => parseStaff(d.id, d.data() as Record<string, unknown>))
-          .filter((s): s is StaffMember => s !== null && s.role === 'agent'),
+          .filter((s): s is StaffMember => s !== null && staffHasRole(s, 'agent')),
       )
     } catch (err) {
       console.error('[AgentCommissionReports]', err)

@@ -50,7 +50,7 @@ export default function ReceptionDashboard() {
           ).catch(() => ({ docs: [] as any[] })),
           getDocs(
             query(
-              collection(db, 'consultations'),
+              collection(db, 'roomBookings'),
               where('date', '==', today)
             )
           ).catch(() => ({ docs: [] as any[] })),

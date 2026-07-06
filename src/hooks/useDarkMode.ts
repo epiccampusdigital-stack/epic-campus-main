@@ -2,28 +2,40 @@
 import { useEffect, useState } from 'react'
 
 export function useDarkMode() {
-  const [dark, setDark] = useState(false)
+  const [dark, setDark] = useState(true)
 
   useEffect(() => {
-    const saved = localStorage.getItem('epic-theme')
-    if (saved === 'dark') {
-      setDark(true)
-      document.documentElement.classList.add('dark')
-    } else {
+    const saved = localStorage.getItem('theme')
+    const root = document.documentElement
+    if (saved === 'light') {
       setDark(false)
-      document.documentElement.classList.remove('dark')
+      root.classList.remove('dark')
+      root.classList.add('light')
+    } else if (saved === 'dark') {
+      setDark(true)
+      root.classList.add('dark')
+      root.classList.remove('light')
+    } else {
+      // First visit: no stored preference — default to dark regardless of system preference
+      setDark(true)
+      root.classList.add('dark')
+      root.classList.remove('light')
+      localStorage.setItem('theme', 'dark')
     }
   }, [])
 
   const toggle = () => {
     setDark(prev => {
       const next = !prev
+      const root = document.documentElement
       if (next) {
-        document.documentElement.classList.add('dark')
-        localStorage.setItem('epic-theme', 'dark')
+        root.classList.add('dark')
+        root.classList.remove('light')
+        localStorage.setItem('theme', 'dark')
       } else {
-        document.documentElement.classList.remove('dark')
-        localStorage.setItem('epic-theme', 'light')
+        root.classList.remove('dark')
+        root.classList.add('light')
+        localStorage.setItem('theme', 'light')
       }
       return next
     })

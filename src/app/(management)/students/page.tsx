@@ -47,7 +47,7 @@ const TEACHER_STAT_VALUES: TeacherStatFilter[] = [
 ]
 
 export default function StudentsPage() {
-  const { user } = useManagement()
+  const { user, hasRole } = useManagement()
   const searchParams = useSearchParams()
   const teacherStatParam = searchParams.get('teacherStat')
   const teacherStat = TEACHER_STAT_VALUES.includes(teacherStatParam as TeacherStatFilter)
@@ -111,7 +111,7 @@ export default function StudentsPage() {
   useEffect(() => {
     const def = getDefaultLocationFilter(user)
     if (def) setLocationFilter(def)
-  }, [user?.role, user?.locationAssigned])
+  }, [user])
 
   const batches = useMemo(() => {
     const set = new Set(students.map((s) => s.batchId).filter(Boolean))
@@ -214,13 +214,13 @@ export default function StudentsPage() {
     }
   }
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'owner'
+  const isAdmin = hasRole('admin') || hasRole('owner')
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A]">Students</h2>
+          <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white">Students</h2>
           <p className="font-inter text-sm text-[#5A6A7A]">
             {teacherStat
               ? `Filtered: ${TEACHER_STAT_LABELS[teacherStat]}`
@@ -319,7 +319,7 @@ export default function StudentsPage() {
         <StudentTableEmpty onAdd={openAdd} />
       ) : (
         <>
-          <div className="overflow-x-auto -mx-4 rounded-xl border border-[#DDE3EC] bg-white sm:mx-0">
+          <div className="overflow-x-auto -mx-4 rounded-xl border border-[#DDE3EC] bg-white dark:border-white/[0.08] dark:bg-white/[0.04] sm:mx-0">
             <div className="min-w-[600px] sm:min-w-0">
             <table className="min-w-full">
               <thead className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:border-white/[0.08] dark:bg-white/[0.02]">

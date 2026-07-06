@@ -30,6 +30,8 @@ function thisMonthPrefix(offset = 0): string {
   return d.toISOString().slice(0, 7)
 }
 
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
 export default function AccountantKitchenDashboard() {
   const { user } = useManagement()
   const [loading, setLoading] = useState(true)
@@ -62,26 +64,26 @@ export default function AccountantKitchenDashboard() {
 
         // Accommodation - monthly rent total
         const housesSnap = await getDocs(
-          collection(db, 'accommodation'),
+          collection(db, 'accommodations'),
         ).catch(() => ({ docs: [] as Array<{ id: string; data: () => Record<string, unknown> }> }))
 
         setAccommodationHouseCount(housesSnap.docs.length)
 
+        const now = new Date()
+        const billsSnap = await getDocs(
+          query(
+            collection(db, 'utilityBills'),
+            where('year', '==', now.getFullYear()),
+            where('month', '==', MONTH_NAMES[now.getMonth()]),
+          ),
+        ).catch(() => ({ docs: [] as Array<{ data: () => Record<string, unknown> }> }))
+
         let accomTotal = 0
         let unpaidCount = 0
-        for (const houseDoc of housesSnap.docs) {
-          const billsSnap = await getDocs(
-            query(
-              collection(db, 'accommodation', houseDoc.id, 'bills'),
-              where('month', '==', curMonth),
-            ),
-          ).catch(() => ({ docs: [] as Array<{ data: () => Record<string, unknown> }> }))
-
-          for (const b of billsSnap.docs) {
-            const d = b.data()
-            accomTotal += Number(d.amount ?? 0)
-            if (d.status !== 'paid') unpaidCount += 1
-          }
+        for (const b of billsSnap.docs) {
+          const d = b.data()
+          accomTotal += Number(d.ceb ?? 0) + Number(d.water ?? 0) + Number(d.internet ?? 0) + Number(d.other ?? 0)
+          if (!d.paid) unpaidCount += 1
         }
         setAccommodationMonthTotal(accomTotal)
         setAccommodationUnpaidCount(unpaidCount)

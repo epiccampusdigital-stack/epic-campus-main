@@ -16,6 +16,8 @@ import {
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
 import { auth, db, storage } from '@/lib/firebase/client'
 import { useRouter } from 'next/navigation'
+import { useManagement } from '@/components/layout/ManagementContext'
+import type { Role } from '@/types'
 
 interface StudyMaterial {
   id: string
@@ -43,10 +45,11 @@ const TYPE_STYLES: Record<string, string> = {
   Link: 'bg-blue-50 text-blue-700 border-blue-200',
 }
 
-const ALLOWED_ADMIN_ROLES = ['admin', 'owner', 'teacher']
+const ALLOWED_ADMIN_ROLES: Role[] = ['admin', 'owner', 'teacher']
 
 export default function MaterialsPage() {
   const router = useRouter()
+  const { hasRole, loading: authLoading } = useManagement()
   const [materials, setMaterials] = useState<StudyMaterial[]>([])
   const [loading, setLoading] = useState(true)
   const [courseFilter, setCourseFilter] = useState('')
@@ -66,15 +69,19 @@ export default function MaterialsPage() {
   const [editId, setEditId] = useState<string | null>(null)
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
+    const unsub = onAuthStateChanged(auth, (u) => {
       if (!u) { router.replace('/login'); return }
-      const token = await u.getIdTokenResult()
-      const role = token.claims.role as string
-      if (!ALLOWED_ADMIN_ROLES.includes(role)) { router.replace('/dashboard'); return }
       setUserEmail(u.email ?? '')
     })
     return () => unsub()
   }, [router])
+
+  useEffect(() => {
+    if (authLoading) return
+    if (!ALLOWED_ADMIN_ROLES.some((r) => hasRole(r))) {
+      router.replace('/dashboard')
+    }
+  }, [authLoading, hasRole, router])
 
   async function loadMaterials() {
     setLoading(true)

@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'bookingId required' }, { status: 400 })
     }
 
-    const snap = await adminDb.collection('consultationBookings').doc(bookingId).get()
+    const snap = await adminDb.collection('roomBookings').doc(bookingId).get()
     if (!snap.exists) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
     }
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       snap.data() as Record<string, unknown>,
     )
 
-    await adminDb.collection('consultationBookings').doc(bookingId).update({
+    await adminDb.collection('roomBookings').doc(bookingId).update({
       status: 'approved',
     })
 

@@ -137,3 +137,40 @@ h1, h2, h3, h4, h5, h6 {
 .animate-count-up {
   animation: countUp 0.6s ease-out forwards;
 }
+
+/* Subtle grain overlay to soften pure-black dark mode sections site-wide */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.dark .noise-overlay {
+  opacity: 0.035;
+}
+
+/* Dark-mode-only section blend fades (black <-> navy transitions) */
+.section-fade-top,
+.section-fade-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 80px;
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0;
+}
+.section-fade-top {
+  top: 0;
+  background: linear-gradient(to bottom, #0a0a0a, transparent);
+}
+.section-fade-bottom {
+  bottom: 0;
+  background: linear-gradient(to top, #0a0a0a, transparent);
+}
+.dark .section-fade-top,
+.dark .section-fade-bottom {
+  opacity: 1;
+}

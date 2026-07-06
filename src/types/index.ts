@@ -20,6 +20,8 @@ export interface EpicUser {
   email: string
   displayName: string
   role: Role
+  /** All assigned roles (management portal only); mirrors [role] for single-role accounts. */
+  roles?: Role[]
   branchId?: string
   /** Reception / staff campus assignment */
   locationAssigned?: StudentLocation
@@ -40,6 +42,8 @@ export interface StaffMember {
   email: string
   displayName: string
   role: StaffRole
+  /** All assigned roles. `role` above always mirrors roles[0] for backwards compatibility. */
+  roles?: StaffRole[]
   status: StaffStatus
   phone: string
   nic: string

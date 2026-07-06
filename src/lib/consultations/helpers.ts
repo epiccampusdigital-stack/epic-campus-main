@@ -144,7 +144,7 @@ export async function fetchStaffForConsultations(): Promise<StaffMember[]> {
 }
 
 export async function fetchConsultationSlots(): Promise<ConsultationSlot[]> {
-  const snap = await getDocs(collection(db, 'consultationSlots'))
+  const snap = await getDocs(collection(db, 'roomSlots'))
   return snap.docs
     .map((d) => parseConsultationSlot(d.id, d.data() as Record<string, unknown>))
     .sort((a, b) => {
@@ -155,7 +155,7 @@ export async function fetchConsultationSlots(): Promise<ConsultationSlot[]> {
 }
 
 export async function fetchConsultationBookings(): Promise<ConsultationBooking[]> {
-  const snap = await getDocs(collection(db, 'consultationBookings'))
+  const snap = await getDocs(collection(db, 'roomBookings'))
   return snap.docs
     .map((d) => parseConsultationBooking(d.id, d.data() as Record<string, unknown>))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -168,7 +168,7 @@ export async function createConsultationSlot(input: {
   staffId: string
   staffName: string
 }): Promise<string> {
-  const ref = doc(collection(db, 'consultationSlots'))
+  const ref = doc(collection(db, 'roomSlots'))
   await setDoc(ref, {
     date: input.date,
     startTime: input.startTime,
@@ -184,7 +184,7 @@ export async function createConsultationSlot(input: {
 }
 
 export async function deleteConsultationSlot(slotId: string): Promise<void> {
-  const slotRef = doc(db, 'consultationSlots', slotId)
+  const slotRef = doc(db, 'roomSlots', slotId)
   await deleteDoc(slotRef)
 }
 
@@ -195,7 +195,7 @@ export async function createConsultationBooking(input: {
   studentPhone: string
   notes: string
 }): Promise<string> {
-  const bookingRef = doc(collection(db, 'consultationBookings'))
+  const bookingRef = doc(collection(db, 'roomBookings'))
   await setDoc(bookingRef, {
     slotId: input.slot.id,
     studentId: input.studentId,
@@ -211,7 +211,7 @@ export async function createConsultationBooking(input: {
     createdAt: serverTimestamp(),
   })
 
-  await updateDoc(doc(db, 'consultationSlots', input.slot.id), {
+  await updateDoc(doc(db, 'roomSlots', input.slot.id), {
     isBooked: true,
     bookedByStudentId: input.studentId,
     bookedByStudentName: input.studentName,
@@ -223,7 +223,7 @@ export async function createConsultationBooking(input: {
 export async function approveConsultationBooking(
   booking: ConsultationBooking,
 ): Promise<void> {
-  await updateDoc(doc(db, 'consultationBookings', booking.id), {
+  await updateDoc(doc(db, 'roomBookings', booking.id), {
     status: 'approved',
   })
 }
@@ -231,11 +231,11 @@ export async function approveConsultationBooking(
 export async function rejectConsultationBooking(
   booking: ConsultationBooking,
 ): Promise<void> {
-  await updateDoc(doc(db, 'consultationBookings', booking.id), {
+  await updateDoc(doc(db, 'roomBookings', booking.id), {
     status: 'rejected',
   })
 
-  await updateDoc(doc(db, 'consultationSlots', booking.slotId), {
+  await updateDoc(doc(db, 'roomSlots', booking.slotId), {
     isBooked: false,
     bookedByStudentId: null,
     bookedByStudentName: null,

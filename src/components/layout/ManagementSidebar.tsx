@@ -72,7 +72,7 @@ const NAV_ITEMS: NavItem[] = [
 export default function ManagementSidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, sidebarOpen, setSidebarOpen } = useManagement()
+  const { user, sidebarOpen, setSidebarOpen, hasRole } = useManagement()
   const [mounted, setMounted] = useState(false)
   const [unreadMessages, setUnreadMessages] = useState(0)
   const [pendingKitchenOrders, setPendingKitchenOrders] = useState(0)
@@ -95,14 +95,14 @@ export default function ManagementSidebar() {
   }, [])
 
   useEffect(() => {
-    if (!user || (user.role !== 'admin' && user.role !== 'owner')) return
+    if (!user || !(hasRole('admin') || hasRole('owner'))) return
     const q = query(collection(db, 'kitchenOrders'), where('status', '==', 'submitted'))
     const unsub = onSnapshot(q, (snap) => setPendingKitchenOrders(snap.size))
     return () => unsub()
-  }, [user])
+  }, [user, hasRole])
 
   const visibleItems = NAV_ITEMS.filter(
-    (item) => user && item.roles.includes(user.role)
+    (item) => user && item.roles.some((r) => hasRole(r))
   )
 
   async function handleLogout() {

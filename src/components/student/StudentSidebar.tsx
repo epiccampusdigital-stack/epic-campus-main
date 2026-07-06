@@ -130,13 +130,7 @@ export default function StudentSidebar() {
   const courseLabel = student ? getCourseBadge(student.courseId) : ''
   const courseName = student ? (COURSE_MAP[student.courseId]?.label ?? courseLabel) : ''
 
-  const showExamLink =
-    student?.courseId === 'japan-ssw' ||
-    (student?.courseId != null && String(student.courseId).includes('japan'))
-
-  const navItems = showExamLink
-    ? [...BASE_NAV_ITEMS.slice(0, 1), EXAM_NAV_ITEM, EXAM_CODE_NAV_ITEM, ...BASE_NAV_ITEMS.slice(1)]
-    : BASE_NAV_ITEMS
+  const navItems = [...BASE_NAV_ITEMS.slice(0, 1), EXAM_NAV_ITEM, EXAM_CODE_NAV_ITEM, ...BASE_NAV_ITEMS.slice(1)]
 
   const sidebarContent = (
     <div className="flex h-full w-[240px] flex-col bg-white/60 dark:bg-[#0B3D6B]/20 backdrop-blur-2xl border-r border-white/80 dark:border-white/[0.06] transition-all duration-300">

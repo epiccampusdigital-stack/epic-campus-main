@@ -91,13 +91,13 @@ const FIRST_AID_SUBS: { id: FirstAidSubcategory; label: string }[] = [
 const ALLOWED_ROLES = ['admin', 'owner', 'accountant', 'reception', 'teacher'] as const
 
 export default function SuppliesPage() {
-  const { user } = useManagement()
+  const { user, hasRole } = useManagement()
 
-  if (user && !ALLOWED_ROLES.includes(user.role as (typeof ALLOWED_ROLES)[number])) {
+  if (user && !ALLOWED_ROLES.some((r) => hasRole(r))) {
     return <div className="p-8 text-center text-[#5A6A7A]">You do not have access to this page.</div>
   }
 
-  const canWrite = user?.role !== 'teacher'
+  const canWrite = user?.roles?.some((r) => r !== 'teacher') ?? false
 
   const [items, setItems] = useState<SupplyItem[]>([])
   const [loading, setLoading] = useState(true)

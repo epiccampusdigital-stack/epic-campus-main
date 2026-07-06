@@ -91,7 +91,7 @@ export default function MyDashboardPage() {
             const houseId = studSnap.data()?.houseId
             if (houseId) {
               const houseSnap = await getDoc(
-                doc(db, 'accommodation', houseId)
+                doc(db, 'accommodations', houseId)
               ).catch(() => null)
               if (houseSnap?.exists() && !cancelled) {
                 const h = houseSnap.data()
@@ -238,10 +238,14 @@ export default function MyDashboardPage() {
 
   const COURSE_DURATIONS: Record<string, number> = {
     'japan-ssw': 45,
-    'korea': 365,
+    'korea-d2d4': 365,
     'china': 365,
     'ielts': 90,
-    'nvq': 180,
+    'nvq-it': 180,
+    'nvq-hospitality': 180,
+    'nvq-caregiving': 180,
+    'nvq-construction': 180,
+    'nvq-logistics': 180,
   }
 
   const courseId = activeStudent?.courseId ?? ''
@@ -260,10 +264,14 @@ export default function MyDashboardPage() {
 
   const COURSE_LABELS: Record<string, string> = {
     'japan-ssw': '🇯🇵 Japan SSW',
-    'korea': '🇰🇷 Korea',
+    'korea-d2d4': '🇰🇷 Korea',
     'china': '🇨🇳 China',
     'ielts': '📝 IELTS',
-    'nvq': '🎓 NVQ',
+    'nvq-it': '🎓 NVQ IT',
+    'nvq-hospitality': '🎓 NVQ Hospitality',
+    'nvq-caregiving': '🎓 NVQ Caregiving',
+    'nvq-construction': '🎓 NVQ Construction',
+    'nvq-logistics': '🎓 NVQ Logistics',
   }
 
   return (

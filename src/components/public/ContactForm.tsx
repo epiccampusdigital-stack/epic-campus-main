@@ -12,7 +12,7 @@ const PROGRAMS = [
 ]
 
 const inputClass =
-  'w-full rounded-xl border border-[#DDE3EC] bg-[#F5F7FB] px-4 py-3 text-[14px] text-[#0D1B2A] outline-none focus:border-[#E8A020] transition-colors dark:border-white/10 dark:bg-white/[0.04] dark:text-white'
+  'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-[14px] text-[#0D1B2A] outline-none focus:border-[#E8A020] transition-colors dark:border-white/10 dark:bg-white/[0.04] dark:text-white'
 
 export default function ContactForm() {
   const [name, setName] = useState('')

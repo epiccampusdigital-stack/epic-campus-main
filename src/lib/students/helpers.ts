@@ -176,7 +176,10 @@ export function parseStudent(id: string, data: Record<string, unknown>): Student
     referredByStaffId: data.referredByStaffId ? String(data.referredByStaffId) : undefined,
     referredByStaffName: data.referredByStaffName ? String(data.referredByStaffName) : undefined,
     feeSchedule: parseFeeSchedule(data) ?? defaultFeeSchedule(),
-    enrollmentDate: data.enrollmentDate ? String(data.enrollmentDate) : undefined,
+    enrollmentDate: data.enrollmentDate
+      ? (toDate(data.enrollmentDate)?.toISOString().slice(0, 10) ??
+        String(data.enrollmentDate).slice(0, 10))
+      : undefined,
     expectedCompletionDate: data.expectedCompletionDate
       ? String(data.expectedCompletionDate)
       : undefined,

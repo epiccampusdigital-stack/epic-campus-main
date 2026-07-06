@@ -78,7 +78,7 @@ export default function PayPalPayment({
             const capture = await res.json() as { status: string; captureId: string }
             if (capture.status === 'COMPLETED') {
               if (planId && installmentIndex !== undefined) {
-                await updateDoc(doc(db, 'studentPaymentPlans', planId), {
+                await updateDoc(doc(db, 'payments', planId), {
                   [`installments.${installmentIndex}.status`]: 'paid',
                   [`installments.${installmentIndex}.paidAt`]: serverTimestamp(),
                   [`installments.${installmentIndex}.method`]: 'paypal',

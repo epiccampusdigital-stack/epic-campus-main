@@ -26,8 +26,8 @@ export default function UtilityBillList({
   onDeleted,
   onAdd,
 }: UtilityBillListProps) {
-  const { user } = useManagement()
-  const isAdmin = user?.role === 'admin' || user?.role === 'owner'
+  const { user, hasRole } = useManagement()
+  const isAdmin = hasRole('admin') || hasRole('owner')
 
   async function handleDelete(bill: UtilityBill) {
     if (!isAdmin) return

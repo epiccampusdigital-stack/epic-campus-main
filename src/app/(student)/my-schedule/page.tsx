@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { collection, getDocs, orderBy, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { useStudentPortal } from '@/components/student/StudentContext'
 
-type ViewMode = 'day' | 'week' | 'month'
 type SessionType = 'class' | 'exam' | 'workshop' | 'other'
+type StoredStatus = 'scheduled' | 'completed' | 'cancelled'
+type DisplayStatus = 'upcoming' | 'today' | 'completed' | 'cancelled'
+type ScheduleView = 'month' | 'week' | 'list'
 
 interface Session {
   id: string
@@ -20,39 +22,87 @@ interface Session {
   courseId: string
   notes?: string
   joinLink?: string
+  /** Optional — not all session docs carry an explicit status; derived from date when absent. */
+  status?: StoredStatus
 }
 
-// ── Colour config ────────────────────────────────────────────────────────────
-const TYPE_CONFIG: Record<SessionType, { bg: string; text: string; border: string; dot: string }> = {
-  class:    { bg: 'bg-[#0B3D6B]/10 dark:bg-[#0B3D6B]/30', text: 'text-[#0B3D6B] dark:text-blue-300',   border: 'border-[#0B3D6B]/30', dot: 'bg-[#0B3D6B]' },
-  exam:     { bg: 'bg-red-50 dark:bg-red-900/20',           text: 'text-red-700 dark:text-red-400',       border: 'border-red-200 dark:border-red-800',     dot: 'bg-red-500' },
-  workshop: { bg: 'bg-purple-50 dark:bg-purple-900/20',     text: 'text-purple-700 dark:text-purple-400', border: 'border-purple-200 dark:border-purple-800', dot: 'bg-purple-500' },
-  other:    { bg: 'bg-[#F5F7FB] dark:bg-white/[0.06]',      text: 'text-[#5A6A7A] dark:text-white/60',   border: 'border-[#DDE3EC] dark:border-white/20',   dot: 'bg-[#5A6A7A]' },
-}
 const TYPE_ICONS: Record<SessionType, string> = {
   class: 'ti-book', exam: 'ti-pencil', workshop: 'ti-tools', other: 'ti-calendar',
 }
 
+// bg/text drive the agenda status pill; border adds the gold outline for "today";
+// barColor drives the session card's left accent bar and the week-view session chips.
+const STATUS_CONFIG: Record<DisplayStatus, { label: string; bg: string; text: string; border: string; barColor: string }> = {
+  upcoming:  { label: 'Upcoming',  bg: 'bg-blue-50 dark:bg-blue-900/30',       text: 'text-blue-700 dark:text-blue-300',      border: 'border border-transparent', barColor: 'border-l-[#0B3D6B]' },
+  today:     { label: 'Today',     bg: 'bg-[#E8A020]/10',                     text: 'text-[#E8A020]',                        border: 'border border-[#E8A020]',   barColor: 'border-l-[#E8A020]' },
+  completed: { label: 'Completed', bg: 'bg-green-50 dark:bg-emerald-900/20',  text: 'text-green-700 dark:text-emerald-400',  border: 'border border-transparent', barColor: 'border-l-gray-300 dark:border-l-gray-600' },
+  cancelled: { label: 'Cancelled', bg: 'bg-red-50 dark:bg-red-900/20',        text: 'text-red-600 dark:text-red-400',        border: 'border border-transparent', barColor: 'border-l-red-400 dark:border-l-red-500' },
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
-function isoToday() { return new Date().toISOString().slice(0, 10) }
-
-function startOfWeek(iso: string): string {
-  const d = new Date(iso + 'T00:00:00')
-  const day = d.getDay()
-  d.setDate(d.getDate() - day)
-  return d.toISOString().slice(0, 10)
+// NOTE: dates are formatted from local Date fields (getFullYear/getMonth/getDate),
+// never via toISOString() — that round-trips through UTC and shifts the date by
+// one day in positive-offset zones like Asia/Colombo (UTC+5:30).
+function toLocalISODate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
-function addDays(iso: string, n: number): string {
-  const d = new Date(iso + 'T00:00:00')
-  d.setDate(d.getDate() + n)
-  return d.toISOString().slice(0, 10)
-}
+function isoToday() { return toLocalISODate(new Date()) }
 
 function addMonths(iso: string, n: number): string {
   const d = new Date(iso + 'T00:00:00')
   d.setMonth(d.getMonth() + n)
-  return d.toISOString().slice(0, 10)
+  return toLocalISODate(d)
+}
+
+function addDaysIso(iso: string, n: number): string {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(d.getDate() + n)
+  return toLocalISODate(d)
+}
+
+/** Sunday of the week containing `iso` — matches the Sun-first WEEKDAYS_SHORT order. */
+function startOfWeek(iso: string): string {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(d.getDate() - d.getDay())
+  return toLocalISODate(d)
+}
+
+function firstOfMonth(iso: string): string {
+  return iso.slice(0, 8) + '01'
+}
+
+function monthKey(iso: string): string {
+  return iso.slice(0, 7)
+}
+
+function fmtMonthYear(iso: string): string {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+}
+
+/** e.g. "July 6 – 12, 2026"; handles a week that spans two months/years. */
+function fmtWeekRange(weekStartIso: string): string {
+  const start = new Date(weekStartIso + 'T00:00:00')
+  const end = new Date(addDaysIso(weekStartIso, 6) + 'T00:00:00')
+  const startMonth = start.toLocaleDateString('en-GB', { month: 'long' })
+  const endMonth = end.toLocaleDateString('en-GB', { month: 'long' })
+  if (start.getFullYear() !== end.getFullYear()) {
+    return `${startMonth} ${start.getDate()}, ${start.getFullYear()} – ${endMonth} ${end.getDate()}, ${end.getFullYear()}`
+  }
+  if (startMonth !== endMonth) {
+    return `${startMonth} ${start.getDate()} – ${endMonth} ${end.getDate()}, ${end.getFullYear()}`
+  }
+  return `${startMonth} ${start.getDate()} – ${end.getDate()}, ${end.getFullYear()}`
+}
+
+/** e.g. "Monday, 7 July" — no year, matches the agenda group header format. */
+function fmtGroupHeader(iso: string): string {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  })
 }
 
 function fmtDay(iso: string): string {
@@ -61,31 +111,59 @@ function fmtDay(iso: string): string {
   })
 }
 
-function fmtMonthYear(iso: string): string {
-  return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', {
-    month: 'long', year: 'numeric',
-  })
+function computeStatus(session: Session, today: string): DisplayStatus {
+  if (session.status === 'cancelled') return 'cancelled'
+  if (session.date === today) return 'today'
+  if (session.date > today) return 'upcoming'
+  return 'completed'
 }
 
-function fmtShortDay(iso: string): string {
-  return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', {
-    weekday: 'short', day: 'numeric',
-  })
+interface MonthCell {
+  iso: string
+  day: number
+  inMonth: boolean
 }
 
-function daysInMonth(iso: string): number {
-  const d = new Date(iso + 'T00:00:00')
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+/** Full weeks (5 or 6 rows) covering the given month, including muted lead/trail days. */
+function buildMonthGrid(monthIso: string): MonthCell[] {
+  const first = new Date(monthIso + 'T00:00:00')
+  const year = first.getFullYear()
+  const month = first.getMonth()
+  const firstWeekday = new Date(year, month, 1).getDay()
+  const totalDays = new Date(year, month + 1, 0).getDate()
+  const prevMonthDays = new Date(year, month, 0).getDate()
+
+  const cells: MonthCell[] = []
+  for (let i = firstWeekday - 1; i >= 0; i--) {
+    const day = prevMonthDays - i
+    cells.push({ iso: toLocalISODate(new Date(year, month - 1, day)), day, inMonth: false })
+  }
+  for (let day = 1; day <= totalDays; day++) {
+    cells.push({ iso: toLocalISODate(new Date(year, month, day)), day, inMonth: true })
+  }
+  let trailDay = 1
+  while (cells.length % 7 !== 0) {
+    cells.push({ iso: toLocalISODate(new Date(year, month + 1, trailDay)), day: trailDay, inMonth: false })
+    trailDay++
+  }
+  return cells
 }
 
-function firstDayOfMonthWeekday(iso: string): number {
-  const d = new Date(iso + 'T00:00:00')
-  return new Date(d.getFullYear(), d.getMonth(), 1).getDay()
+interface WeekCell {
+  iso: string
+  day: number
+  weekday: string
 }
 
-function isoOfDay(monthIso: string, day: number): string {
-  const d = new Date(monthIso + 'T00:00:00')
-  return new Date(d.getFullYear(), d.getMonth(), day).toISOString().slice(0, 10)
+/** The 7 days (Sun→Sat) of the week starting at `weekStartIso`. */
+function buildWeekGrid(weekStartIso: string): WeekCell[] {
+  const cells: WeekCell[] = []
+  for (let i = 0; i < 7; i++) {
+    const iso = addDaysIso(weekStartIso, i)
+    const d = new Date(iso + 'T00:00:00')
+    cells.push({ iso, day: d.getDate(), weekday: WEEKDAYS_SHORT[d.getDay()] })
+  }
+  return cells
 }
 
 // ── ICS export ───────────────────────────────────────────────────────────────
@@ -122,7 +200,8 @@ function downloadICS(session: Session) {
 
 // ── Session detail panel ─────────────────────────────────────────────────────
 function SessionPanel({ session, onClose }: { session: Session; onClose: () => void }) {
-  const cfg = TYPE_CONFIG[session.type ?? 'class']
+  const status = computeStatus(session, isoToday())
+  const cfg = STATUS_CONFIG[status]
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
@@ -134,22 +213,19 @@ function SessionPanel({ session, onClose }: { session: Session; onClose: () => v
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Type badge */}
-          <div className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 ${cfg.bg} ${cfg.border}`}>
+          <div className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 ${cfg.bg} ${cfg.border}`}>
             <span className={`ti ${TYPE_ICONS[session.type ?? 'class']} ${cfg.text}`} />
-            <span className={`text-xs font-bold capitalize ${cfg.text}`}>{session.type ?? 'class'}</span>
+            <span className={`text-xs font-bold ${cfg.text}`}>{cfg.label}</span>
           </div>
 
-          {/* Title */}
           <h3 className="font-jakarta text-xl font-bold text-[#0D1B2A] dark:text-white">{session.title}</h3>
 
-          {/* Details grid */}
           <div className="space-y-3">
             {[
               { icon: 'ti-calendar', label: 'Date', value: fmtDay(session.date) },
               { icon: 'ti-clock', label: 'Time', value: session.startTime ? `${session.startTime}${session.endTime ? ` – ${session.endTime}` : ''}` : 'TBC' },
-              { icon: 'ti-map-pin', label: 'Location', value: session.location || '—' },
-              { icon: 'ti-user', label: 'Teacher', value: session.teacherName || '—' },
+              ...(session.location ? [{ icon: 'ti-map-pin', label: 'Location', value: session.location }] : []),
+              ...(session.teacherName ? [{ icon: 'ti-user', label: 'Teacher', value: session.teacherName }] : []),
             ].map(item => (
               <div key={item.label} className="flex items-start gap-3 rounded-xl bg-[#F5F7FB] dark:bg-white/[0.04] px-4 py-3">
                 <span className={`ti ${item.icon} mt-0.5 text-[#E8A020]`} />
@@ -161,7 +237,6 @@ function SessionPanel({ session, onClose }: { session: Session; onClose: () => v
             ))}
           </div>
 
-          {/* Notes */}
           {session.notes && (
             <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-4 py-3">
               <p className="text-xs font-bold text-amber-700 dark:text-amber-400 mb-1">Notes</p>
@@ -169,7 +244,6 @@ function SessionPanel({ session, onClose }: { session: Session; onClose: () => v
             </div>
           )}
 
-          {/* Join link */}
           {session.joinLink && (
             <a
               href={session.joinLink}
@@ -184,7 +258,6 @@ function SessionPanel({ session, onClose }: { session: Session; onClose: () => v
           )}
         </div>
 
-        {/* Add to calendar */}
         <div className="border-t border-[#DDE3EC] dark:border-white/[0.08] p-5">
           <button
             type="button"
@@ -195,7 +268,7 @@ function SessionPanel({ session, onClose }: { session: Session; onClose: () => v
             Add to My Calendar
           </button>
           <p className="mt-2 text-center text-xs text-[#5A6A7A] dark:text-white/40">
-            Works with Google Calendar, Apple Calendar & Outlook
+            Works with Google Calendar, Apple Calendar &amp; Outlook
           </p>
         </div>
       </div>
@@ -203,61 +276,165 @@ function SessionPanel({ session, onClose }: { session: Session; onClose: () => v
   )
 }
 
-// ── Session card (compact) ────────────────────────────────────────────────────
-function SessionCard({ session, past, onClick }: { session: Session; past: boolean; onClick: () => void }) {
-  const cfg = TYPE_CONFIG[session.type ?? 'class']
+// ── Agenda session card ──────────────────────────────────────────────────────
+function SessionCard({ session, today, onClick }: { session: Session; today: string; onClick: () => void }) {
+  const status = computeStatus(session, today)
+  const cfg = STATUS_CONFIG[status]
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`w-full text-left rounded-2xl border p-4 transition-all hover:shadow-sm ${
-        past
-          ? 'border-[#DDE3EC] dark:border-white/[0.06] bg-[#F5F7FB]/50 dark:bg-white/[0.02] opacity-60'
-          : `${cfg.bg} ${cfg.border} hover:scale-[1.01]`
-      }`}
+      className={`min-h-[44px] w-full rounded-xl border-l-4 ${cfg.barColor} bg-white dark:bg-gray-800 p-4 text-left shadow-sm transition-shadow hover:shadow-md`}
     >
-      <div className="flex items-start gap-3">
-        <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${past ? 'bg-[#DDE3EC] dark:bg-white/10' : cfg.bg} border ${past ? 'border-[#DDE3EC]' : cfg.border}`}>
-          <span className={`ti ${TYPE_ICONS[session.type ?? 'class']} text-base ${past ? 'text-[#5A6A7A]' : cfg.text}`} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className={`font-semibold text-sm truncate ${past ? 'text-[#5A6A7A] dark:text-white/40' : 'text-[#0D1B2A] dark:text-white'}`}>
-            {session.title}
-          </p>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[#5A6A7A] dark:text-white/40">
-            {session.startTime && (
-              <span className="flex items-center gap-1">
-                <span className="ti ti-clock" />
-                {session.startTime}{session.endTime ? ` – ${session.endTime}` : ''}
-              </span>
-            )}
-            {session.location && (
-              <span className="flex items-center gap-1">
-                <span className="ti ti-map-pin" />
-                {session.location}
-              </span>
-            )}
-            {session.teacherName && (
-              <span className="flex items-center gap-1">
-                <span className="ti ti-user" />
-                {session.teacherName}
-              </span>
-            )}
-          </div>
-          {session.notes && (
-            <p className="mt-1 text-xs text-[#5A6A7A] dark:text-white/30 truncate">{session.notes}</p>
-          )}
-        </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ${past ? 'bg-[#DDE3EC] dark:bg-white/10 text-[#5A6A7A]' : `${cfg.bg} ${cfg.text}`}`}>
-            {session.type ?? 'class'}
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        {session.startTime && (
+          <span className="text-sm font-medium text-gray-900 dark:text-white">
+            {session.startTime}{session.endTime ? ` – ${session.endTime}` : ''}
           </span>
-          {session.joinLink && !past && (
-            <span className="ti ti-video text-xs text-emerald-500" />
-          )}
-        </div>
+        )}
+        <span className="truncate text-base font-semibold text-gray-900 dark:text-white">{session.title}</span>
+      </div>
+      <div className="mt-1 space-y-0.5">
+        {session.teacherName && (
+          <p className="text-sm text-gray-500 dark:text-gray-400">Teacher: {session.teacherName}</p>
+        )}
+        {session.location ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">{session.location}</p>
+        ) : session.joinLink ? (
+          <p className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400">
+            <span className="ti ti-video" /> Online
+          </p>
+        ) : null}
+      </div>
+      <div className="mt-2">
+        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+          {cfg.label}
+        </span>
       </div>
     </button>
+  )
+}
+
+// ── Month grid (left panel — month view) ─────────────────────────────────────
+function MonthGrid({
+  cells, today, selectedDate, byDate, onSelect,
+}: {
+  cells: MonthCell[]
+  today: string
+  selectedDate: string | null
+  byDate: Record<string, Session[]>
+  onSelect: (iso: string) => void
+}) {
+  return (
+    <div>
+      <div className="grid grid-cols-7">
+        {WEEKDAYS_SHORT.map(d => (
+          <div key={d} className="py-1 text-center text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            {d}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map(cell => {
+          const isTdy = cell.iso === today
+          const isSelected = cell.iso === selectedDate
+          const hasSessions = (byDate[cell.iso]?.length ?? 0) > 0
+
+          if (!cell.inMonth) {
+            return (
+              <div key={cell.iso} className="flex min-h-[44px] items-start justify-center pt-2">
+                <span className="text-xs text-gray-300 dark:text-gray-600">{cell.day}</span>
+              </div>
+            )
+          }
+
+          return (
+            <button
+              key={cell.iso}
+              type="button"
+              onClick={() => onSelect(cell.iso)}
+              className="relative flex min-h-[44px] flex-col items-center justify-start gap-0.5 rounded-xl pt-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <span
+                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+                  isSelected
+                    ? 'bg-[#0B3D6B] text-white'
+                    : isTdy
+                      ? 'bg-[#E8A020] text-white'
+                      : 'text-gray-900 dark:text-white'
+                }`}
+              >
+                {cell.day}
+              </span>
+              <span className={`h-1.5 w-1.5 rounded-full ${hasSessions ? 'bg-[#0B3D6B] dark:bg-[#1A6BAD]' : 'bg-transparent'}`} />
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Week grid (left panel — week view) ───────────────────────────────────────
+function WeekGrid({
+  cells, today, selectedDate, byDate, onSelect,
+}: {
+  cells: WeekCell[]
+  today: string
+  selectedDate: string | null
+  byDate: Record<string, Session[]>
+  onSelect: (iso: string) => void
+}) {
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1">
+      {cells.map(cell => {
+        const isTdy = cell.iso === today
+        const isSelected = cell.iso === selectedDate
+        const daySessions = (byDate[cell.iso] ?? [])
+          .slice()
+          .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''))
+
+        return (
+          <button
+            key={cell.iso}
+            type="button"
+            onClick={() => onSelect(cell.iso)}
+            className={`flex min-h-[44px] w-[92px] shrink-0 flex-col items-stretch gap-1 rounded-xl p-2 text-left transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 ${
+              isSelected ? 'bg-[#0B3D6B]/5 dark:bg-[#0B3D6B]/20' : ''
+            }`}
+          >
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                {cell.weekday}
+              </span>
+              <span
+                className={`mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+                  isTdy ? 'bg-[#E8A020] text-white' : 'text-gray-900 dark:text-white'
+                }`}
+              >
+                {cell.day}
+              </span>
+            </div>
+            <div className="mt-1 space-y-1">
+              {daySessions.slice(0, 3).map(s => {
+                const status = computeStatus(s, today)
+                return (
+                  <div
+                    key={s.id}
+                    className={`truncate rounded-md border-l-2 ${STATUS_CONFIG[status].barColor} bg-gray-50 dark:bg-white/[0.06] px-1.5 py-1 text-[9px] font-medium text-gray-700 dark:text-white/70`}
+                  >
+                    {s.startTime ? `${s.startTime} ` : ''}{s.title}
+                  </div>
+                )
+              })}
+              {daySessions.length > 3 && (
+                <p className="text-center text-[9px] text-gray-400 dark:text-gray-500">+{daySessions.length - 3} more</p>
+              )}
+            </div>
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
@@ -268,50 +445,51 @@ export default function MySchedulePage() {
   const { student } = useStudentPortal()
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
-  const [viewMode, setViewMode] = useState<ViewMode>('week')
-  const [anchor, setAnchor] = useState(isoToday())
+  const [view, setView] = useState<ScheduleView>('month')
+  const [monthAnchor, setMonthAnchor] = useState(() => firstOfMonth(isoToday()))
+  const [weekAnchor, setWeekAnchor] = useState(() => startOfWeek(isoToday()))
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [selected, setSelected] = useState<Session | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const groupRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
-  // Load sessions for this student's course
+  const courseId = student?.courseId ?? ''
+
+  // Load sessions for this student's enrolled course only.
   useEffect(() => {
     if (!student) return
+    if (!courseId) {
+      setSessions([])
+      setLoading(false)
+      return
+    }
     let cancelled = false
     async function load() {
       setLoading(true)
       try {
-        // Try course-filtered query first, fallback to all
         const snap = await getDocs(
           query(
             collection(db, 'sessions'),
-            where('courseId', '==', student!.courseId ?? ''),
+            where('courseId', '==', courseId),
             orderBy('date', 'asc'),
           ),
-        ).catch(() =>
-          getDocs(query(collection(db, 'sessions'), orderBy('date', 'asc')))
         )
         if (!cancelled) {
-          setSessions(
-            snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Session, 'id'>) }))
-          )
+          setSessions(snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Session, 'id'>) })))
         }
       } catch (err) {
         console.error('[MySchedule]', err)
+        if (!cancelled) setSessions([])
       } finally {
         if (!cancelled) setLoading(false)
       }
     }
     void load()
     return () => { cancelled = true }
-  }, [student])
+  }, [student, courseId])
 
   const today = isoToday()
 
-  // ── Derived date ranges ────────────────────────────────────────────────────
-  const weekStart = useMemo(() => startOfWeek(anchor), [anchor])
-  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart])
-  const monthAnchor = useMemo(() => anchor.slice(0, 8) + '01', [anchor])
-
-  // ── Session lookup map ─────────────────────────────────────────────────────
   const byDate = useMemo(() => {
     const map: Record<string, Session[]> = {}
     sessions.forEach(s => {
@@ -321,30 +499,90 @@ export default function MySchedulePage() {
     return map
   }, [sessions])
 
-  // ── Navigation ─────────────────────────────────────────────────────────────
-  function goBack() {
-    if (viewMode === 'day') setAnchor(a => addDays(a, -1))
-    else if (viewMode === 'week') setAnchor(a => addDays(a, -7))
-    else setAnchor(a => addMonths(a, -1))
-  }
-  function goForward() {
-    if (viewMode === 'day') setAnchor(a => addDays(a, 1))
-    else if (viewMode === 'week') setAnchor(a => addDays(a, 7))
-    else setAnchor(a => addMonths(a, 1))
-  }
-  function goToday() { setAnchor(isoToday()) }
+  const monthCells = useMemo(() => buildMonthGrid(monthAnchor), [monthAnchor])
+  const weekCells = useMemo(() => buildWeekGrid(weekAnchor), [weekAnchor])
 
-  // ── Header label ───────────────────────────────────────────────────────────
-  const headerLabel = useMemo(() => {
-    if (viewMode === 'day') return fmtDay(anchor)
-    if (viewMode === 'week') {
-      const end = addDays(weekStart, 6)
-      const s = new Date(weekStart + 'T00:00:00')
-      const e = new Date(end + 'T00:00:00')
-      return `${s.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${e.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
-    }
-    return fmtMonthYear(anchor)
-  }, [viewMode, anchor, weekStart])
+  const sessionsThisMonth = useMemo(
+    () => sessions.filter(s => monthKey(s.date) === monthKey(monthAnchor)),
+    [sessions, monthAnchor],
+  )
+
+  const sessionsThisWeek = useMemo(() => {
+    const weekEnd = addDaysIso(weekAnchor, 6)
+    return sessions.filter(s => s.date >= weekAnchor && s.date <= weekEnd)
+  }, [sessions, weekAnchor])
+
+  const upcomingSessions = useMemo(
+    () => sessions.filter(s => s.date >= today),
+    [sessions, today],
+  )
+
+  // Chronological agenda groups for the current view's scope (month / week / all-upcoming),
+  // narrowed further to a single day when one is selected (month & week views only).
+  const agendaGroups = useMemo(() => {
+    const base = view === 'list' ? upcomingSessions : view === 'week' ? sessionsThisWeek : sessionsThisMonth
+    const scoped = (view !== 'list' && selectedDate) ? base.filter(s => s.date === selectedDate) : base
+    const dates = Array.from(new Set(scoped.map(s => s.date))).sort()
+    return dates.map(date => ({
+      date,
+      items: (byDate[date] ?? []).slice().sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? '')),
+    }))
+  }, [view, upcomingSessions, sessionsThisWeek, sessionsThisMonth, selectedDate, byDate])
+
+  function goPrevMonth() {
+    setMonthAnchor(a => addMonths(a, -1))
+    setSelectedDate(null)
+  }
+  function goNextMonth() {
+    setMonthAnchor(a => addMonths(a, 1))
+    setSelectedDate(null)
+  }
+  function goThisMonth() {
+    setMonthAnchor(firstOfMonth(today))
+    setSelectedDate(null)
+  }
+
+  function goPrevWeek() {
+    setWeekAnchor(a => addDaysIso(a, -7))
+    setSelectedDate(null)
+  }
+  function goNextWeek() {
+    setWeekAnchor(a => addDaysIso(a, 7))
+    setSelectedDate(null)
+  }
+  function goThisWeek() {
+    setWeekAnchor(startOfWeek(today))
+    setSelectedDate(null)
+  }
+
+  function goPrev() {
+    if (view === 'week') goPrevWeek()
+    else if (view === 'month') goPrevMonth()
+  }
+  function goNext() {
+    if (view === 'week') goNextWeek()
+    else if (view === 'month') goNextMonth()
+  }
+  function goToday() {
+    if (view === 'week') { goThisWeek(); return }
+    if (view === 'month') { goThisMonth(); return }
+    // List view has no month/week to page — jump the agenda to today's group instead.
+    const el = groupRefs.current[today]
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    else listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  function selectDay(iso: string) {
+    setSelectedDate(prev => (prev === iso ? null : iso))
+    requestAnimationFrame(() => {
+      listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
+
+  function selectView(v: ScheduleView) {
+    setView(v)
+    setSelectedDate(null)
+  }
 
   if (loading) {
     return (
@@ -355,254 +593,156 @@ export default function MySchedulePage() {
     )
   }
 
-  const sessionsOnDay = (iso: string) => byDate[iso] ?? []
-
   return (
-    <div className="space-y-4 pb-24 md:pb-6">
+    <div className="pb-24 md:pb-6">
       {/* Page header */}
-      <div>
+      <div className="mb-4">
         <h1 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white">My Schedule</h1>
         <p className="text-sm text-[#5A6A7A] dark:text-white/50">Classes, exams and workshops</p>
       </div>
 
-      {/* Controls: view mode + nav */}
-      <div className="flex flex-wrap items-center gap-3">
-        {/* View mode tabs */}
-        <div className="flex rounded-xl border border-[#DDE3EC] dark:border-white/20 overflow-hidden">
-          {(['day', 'week', 'month'] as const).map(v => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setViewMode(v)}
-              className={`px-4 py-2 text-sm font-semibold capitalize transition-all ${
-                viewMode === v
-                  ? 'bg-[#0B3D6B] text-white'
-                  : 'bg-white dark:bg-white/[0.04] text-[#5A6A7A] dark:text-white/60 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.08]'
-              }`}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
-
-        {/* Navigation */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={goBack}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/60 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06]"
-          >
-            <span className="ti ti-chevron-left" />
-          </button>
-          <button
-            type="button"
-            onClick={goToday}
-            className="rounded-xl border border-[#DDE3EC] dark:border-white/20 px-3 py-1.5 text-xs font-semibold text-[#5A6A7A] dark:text-white/60 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06]"
-          >
-            Today
-          </button>
-          <button
-            type="button"
-            onClick={goForward}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/60 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06]"
-          >
-            <span className="ti ti-chevron-right" />
-          </button>
-        </div>
-
-        {/* Date label */}
-        <p className="text-sm font-semibold text-[#0D1B2A] dark:text-white">{headerLabel}</p>
-
-        {/* Session count */}
-        <span className="ml-auto rounded-full bg-[#F5F7FB] dark:bg-white/[0.06] px-3 py-1 text-xs font-semibold text-[#5A6A7A] dark:text-white/50">
-          {sessions.length} session{sessions.length !== 1 ? 's' : ''} total
-        </span>
-      </div>
-
-      {/* ── DAY VIEW ─────────────────────────────────────────────────────────── */}
-      {viewMode === 'day' && (
-        <div className="space-y-3">
-          <div className={`flex items-center gap-2 rounded-xl px-4 py-2.5 ${
-            anchor === today
-              ? 'bg-[#E8A020]/10 border border-[#E8A020]/30'
-              : 'bg-[#F5F7FB] dark:bg-white/[0.04] border border-[#DDE3EC] dark:border-white/[0.08]'
-          }`}>
-            {anchor === today && (
-              <span className="rounded-full bg-[#E8A020] px-2 py-0.5 text-[10px] font-bold text-white">TODAY</span>
-            )}
-            <span className="text-sm font-semibold text-[#0D1B2A] dark:text-white">{fmtDay(anchor)}</span>
+      {!courseId ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0B3D6B]/10 dark:bg-white/[0.06]">
+            <span className="ti ti-school text-[28px] text-[#0B3D6B] dark:text-white/30" />
           </div>
-
-          {sessionsOnDay(anchor).length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0B3D6B]/10 dark:bg-white/[0.06]">
-                <span className="ti ti-calendar-off text-[28px] text-[#0B3D6B] dark:text-white/30" />
-              </div>
-              <h3 className="font-jakarta text-[18px] font-bold text-[#0B3D6B] dark:text-white mb-2">
-                No sessions scheduled yet
-              </h3>
-              <p className="max-w-xs text-[14px] text-[#5A6A7A] dark:text-white/40 leading-relaxed">
-                Your upcoming classes and sessions will appear here once your teacher schedules them.
-              </p>
-            </div>
-          ) : (
-            sessionsOnDay(anchor)
-              .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''))
-              .map(s => (
-                <SessionCard key={s.id} session={s} past={s.date < today} onClick={() => setSelected(s)} />
-              ))
-          )}
+          <h3 className="font-jakarta text-[18px] font-bold text-[#0B3D6B] dark:text-white mb-2">
+            No course enrolled
+          </h3>
+          <p className="max-w-xs text-[14px] text-[#5A6A7A] dark:text-white/40 leading-relaxed">
+            Your schedule will appear here once you&apos;re enrolled in a course.
+          </p>
         </div>
-      )}
+      ) : (
+        <>
+          {/* ── TOP CONTROLS BAR ─────────────────────────────────────────── */}
+          <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={goToday}
+                className="flex h-11 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 px-4 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={goPrev}
+                disabled={view === 'list'}
+                aria-label="Previous"
+                className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:pointer-events-none"
+              >
+                <span className="ti ti-chevron-left text-lg" />
+              </button>
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={view === 'list'}
+                aria-label="Next"
+                className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:pointer-events-none"
+              >
+                <span className="ti ti-chevron-right text-lg" />
+              </button>
+              <span className="font-jakarta text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                {view === 'week' ? fmtWeekRange(weekAnchor) : view === 'month' ? fmtMonthYear(monthAnchor) : 'Upcoming'}
+              </span>
+            </div>
 
-      {/* ── WEEK VIEW ────────────────────────────────────────────────────────── */}
-      {viewMode === 'week' && (
-        <div className="space-y-3">
-          {/* Week day strip */}
-          <div className="grid grid-cols-7 gap-1">
-            {weekDays.map(iso => {
-              const count = sessionsOnDay(iso).length
-              const isAnchor = iso === anchor
-              const isTdy = iso === today
-              return (
+            <div className="flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700">
+              {(['month', 'week', 'list'] as const).map(v => (
                 <button
-                  key={iso}
+                  key={v}
                   type="button"
-                  onClick={() => { setAnchor(iso); setViewMode('day') }}
-                  className={`flex flex-col items-center rounded-xl py-2 transition-all ${
-                    isTdy
-                      ? 'bg-[#E8A020] text-white'
-                      : isAnchor
+                  onClick={() => selectView(v)}
+                  className={`h-11 rounded-md px-3 sm:px-4 text-xs sm:text-sm font-semibold capitalize transition-colors ${
+                    view === v
                       ? 'bg-[#0B3D6B] text-white'
-                      : 'bg-[#F5F7FB] dark:bg-white/[0.04] text-[#5A6A7A] dark:text-white/60 hover:bg-[#DDE3EC]/50'
+                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                   }`}
                 >
-                  <span className="text-[10px] font-bold">{WEEKDAYS_SHORT[new Date(iso + 'T00:00:00').getDay()]}</span>
-                  <span className="text-base font-black">{new Date(iso + 'T00:00:00').getDate()}</span>
-                  {count > 0 && (
-                    <span className={`mt-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold ${
-                      isTdy ? 'bg-white text-[#E8A020]' : 'bg-[#E8A020] text-white'
-                    }`}>
-                      {count}
-                    </span>
-                  )}
+                  {v}
                 </button>
-              )
-            })}
-          </div>
-
-          {/* Sessions for each day of the week */}
-          <div className="space-y-4">
-            {weekDays.map(iso => {
-              const daySessions = sessionsOnDay(iso).sort((a, b) =>
-                (a.startTime ?? '').localeCompare(b.startTime ?? '')
-              )
-              if (daySessions.length === 0) return null
-              return (
-                <div key={iso}>
-                  <div className={`mb-2 flex items-center gap-2 ${
-                    iso === today ? 'text-[#E8A020]' : 'text-[#5A6A7A] dark:text-white/50'
-                  }`}>
-                    {iso === today && (
-                      <span className="rounded-full bg-[#E8A020] px-2 py-0.5 text-[10px] font-bold text-white">TODAY</span>
-                    )}
-                    <span className="text-xs font-semibold">{fmtShortDay(iso)}</span>
-                  </div>
-                  <div className="space-y-2">
-                    {daySessions.map(s => (
-                      <SessionCard key={s.id} session={s} past={iso < today} onClick={() => setSelected(s)} />
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-            {weekDays.every(iso => sessionsOnDay(iso).length === 0) && (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0B3D6B]/10 dark:bg-white/[0.06]">
-                  <span className="ti ti-calendar-off text-[28px] text-[#0B3D6B] dark:text-white/30" />
-                </div>
-                <h3 className="font-jakarta text-[18px] font-bold text-[#0B3D6B] dark:text-white mb-2">
-                  No sessions scheduled yet
-                </h3>
-                <p className="max-w-xs text-[14px] text-[#5A6A7A] dark:text-white/40 leading-relaxed">
-                  Your upcoming classes and sessions will appear here once your teacher schedules them.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── MONTH VIEW ───────────────────────────────────────────────────────── */}
-      {viewMode === 'month' && (
-        <div className="space-y-3">
-          {/* Grid header */}
-          <div className="grid grid-cols-7 gap-1">
-            {WEEKDAYS_SHORT.map(d => (
-              <div key={d} className="py-1 text-center text-[10px] font-bold uppercase text-[#5A6A7A] dark:text-white/40">
-                {d}
-              </div>
-            ))}
-          </div>
-
-          {/* Calendar grid */}
-          <div className="grid grid-cols-7 gap-1">
-            {/* Empty cells before month starts */}
-            {Array.from({ length: firstDayOfMonthWeekday(monthAnchor) }, (_, i) => (
-              <div key={`empty-${i}`} className="h-14 rounded-xl" />
-            ))}
-            {/* Day cells */}
-            {Array.from({ length: daysInMonth(monthAnchor) }, (_, i) => {
-              const iso = isoOfDay(monthAnchor, i + 1)
-              const daySessions = sessionsOnDay(iso)
-              const isTdy = iso === today
-              const isPast = iso < today
-              return (
-                <button
-                  key={iso}
-                  type="button"
-                  onClick={() => { setAnchor(iso); setViewMode('day') }}
-                  className={`relative flex h-14 flex-col items-start rounded-xl p-1.5 transition-all ${
-                    isTdy
-                      ? 'bg-[#E8A020] text-white shadow-md'
-                      : isPast
-                      ? 'bg-[#F5F7FB]/50 dark:bg-white/[0.02] text-[#5A6A7A]/50 dark:text-white/20'
-                      : 'bg-white dark:bg-white/[0.04] text-[#0D1B2A] dark:text-white hover:border-[#E8A020] border border-[#DDE3EC] dark:border-white/[0.08]'
-                  }`}
-                >
-                  <span className={`text-xs font-bold ${isTdy ? 'text-white' : ''}`}>{i + 1}</span>
-                  <div className="mt-auto flex gap-0.5 flex-wrap">
-                    {daySessions.slice(0, 3).map(s => (
-                      <div
-                        key={s.id}
-                        className={`h-1.5 w-1.5 rounded-full ${
-                          isTdy ? 'bg-white' : TYPE_CONFIG[s.type ?? 'class'].dot
-                        }`}
-                      />
-                    ))}
-                    {daySessions.length > 3 && (
-                      <span className={`text-[8px] font-bold ${isTdy ? 'text-white' : 'text-[#5A6A7A]'}`}>+{daySessions.length - 3}</span>
-                    )}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Sessions for selected anchor day (click any day to see) */}
-          {sessionsOnDay(anchor).length > 0 && (
-            <div className="space-y-2 pt-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A7A] dark:text-white/50">
-                {fmtShortDay(anchor)}
-              </p>
-              {sessionsOnDay(anchor)
-                .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''))
-                .map(s => (
-                  <SessionCard key={s.id} session={s} past={anchor < today} onClick={() => setSelected(s)} />
-                ))}
+              ))}
             </div>
-          )}
-        </div>
+          </div>
+
+          {/* ── PANELS ───────────────────────────────────────────────────── */}
+          <div className="flex flex-col md:flex-row">
+            {view !== 'list' && (
+              <>
+                <div className="w-full md:w-[320px] md:shrink-0 bg-white dark:bg-gray-900 p-4">
+                  {view === 'month' ? (
+                    <MonthGrid cells={monthCells} today={today} selectedDate={selectedDate} byDate={byDate} onSelect={selectDay} />
+                  ) : (
+                    <WeekGrid cells={weekCells} today={today} selectedDate={selectedDate} byDate={byDate} onSelect={selectDay} />
+                  )}
+                </div>
+                <div className="hidden md:block w-px shrink-0 bg-gray-200 dark:bg-gray-700" />
+              </>
+            )}
+
+            {/* Agenda (right panel) */}
+            <div ref={listRef} className="min-w-0 flex-1 bg-white dark:bg-gray-900 p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  {selectedDate && view !== 'list'
+                    ? fmtGroupHeader(selectedDate)
+                    : view === 'week'
+                      ? fmtWeekRange(weekAnchor)
+                      : view === 'month'
+                        ? fmtMonthYear(monthAnchor)
+                        : 'Upcoming'}
+                </p>
+                {selectedDate && view !== 'list' && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDate(null)}
+                    className="whitespace-nowrap text-xs font-semibold text-[#0B3D6B] dark:text-[#E8A020] hover:underline"
+                  >
+                    ← Show full {view === 'week' ? 'week' : 'month'}
+                  </button>
+                )}
+              </div>
+
+              {agendaGroups.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0B3D6B]/10 dark:bg-white/[0.06]">
+                    <span className="ti ti-calendar text-[28px] text-[#0B3D6B] dark:text-white/30" />
+                  </div>
+                  <h3 className="font-jakarta text-[18px] font-bold text-[#0B3D6B] dark:text-white mb-2">
+                    No sessions scheduled
+                  </h3>
+                  <p className="max-w-xs text-[14px] text-[#5A6A7A] dark:text-white/40 leading-relaxed">
+                    Your upcoming classes will appear here once your teacher schedules them.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  {agendaGroups.map(group => (
+                    <div key={group.date} ref={(el) => { groupRefs.current[group.date] = el }}>
+                      {/* Sticky only from md up — the top controls bar can wrap to two
+                          lines on mobile, so its height (and a safe offset here) isn't
+                          predictable below that breakpoint. */}
+                      <div className="relative md:sticky md:top-[68px] z-10 -mx-1 flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-1 py-2">
+                        {group.date === today && (
+                          <span className="rounded-full bg-[#E8A020] px-2 py-0.5 text-[10px] font-bold text-white">TODAY</span>
+                        )}
+                        <span className="text-xs font-bold uppercase tracking-wide text-[#E8A020]">
+                          {fmtGroupHeader(group.date)}
+                        </span>
+                      </div>
+                      <div className="space-y-2 pt-2">
+                        {group.items.map(s => (
+                          <SessionCard key={s.id} session={s} today={today} onClick={() => setSelected(s)} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
       )}
 
       {/* Session detail panel */}

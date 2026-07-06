@@ -262,25 +262,8 @@ export default function LoginPage() {
       const result = await signInWithEmailAndPassword(auth, email, password)
       const info = await completeSignIn(result.user)
 
-      if (STAFF_ROLES.includes(info.role) && info.phone) {
-        await fetch('/api/twilio/send-2fa', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: info.uid,
-            phone: info.phone,
-            name: info.displayName,
-          }),
-        })
-        setTwoFactorUserId(info.uid)
-        setTwoFactorRole(info.role)
-        setTwoFactorPhone(info.phone)
-        setTwoFactorName(info.displayName)
-        setPendingRedirect(info.redirectPath)
-        setTwoFactorRequired(true)
-        return
-      }
-
+      // TODO: Re-enable 2FA when Twilio live number is activated
+      // The send-2fa and verify-2fa API routes are preserved
       router.push(info.redirectPath)
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''
@@ -390,8 +373,24 @@ export default function LoginPage() {
   )
 
   return (
-    <div className="min-h-screen bg-[#F5F7FB] dark:bg-[#04090f]">
-      <div className="mx-auto grid min-h-screen max-w-5xl grid-cols-1 items-center gap-8 px-4 py-12 sm:px-6 lg:grid-cols-5">
+    <div className="relative min-h-screen overflow-hidden bg-[#F0F4FA] dark:bg-[#050d1a]">
+      {/* Light mode background */}
+      <div
+        className="pointer-events-none absolute inset-0 dark:hidden"
+        style={{ background: 'radial-gradient(ellipse at center, #ffffff 0%, #F0F4FA 100%)' }}
+      />
+      {/* Dark mode background */}
+      <div
+        className="pointer-events-none absolute inset-0 hidden dark:block"
+        style={{ background: 'radial-gradient(ellipse at center, #0d1f3c 0%, #050d1a 100%)' }}
+      />
+      {/* Dark mode ambient glows */}
+      <div className="pointer-events-none absolute -left-20 top-10 hidden h-[420px] w-[420px] rounded-full bg-[#1A6BAD] opacity-[0.15] blur-3xl dark:block" />
+      <div className="pointer-events-none absolute -right-24 top-1/3 hidden h-[380px] w-[380px] rounded-full bg-[#0B3D6B] opacity-[0.15] blur-3xl dark:block" />
+      <div className="pointer-events-none absolute bottom-0 left-1/4 hidden h-[360px] w-[360px] rounded-full bg-[#1A6BAD] opacity-[0.15] blur-3xl dark:block" />
+      <div className="pointer-events-none absolute bottom-10 right-1/4 hidden h-[300px] w-[300px] rounded-full bg-[#0f4c81] opacity-[0.15] blur-3xl dark:block" />
+
+      <div className="relative z-10 mx-auto grid min-h-screen max-w-5xl grid-cols-1 items-center gap-8 px-4 py-12 sm:px-6 lg:grid-cols-5">
         {/* Left panel — navy gradient, desktop only */}
         <div className="hidden lg:flex lg:col-span-2 flex-col justify-center rounded-2xl bg-gradient-to-br from-[#0B3D6B] to-[#071428] p-10">
           <div className="mb-8">

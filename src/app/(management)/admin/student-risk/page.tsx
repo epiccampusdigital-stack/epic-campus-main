@@ -106,7 +106,7 @@ function exportAtRiskCsv(profiles: StudentRiskProfile[]) {
 
 export default function StudentRiskPage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useManagement()
+  const { user, loading: authLoading, hasRole } = useManagement()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [profiles, setProfiles] = useState<StudentRiskProfile[]>([])
@@ -118,10 +118,10 @@ export default function StudentRiskPage() {
   useEffect(() => {
     if (authLoading) return
     if (!user) return
-    if (user.role !== 'admin' && user.role !== 'owner') {
+    if (!(hasRole('admin') || hasRole('owner'))) {
       router.replace('/dashboard')
     }
-  }, [user, authLoading, router])
+  }, [user, authLoading, router, hasRole])
 
   const loadCache = useCallback(async () => {
     setLoading(true)
@@ -137,9 +137,9 @@ export default function StudentRiskPage() {
   }, [])
 
   useEffect(() => {
-    if (authLoading || !user || (user.role !== 'admin' && user.role !== 'owner')) return
+    if (authLoading || !user || !(hasRole('admin') || hasRole('owner'))) return
     void loadCache()
-  }, [authLoading, user, loadCache])
+  }, [authLoading, user, loadCache, hasRole])
 
   async function handleRefresh() {
     setRefreshing(true)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { onAuthStateChanged } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
@@ -39,8 +39,11 @@ export default function ManagementLayout({
 
         const data = snap.data()
         const role = data.role as Role
+        const roles: Role[] = Array.isArray(data.roles) && data.roles.length > 0
+          ? (data.roles as Role[])
+          : [role]
 
-        if (!ALLOWED_ROLES.includes(role)) {
+        if (!roles.some((r) => ALLOWED_ROLES.includes(r))) {
           router.replace('/login')
           return
         }
@@ -50,6 +53,7 @@ export default function ManagementLayout({
           email: data.email ?? firebaseUser.email ?? '',
           displayName: data.displayName ?? firebaseUser.displayName ?? '',
           role,
+          roles,
           branchId: data.branchId,
           locationAssigned: data.locationAssigned
             ? (String(data.locationAssigned) as EpicUser['locationAssigned'])
@@ -67,6 +71,11 @@ export default function ManagementLayout({
     return () => unsubscribe()
   }, [router])
 
+  const hasRole = useCallback(
+    (role: Role) => (user?.roles ?? (user ? [user.role] : [])).includes(role),
+    [user],
+  )
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#eef2f7] dark:bg-[#080d18] transition-colors duration-300">
@@ -82,7 +91,7 @@ export default function ManagementLayout({
 
   return (
     <ManagementContext.Provider
-      value={{ user, loading, sidebarOpen, setSidebarOpen }}
+      value={{ user, loading, sidebarOpen, setSidebarOpen, hasRole }}
     >
       <div className="flex h-screen overflow-hidden bg-[#eef2f7] dark:bg-[#080d18] transition-colors duration-300 font-['DM_Sans']">
         <ManagementSidebar />

@@ -5,8 +5,10 @@ import {
   getInitials,
   getRoleColor,
   getRoleLabel,
+  getStaffRoles,
   getStatusColor,
   getStatusLabel,
+  staffHasRole,
 } from '@/lib/staff/helpers'
 import { LOCATION_LABELS, LOCATION_STYLES } from '@/lib/students/helpers'
 import type { StaffMember } from '@/types'
@@ -81,7 +83,7 @@ export function PendingStaffBanner({
                   {member.displayName}
                 </p>
                 <p className="text-xs text-[#5A6A7A]">
-                  {getRoleLabel(member.role)} · {member.email || member.phone}
+                  {getStaffRoles(member).map(getRoleLabel).join(', ')} · {member.email || member.phone}
                 </p>
               </div>
             </div>
@@ -176,12 +178,15 @@ export default function StaffTable({
                 </td>
                 <td className="hidden px-4 py-3 md:table-cell">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span
-                      className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${getRoleColor(member.role)}`}
-                    >
-                      {getRoleLabel(member.role)}
-                    </span>
-                    {member.role === 'agent' && member.commissionRate != null && member.commissionRate > 0 && (
+                    {getStaffRoles(member).map((r) => (
+                      <span
+                        key={r}
+                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${getRoleColor(r)}`}
+                      >
+                        {getRoleLabel(r)}
+                      </span>
+                    ))}
+                    {staffHasRole(member, 'agent') && member.commissionRate != null && member.commissionRate > 0 && (
                       <span className="inline-flex rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-xs font-medium text-teal-700">
                         {member.commissionRate}%
                       </span>

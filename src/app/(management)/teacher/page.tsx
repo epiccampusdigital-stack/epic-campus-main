@@ -28,10 +28,14 @@ interface ExamAttempt {
 
 const COURSE_LABELS: Record<string, string> = {
   'japan-ssw': '🇯🇵 Japan SSW',
-  'korea': '🇰🇷 Korea',
+  'korea-d2d4': '🇰🇷 Korea',
   'china': '🇨🇳 China',
   'ielts': '📝 IELTS',
-  'nvq': '🎓 NVQ',
+  'nvq-it': '🎓 NVQ IT',
+  'nvq-hospitality': '🎓 NVQ Hospitality',
+  'nvq-caregiving': '🎓 NVQ Caregiving',
+  'nvq-construction': '🎓 NVQ Construction',
+  'nvq-logistics': '🎓 NVQ Logistics',
 }
 
 function today() { return new Date().toISOString().slice(0, 10) }
