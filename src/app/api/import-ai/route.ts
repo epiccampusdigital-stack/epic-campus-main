@@ -53,11 +53,28 @@ async function extractText(file: File): Promise<{ ok: true; text: string } | { o
       return { ok: true, text: csv }
     }
     if (name.endsWith('.pdf')) {
-      // No server-side PDF text extractor is bundled. Fail gracefully with guidance
-      // rather than importing garbage.
-      return {
-        ok: false,
-        error: 'PDF text extraction is not available — please export the data as CSV/Excel, or paste the text into the box below.',
+      try {
+        const buf = Buffer.from(await file.arrayBuffer())
+        // Import the internal lib entry directly — pdf-parse's index.js has a debug
+        // block that reads a bundled sample PDF and throws inside serverless bundles.
+        // The `string`-typed specifier keeps TS from resolving/type-checking the path.
+        const spec: string = 'pdf-parse/lib/pdf-parse.js'
+        const mod = (await import(spec)) as { default?: (b: Buffer) => Promise<{ text?: string }> }
+        const pdfParse = mod.default
+        if (!pdfParse) {
+          return { ok: false, error: 'PDF parser unavailable — please export as CSV/Excel or paste the text.' }
+        }
+        const data = await pdfParse(buf)
+        const text = String(data?.text ?? '').trim()
+        if (!text) {
+          return { ok: false, error: 'No extractable text found in this PDF (it may be a scanned image).' }
+        }
+        return { ok: true, text }
+      } catch (err) {
+        return {
+          ok: false,
+          error: `PDF could not be read: ${err instanceof Error ? err.message : String(err)}. Try exporting as CSV/Excel or pasting the text.`,
+        }
       }
     }
     // csv / json / txt / anything text-like

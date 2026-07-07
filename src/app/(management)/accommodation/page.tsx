@@ -12,6 +12,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   Timestamp,
   updateDoc,
 } from 'firebase/firestore'
@@ -102,6 +103,20 @@ const CURRENT_MONTH_KEY = (() => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 })()
 
+function accomMonthOptions(count: number): { value: string; label: string }[] {
+  const out: { value: string; label: string }[] = []
+  const base = new Date()
+  for (let i = 0; i < count; i++) {
+    const dt = new Date(base.getFullYear(), base.getMonth() - i, 1)
+    out.push({
+      value: `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`,
+      label: dt.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+    })
+  }
+  return out
+}
+const ACCOM_MONTHS = accomMonthOptions(12)
+
 function AccommodationPageContent() {
   const { user, hasRole } = useManagement()
   const [houses, setHouses] = useState<House[]>([])
@@ -114,7 +129,17 @@ function AccommodationPageContent() {
   const [toast, setToast] = useState('')
   const [toastKind, setToastKind] = useState<ToastKind>('success')
 
+  // ── Monthly rent tracking (budget + per-house rent-paid status) ──────────────
+  const [selectedMonth, setSelectedMonth] = useState(CURRENT_MONTH_KEY)
+  const [budget, setBudget] = useState<number | null>(null)
+  const [rentPaid, setRentPaid] = useState<Record<string, boolean>>({})
+  const [budgetModalOpen, setBudgetModalOpen] = useState(false)
+  const [budgetInput, setBudgetInput] = useState('')
+  const [savingBudget, setSavingBudget] = useState(false)
+
   const allowed = (['admin', 'owner', 'accountant', 'reception', 'teacher', 'examCoordinator'] as Role[]).some((r) => hasRole(r))
+  const canManageRent = (['admin', 'owner', 'accountant', 'reception'] as Role[]).some((r) => hasRole(r))
+  const canSetBudget = (['admin', 'owner', 'accountant'] as Role[]).some((r) => hasRole(r))
 
   const showToast = useCallback((msg: string, kind: ToastKind = 'success') => {
     setToastKind(kind)
@@ -165,6 +190,90 @@ function AccommodationPageContent() {
     const activeLeases = houses.filter((h) => (h.leaseEnd || '') >= today).length
     return { totalHouses, monthlyRentTotal, activeLeases }
   }, [houses])
+
+  // Load the selected month's budget + each house's rent-paid status.
+  const loadMonthData = useCallback(async (month: string, houseList: House[]) => {
+    try {
+      const budgetSnap = await getDoc(doc(db, 'accommodationBudget', month))
+      setBudget(budgetSnap.exists() ? Number((budgetSnap.data() as { budget?: number }).budget ?? 0) : null)
+    } catch {
+      setBudget(null)
+    }
+    const paidMap: Record<string, boolean> = {}
+    await Promise.all(
+      houseList.map(async (h) => {
+        try {
+          const s = await getDoc(doc(db, 'accommodations', h.id, 'rentPayments', month))
+          if (s.exists()) paidMap[h.id] = Boolean((s.data() as { paid?: boolean }).paid)
+        } catch {
+          /* no access / no record */
+        }
+      }),
+    )
+    setRentPaid(paidMap)
+  }, [])
+
+  useEffect(() => {
+    if (!allowed || houses.length === 0) return
+    void loadMonthData(selectedMonth, houses)
+  }, [allowed, houses, selectedMonth, loadMonthData])
+
+  const rentSummary = useMemo(() => {
+    const totalRent = stats.monthlyRentTotal
+    const paidAmount = houses.filter((h) => rentPaid[h.id]).reduce((s, h) => s + Number(h.monthlyRent || 0), 0)
+    const paidCount = houses.filter((h) => rentPaid[h.id]).length
+    const balance = budget != null ? budget - totalRent : null
+    return { totalRent, paidAmount, paidCount, balance }
+  }, [stats.monthlyRentTotal, houses, rentPaid, budget])
+
+  async function toggleRentPaid(house: House) {
+    if (!canManageRent || !user) return
+    const nowPaid = !rentPaid[house.id]
+    try {
+      await setDoc(
+        doc(db, 'accommodations', house.id, 'rentPayments', selectedMonth),
+        {
+          month: selectedMonth,
+          amount: Number(house.monthlyRent || 0),
+          paid: nowPaid,
+          paidDate: nowPaid ? serverTimestamp() : null,
+          paidBy: nowPaid ? user.uid : null,
+        },
+        { merge: true },
+      )
+      setRentPaid((prev) => ({ ...prev, [house.id]: nowPaid }))
+    } catch (err) {
+      console.error('[Accommodation] rent toggle', err)
+      showToast('Failed to update rent status', 'warning')
+    }
+  }
+
+  async function handleSaveBudget() {
+    if (!canSetBudget) return
+    setSavingBudget(true)
+    try {
+      const amt = Number(budgetInput) || 0
+      const existing = await getDoc(doc(db, 'accommodationBudget', selectedMonth)).catch(() => null)
+      await setDoc(
+        doc(db, 'accommodationBudget', selectedMonth),
+        {
+          month: selectedMonth,
+          budget: amt,
+          updatedAt: serverTimestamp(),
+          ...(existing?.exists() ? {} : { createdAt: serverTimestamp() }),
+        },
+        { merge: true },
+      )
+      setBudget(amt)
+      setBudgetModalOpen(false)
+      showToast('Budget saved')
+    } catch (err) {
+      console.error('[Accommodation] budget save', err)
+      showToast('Failed to save budget', 'warning')
+    } finally {
+      setSavingBudget(false)
+    }
+  }
 
   function openAddModal() {
     setEditTarget(null)
@@ -296,6 +405,73 @@ function AccommodationPageContent() {
         />
       </div>
 
+      {/* ── Monthly Rent Tracking ─────────────────────────────────────────── */}
+      <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="ti ti-cash text-[#0B3D6B] dark:text-[#E8A020]" />
+            <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">Monthly Rent</h3>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-1.5 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020]"
+            >
+              {ACCOM_MONTHS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+          </div>
+          {canSetBudget && (
+            <button
+              type="button"
+              onClick={() => { setBudgetInput(budget != null ? String(budget) : ''); setBudgetModalOpen(true) }}
+              className="rounded-lg border border-[#DDE3EC] dark:border-white/10 px-3 py-1.5 text-xs font-semibold text-[#0B3D6B] dark:text-white/70 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06]"
+            >
+              <span className="ti ti-pencil mr-1" /> Set Budget
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-xl bg-[#F5F7FB] dark:bg-white/[0.04] px-4 py-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Total Rent</p>
+            <p className="mt-1 font-jakarta text-xl font-black text-[#E8A020]">{formatLKR(rentSummary.totalRent)}</p>
+            <p className="mt-0.5 text-xs text-[#5A6A7A] dark:text-white/40">
+              {rentSummary.paidCount}/{houses.length} paid · {formatLKR(rentSummary.paidAmount)}
+            </p>
+          </div>
+          <div className="rounded-xl bg-[#F5F7FB] dark:bg-white/[0.04] px-4 py-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Budget</p>
+            {budget != null ? (
+              <p className="mt-1 font-jakarta text-xl font-black text-[#E8A020]">{formatLKR(budget)}</p>
+            ) : canSetBudget ? (
+              <button
+                type="button"
+                onClick={() => { setBudgetInput(''); setBudgetModalOpen(true) }}
+                className="mt-1 text-sm font-semibold text-[#0B3D6B] dark:text-[#E8A020] hover:underline"
+              >
+                Set Budget →
+              </button>
+            ) : (
+              <p className="mt-1 text-sm text-[#5A6A7A] dark:text-white/40">Not set</p>
+            )}
+          </div>
+          <div className={`rounded-xl px-4 py-3 ${
+            rentSummary.balance == null
+              ? 'bg-[#F5F7FB] dark:bg-white/[0.04]'
+              : rentSummary.balance >= 0
+                ? 'bg-emerald-50 dark:bg-emerald-900/20'
+                : 'bg-red-50 dark:bg-red-900/20'
+          }`}>
+            <p className="text-xs font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Balance</p>
+            {rentSummary.balance == null ? (
+              <p className="mt-1 text-sm text-[#5A6A7A] dark:text-white/40">—</p>
+            ) : (
+              <p className={`mt-1 font-jakarta text-xl font-black ${rentSummary.balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                {formatLKR(rentSummary.balance)}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
       {loading ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -358,6 +534,21 @@ function AccommodationPageContent() {
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
+                {canManageRent && (
+                  <button
+                    type="button"
+                    onClick={() => void toggleRentPaid(house)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                      rentPaid[house.id]
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                    }`}
+                    title={`Rent for ${ACCOM_MONTHS.find((m) => m.value === selectedMonth)?.label ?? selectedMonth}`}
+                  >
+                    <span className={`ti ${rentPaid[house.id] ? 'ti-check' : 'ti-clock'} mr-1`} />
+                    {rentPaid[house.id] ? 'Rent Paid' : 'Mark Rent Paid'}
+                  </button>
+                )}
                 <Link
                   href={`/accommodation/${house.id}`}
                   className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
@@ -524,6 +715,48 @@ function AccommodationPageContent() {
                 className="flex-1 rounded-xl bg-[#E8A020] py-2.5 text-sm font-bold text-[#0B3D6B] disabled:opacity-50"
               >
                 {saving ? 'Saving…' : editTarget ? 'Save Changes' : 'Add House'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set monthly budget modal */}
+      {budgetModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setBudgetModalOpen(false)} />
+          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl dark:bg-[#1A1535]">
+            <h2 className="font-jakarta text-lg font-bold text-[#0B3D6B] dark:text-white">
+              Accommodation Budget
+            </h2>
+            <p className="mt-0.5 text-xs text-[#5A6A7A] dark:text-white/50">
+              {ACCOM_MONTHS.find((m) => m.value === selectedMonth)?.label ?? selectedMonth}
+            </p>
+            <label className="mt-4 mb-1 block text-xs font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">
+              Monthly Budget (LKR)
+            </label>
+            <input
+              type="number"
+              value={budgetInput}
+              onChange={(e) => setBudgetInput(e.target.value)}
+              placeholder="e.g. 600000"
+              className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0d0b1e] px-3 py-2.5 text-sm text-gray-900 dark:text-white outline-none focus:border-[#E8A020]"
+            />
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setBudgetModalOpen(false)}
+                className="flex-1 rounded-xl border border-gray-200 dark:border-white/10 py-2.5 text-sm font-medium text-[#5A6A7A] dark:text-white/70"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={savingBudget}
+                onClick={() => void handleSaveBudget()}
+                className="flex-1 rounded-xl bg-[#E8A020] py-2.5 text-sm font-bold text-[#0B3D6B] disabled:opacity-50"
+              >
+                {savingBudget ? 'Saving…' : 'Save Budget'}
               </button>
             </div>
           </div>

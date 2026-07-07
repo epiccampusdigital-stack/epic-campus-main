@@ -95,7 +95,8 @@ export default function DashboardPage() {
   const isPureReception = userRoles.length > 0 && userRoles.every((r) => r === 'reception')
   const [loading, setLoading] = useState(true)
   const [kitchenOverview, setKitchenOverview] = useState<KitchenOverview | null>(null)
-  const [accomOverview, setAccomOverview] = useState<{ rent: number; billsThis: number; billsPrev: number } | null>(null)
+  const [accomOverview, setAccomOverview] = useState<{ rent: number; billsThis: number; billsPrev: number; budget: number | null; rentPaid: number } | null>(null)
+  const [expensesThisMonth, setExpensesThisMonth] = useState<number | null>(null)
   const [courseFilter, setCourseFilter] = useState<CourseId | ''>('')
   const [locationFilter, setLocationFilter] = useState<StudentLocation | ''>('')
   const [monthFilter, setMonthFilter] = useState(currentMonthKey())
@@ -242,18 +243,32 @@ export default function DashboardPage() {
         let rent = 0
         let billsThis = 0
         let billsPrev = 0
+        let rentPaid = 0
         await Promise.all(
           housesSnap.docs.map(async (h) => {
-            rent += Number(h.data().monthlyRent || 0)
-            const [curSnap, prevSnap] = await Promise.all([
+            const monthlyRent = Number(h.data().monthlyRent || 0)
+            rent += monthlyRent
+            const [curSnap, prevSnap, rentSnap] = await Promise.all([
               getDoc(doc(db, 'accommodations', h.id, 'bills', curKey)).catch(() => null),
               getDoc(doc(db, 'accommodations', h.id, 'bills', prevKey)).catch(() => null),
+              getDoc(doc(db, 'accommodations', h.id, 'rentPayments', curKey)).catch(() => null),
             ])
             if (curSnap?.exists()) billsThis += Number((curSnap.data() as { totalAmount?: number }).totalAmount || 0)
             if (prevSnap?.exists()) billsPrev += Number((prevSnap.data() as { totalAmount?: number }).totalAmount || 0)
+            if (rentSnap?.exists() && (rentSnap.data() as { paid?: boolean }).paid) rentPaid += monthlyRent
           }),
         )
-        setAccomOverview({ rent, billsThis, billsPrev })
+        const budgetSnap = await getDoc(doc(db, 'accommodationBudget', curKey)).catch(() => null)
+        const budget = budgetSnap?.exists() ? Number((budgetSnap.data() as { budget?: number }).budget ?? 0) : null
+        setAccomOverview({ rent, billsThis, billsPrev, budget, rentPaid })
+
+        // Total tracked expenses for the current month (from the Expenses page).
+        try {
+          const expSnap = await getDocs(query(collection(db, 'expenses'), where('month', '==', curKey)))
+          setExpensesThisMonth(expSnap.docs.reduce((s, d) => s + Number(d.data().amount || 0), 0))
+        } catch {
+          /* ignore — expenses card simply won't render */
+        }
       } catch {
         /* ignore — card simply won't render */
       }
@@ -842,6 +857,23 @@ export default function DashboardPage() {
         </div>
       </section>
 
+      {/* Total Expenses — admin/owner only */}
+      {(hasRole('admin') || hasRole('owner')) && expensesThisMonth !== null && (
+        <section>
+          <Link href="/expenses" className="block rounded-xl border border-white/90 bg-white/65 p-5 backdrop-blur-xl transition-all hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="ti ti-cash-banknote text-[#0B3D6B] dark:text-[#E8A020]" />
+                <h2 className="font-bold text-[#0D1B2A] dark:text-white">Total Expenses</h2>
+                <span className="rounded-full bg-[#0B3D6B]/10 px-2 py-0.5 text-[10px] font-medium text-[#0B3D6B] dark:bg-white/[0.06] dark:text-white/60">This month</span>
+              </div>
+              <span className="ti ti-chevron-right text-[#5A6A7A] dark:text-white/40" />
+            </div>
+            <p className="mt-2 font-jakarta text-2xl font-black text-[#E8A020]">{formatLKR(expensesThisMonth)}</p>
+          </Link>
+        </section>
+      )}
+
       {/* Accommodation Expenses — admin/owner only */}
       {(hasRole('admin') || hasRole('owner')) && accomOverview && (
         <section>
@@ -861,10 +893,22 @@ export default function DashboardPage() {
                 const momPct = accomOverview.billsPrev > 0
                   ? Math.round(((accomOverview.billsThis - accomOverview.billsPrev) / accomOverview.billsPrev) * 100)
                   : null
+                const balance = accomOverview.budget != null ? accomOverview.budget - accomOverview.rent : null
                 const cards = [
                   { label: 'Rent This Month', value: formatLKR(accomOverview.rent), color: 'text-[#0B3D6B] dark:text-white' },
+                  { label: 'Rent Paid', value: formatLKR(accomOverview.rentPaid), color: 'text-emerald-600 dark:text-emerald-400' },
                   { label: 'Bills This Month', value: formatLKR(accomOverview.billsThis), color: 'text-[#0B3D6B] dark:text-white' },
                   { label: 'Combined Cost', value: formatLKR(accomOverview.rent + accomOverview.billsThis), color: 'text-[#E8A020]' },
+                  {
+                    label: 'Budget',
+                    value: accomOverview.budget != null ? formatLKR(accomOverview.budget) : '—',
+                    color: 'text-[#0B3D6B] dark:text-white',
+                  },
+                  {
+                    label: 'Balance',
+                    value: balance == null ? '—' : formatLKR(balance),
+                    color: balance == null ? 'text-gray-400 dark:text-white/40' : balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400',
+                  },
                   {
                     label: 'Bills vs Last Month',
                     value: momPct === null ? '—' : `${momPct > 0 ? '+' : ''}${momPct}%`,
