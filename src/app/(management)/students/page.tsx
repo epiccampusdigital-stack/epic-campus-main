@@ -15,6 +15,7 @@ import {
 } from '@/lib/dashboard/teacherStats'
 import { parseStudent, STATUS_STYLES } from '@/lib/students/helpers'
 import StudentForm from '@/components/students/StudentForm'
+import SendCredentialsModal from '@/components/students/SendCredentialsModal'
 import { StudentTableEmpty, StudentTableMeta } from '@/components/students/StudentTable'
 import { getDefaultLocationFilter } from '@/lib/locations/helpers'
 import LocationFilterSelect from '@/components/ui/LocationFilterSelect'
@@ -66,6 +67,7 @@ export default function StudentsPage() {
   const [page, setPage] = useState(1)
   const [formOpen, setFormOpen] = useState(false)
   const [editStudent, setEditStudent] = useState<Student | null>(null)
+  const [sendCredsStudent, setSendCredsStudent] = useState<Student | null>(null)
   const [fixingUids, setFixingUids] = useState(false)
 
   const loadStudents = useCallback(async () => {
@@ -261,11 +263,11 @@ export default function StudentsPage() {
         </div>
       )}
 
-      <div className="rounded-xl border border-[#DDE3EC] bg-white p-4">
+      <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1A1535] p-4">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
           <div className="relative md:col-span-2 lg:col-span-1">
             <span
-              className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A7A]"
+              className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A7A] dark:text-white/40"
               aria-hidden="true"
             />
             <input
@@ -273,13 +275,13 @@ export default function StudentsPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search name, email, phone…"
-              className="w-full rounded-xl border-2 border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] py-2.5 pl-10 pr-3 font-inter text-base text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] transition-colors duration-200 sm:text-sm"
+              className="w-full rounded-xl border-2 border-gray-200 dark:border-white/10 bg-white dark:bg-[#1A1535] py-2.5 pl-10 pr-3 font-inter text-base text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020] transition-colors duration-200 sm:text-sm"
             />
           </div>
           <select
             value={courseFilter}
             onChange={(e) => setCourseFilter(e.target.value as CourseId | '')}
-            className="rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm text-[#0D1B2A] outline-none focus:border-[#E8A020]"
+            className="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 font-inter text-sm text-gray-900 dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
           >
             <option value="">All courses</option>
             {COURSES.map((c) => (
@@ -291,7 +293,7 @@ export default function StudentsPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as Student['status'] | '')}
-            className="rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm text-[#0D1B2A] outline-none focus:border-[#E8A020]"
+            className="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 font-inter text-sm text-gray-900 dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
           >
             <option value="">All statuses</option>
             <option value="active">Active</option>
@@ -302,7 +304,7 @@ export default function StudentsPage() {
           <select
             value={batchFilter}
             onChange={(e) => setBatchFilter(e.target.value)}
-            className="rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm text-[#0D1B2A] outline-none focus:border-[#E8A020]"
+            className="rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 font-inter text-sm text-gray-900 dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
           >
             <option value="">All batches</option>
             {batches.map((b) => (
@@ -319,37 +321,37 @@ export default function StudentsPage() {
         <StudentTableEmpty onAdd={openAdd} />
       ) : (
         <>
-          <div className="overflow-x-auto -mx-4 rounded-xl border border-[#DDE3EC] bg-white dark:border-white/[0.08] dark:bg-white/[0.04] sm:mx-0">
+          <div className="overflow-x-auto -mx-4 rounded-xl border border-gray-100 bg-white dark:border-white/[0.05] dark:bg-white/[0.04] sm:mx-0">
             <div className="min-w-[600px] sm:min-w-0">
             <table className="min-w-full">
-              <thead className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:border-white/[0.08] dark:bg-white/[0.02]">
+              <thead className="border-b border-gray-100 bg-gray-50 dark:border-white/[0.05] dark:bg-white/[0.03]">
                 <tr>
-                  <th className="px-4 py-3 text-left font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">
+                  <th className="px-4 py-3 text-left font-jakarta text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-white/40">
                     Student
                   </th>
-                  <th className="px-4 py-3 text-left font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">
+                  <th className="px-4 py-3 text-left font-jakarta text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-white/40">
                     Contact
                   </th>
-                  <th className="px-4 py-3 text-left font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">
+                  <th className="px-4 py-3 text-left font-jakarta text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-white/40">
                     Student Code
                   </th>
-                  <th className="px-4 py-3 text-left font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">
+                  <th className="px-4 py-3 text-left font-jakarta text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-white/40">
                     Status
                   </th>
-                  <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">
+                  <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-white/40">
                     ID Status
                   </th>
-                  <th className="px-4 py-3 text-left font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">
+                  <th className="px-4 py-3 text-left font-jakarta text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-white/40">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#DDE3EC] dark:divide-white/[0.08]">
+              <tbody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
                 {loading
                   ? Array.from({ length: 6 }).map((_, index) => (
                       <tr key={index}>
                         <td colSpan={6} className="px-4 py-4">
-                          <div className="h-4 w-full animate-pulse rounded bg-[#DDE3EC] dark:bg-white/[0.08]" />
+                          <div className="h-4 w-full animate-pulse rounded bg-gray-100 dark:bg-white/[0.08]" />
                         </td>
                       </tr>
                     ))
@@ -359,29 +361,36 @@ export default function StudentsPage() {
                       const studentIdNum = String(studentRecord.studentId ?? '').trim()
                       const hasIds = Boolean(registrationNumber && studentIdNum)
                       return (
-                        <tr key={s.id} className="hover:bg-[#F5F7FB] dark:hover:bg-white/[0.03] transition-colors duration-150 cursor-pointer">
+                        <tr key={s.id} className="bg-white dark:bg-transparent hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors duration-150 cursor-pointer">
                           <td className="px-4 py-3">
                             <div>
                               <Link
                                 href={`/students/${s.id}`}
-                                className="font-jakarta text-sm font-semibold text-[#0D1B2A] dark:text-white hover:text-[#E8A020] hover:underline transition-colors"
+                                className="font-jakarta text-sm font-semibold text-gray-900 dark:text-white hover:text-[#E8A020] hover:underline transition-colors"
                               >
                                 {s.name}
                               </Link>
-                              <p className="text-xs text-[#5A6A7A] dark:text-white/50">{s.batchId || '—'}</p>
+                              <p className="text-xs text-gray-500 dark:text-white/40">{s.batchId || '—'}</p>
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <p className="text-sm text-[#0D1B2A] dark:text-white">{s.email || '—'}</p>
-                            <p className="text-xs text-[#5A6A7A] dark:text-white/50">{s.mobile || '—'}</p>
+                            <p className="text-sm text-gray-900 dark:text-white">{s.email || '—'}</p>
+                            <p className="text-xs text-gray-500 dark:text-white/40">{s.mobile || '—'}</p>
                           </td>
-                          <td className="px-4 py-3 text-sm text-[#0D1B2A] dark:text-white">{s.studentCode}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{s.studentCode}</td>
                           <td className="px-4 py-3">
-                            <span
-                              className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[s.status]}`}
-                            >
-                              {s.status}
-                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span
+                                className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[s.status]}`}
+                              >
+                                {s.status}
+                              </span>
+                              {s.paymentStatus === 'partial' && (s.pendingAmount ?? 0) > 0 && (
+                                <span className="inline-flex rounded-full bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-400">
+                                  LKR {s.pendingAmount!.toLocaleString()} pending
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-3">
                             {hasIds ? (
@@ -402,16 +411,24 @@ export default function StudentsPage() {
                             <div className="flex items-center gap-2">
                               <Link
                                 href={`/students/${s.id}`}
-                                className="rounded-lg border border-[#DDE3EC] px-2.5 py-1 text-xs font-medium text-[#0B3D6B] hover:bg-[#F5F7FB]"
+                                className="rounded-lg border border-gray-200 dark:border-white/10 px-2.5 py-1 text-xs font-medium text-gray-700 dark:text-white/70 hover:bg-gray-50 dark:hover:bg-white/[0.06]"
                               >
                                 View
                               </Link>
                               <button
                                 type="button"
                                 onClick={() => openEdit(s)}
-                                className="rounded-lg border border-[#0B3D6B] px-2.5 py-1 text-xs font-semibold text-[#0B3D6B] hover:bg-[#0B3D6B]/5"
+                                className="rounded-lg border border-gray-200 dark:border-white/10 px-2.5 py-1 text-xs font-medium text-gray-700 dark:text-white/70 hover:bg-gray-50 dark:hover:bg-white/[0.06]"
                               >
                                 Edit
+                              </button>
+                              <button
+                                type="button"
+                                title="Send login credentials via WhatsApp"
+                                onClick={() => setSendCredsStudent(s)}
+                                className="rounded-lg p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                              >
+                                <span className="ti ti-brand-whatsapp text-lg" />
                               </button>
                             </div>
                           </td>
@@ -438,6 +455,12 @@ export default function StudentsPage() {
         onClose={() => setFormOpen(false)}
         student={editStudent}
         onSaved={loadStudents}
+      />
+
+      <SendCredentialsModal
+        open={!!sendCredsStudent}
+        student={sendCredsStudent}
+        onClose={() => setSendCredsStudent(null)}
       />
     </div>
   )

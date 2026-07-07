@@ -118,38 +118,38 @@ export default function KoreaPage() {
       />
       <StatsBar stats={STATS} />
 
-      <section className="bg-white py-24">
+      <section className="bg-white py-24 dark:bg-[#0D0B1E]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="Why Study in Korea?" />
           <div className="grid gap-8 md:grid-cols-3">
             {WHY_KOREA.map((item) => (
               <div key={item.title} className={CARD}>
                 <div className="text-4xl">{item.emoji}</div>
-                <h3 className="mt-4 font-semibold text-[#0B3D6B]">{item.title}</h3>
-                <p className="mt-2 text-sm text-gray-500">{item.desc}</p>
+                <h3 className="mt-4 font-semibold text-[#0B3D6B] dark:text-white">{item.title}</h3>
+                <p className="mt-2 text-sm text-gray-500 dark:text-white/60">{item.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="programs" className="bg-[#F5F7FB] py-24">
+      <section id="programs" className="bg-[#F5F7FB] py-24 dark:bg-[#130F2A]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="Available Study Pathways" />
           <div className="grid gap-8 md:grid-cols-3">
             {PATHWAYS.map((path) => (
               <div key={path.title} className={`${CARD} border-t-4 border-blue-500`}>
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold text-[#0B3D6B]">{path.title}</h3>
+                  <h3 className="font-semibold text-[#0B3D6B] dark:text-white">{path.title}</h3>
                   {path.badge && (
-                    <span className="shrink-0 rounded-full bg-[#E8A020] px-3 py-1 text-xs font-semibold text-[#0B3D6B]">
+                    <span className="shrink-0 rounded-full bg-[#E8A020] px-3 py-1 text-xs font-semibold text-[#0B3D6B] dark:text-white">
                       {path.badge}
                     </span>
                   )}
                 </div>
                 <ul className="mt-4 space-y-2">
                   {path.steps.map((step) => (
-                    <li key={step} className="text-sm text-gray-500">
+                    <li key={step} className="text-sm text-gray-500 dark:text-white/60">
                       • {step}
                     </li>
                   ))}
@@ -160,28 +160,28 @@ export default function KoreaPage() {
         </div>
       </section>
 
-      <section className="bg-white py-24">
+      <section className="bg-white py-24 dark:bg-[#0D0B1E]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="How the Program Works" />
           <TimelineSteps steps={PROGRAM_STEPS} columns={3} />
         </div>
       </section>
 
-      <section className="bg-[#F5F7FB] py-24">
+      <section className="bg-[#F5F7FB] py-24 dark:bg-[#130F2A]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="Scholarship Opportunities" />
           <div className="grid gap-8 md:grid-cols-2">
             {SCHOLARSHIPS.map((sch) => (
               <div key={sch.title} className={`${CARD} ${sch.borderClass}`}>
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-[#0B3D6B]">{sch.title}</h3>
-                  <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                  <h3 className="font-semibold text-[#0B3D6B] dark:text-white">{sch.title}</h3>
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600 dark:bg-white/[0.08] dark:text-white/70">
                     {sch.badge}
                   </span>
                 </div>
                 <ul className="mt-4 space-y-2">
                   {sch.items.map((item) => (
-                    <li key={item} className="text-sm text-gray-500">
+                    <li key={item} className="text-sm text-gray-500 dark:text-white/60">
                       • {item}
                     </li>
                   ))}
@@ -192,16 +192,16 @@ export default function KoreaPage() {
         </div>
       </section>
 
-      <section className="bg-white py-24">
+      <section className="bg-white py-24 dark:bg-[#0D0B1E]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="What You Need to Apply" />
           <div className="grid gap-4 sm:grid-cols-2">
             {REQUIREMENTS.map((req) => (
-              <div key={req} className="flex items-start gap-3 rounded-xl border border-gray-100 bg-[#F5F7FB] p-4">
+              <div key={req} className="flex items-start gap-3 rounded-xl border border-gray-100 bg-[#F5F7FB] p-4 dark:border-white/[0.08] dark:bg-white/[0.04]">
                 <span className="text-lg" aria-hidden="true">
                   ✅
                 </span>
-                <span className="text-sm text-gray-700">{req}</span>
+                <span className="text-sm text-gray-700 dark:text-white/70">{req}</span>
               </div>
             ))}
           </div>

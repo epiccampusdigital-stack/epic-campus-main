@@ -4,6 +4,7 @@ import { Plus_Jakarta_Sans, Inter } from 'next/font/google'
 import ChatBotRoot from '@/components/public/ChatBotRoot'
 import AppToaster from '@/components/ui/AppToaster'
 import ThemeInit from '@/components/theme/ThemeInit'
+import ThemeChooser from '@/components/theme/ThemeChooser'
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -92,6 +93,7 @@ export default function RootLayout({
       </head>
       <body className="overflow-x-hidden font-inter antialiased bg-[#F5F7FB]">
         <ThemeInit />
+        <ThemeChooser />
         <div className="noise-overlay" aria-hidden="true" />
         {children}
         <ChatBotRoot />

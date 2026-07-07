@@ -11,10 +11,10 @@ export function SectionTitle({
 }) {
   return (
     <div className="mb-16 text-center">
-      <h2 className="text-4xl font-bold text-[#0B3D6B]">{title}</h2>
+      <h2 className="text-4xl font-bold text-[#0B3D6B] dark:text-white">{title}</h2>
       <div className="mx-auto mt-4 h-1 w-16 bg-[#E8A020]" />
       {subtitle && (
-        <p className="mx-auto mt-4 max-w-2xl text-gray-600">{subtitle}</p>
+        <p className="mx-auto mt-4 max-w-2xl text-gray-600 dark:text-white/60">{subtitle}</p>
       )}
     </div>
   )
@@ -92,16 +92,16 @@ export function StatsBar({
   return (
     <section className="relative z-10 -mt-16">
       <div className="mx-auto max-w-5xl px-4">
-        <div className="grid grid-cols-2 rounded-2xl bg-white shadow-xl md:grid-cols-4">
+        <div className="grid grid-cols-2 rounded-2xl border-t-2 border-[#E8A020] bg-white shadow-xl md:grid-cols-4 dark:bg-white/[0.04] dark:shadow-none dark:backdrop-blur-md">
           {stats.map((s, i) => (
             <div
               key={s.label}
               className={`px-6 py-8 text-center ${
-                i < stats.length - 1 ? 'border-r border-gray-100' : ''
+                i < stats.length - 1 ? 'border-r border-gray-100 dark:border-white/[0.08]' : ''
               }`}
             >
-              <div className="text-4xl font-black text-[#0B3D6B]">{s.number}</div>
-              <div className="mt-1 text-xs uppercase tracking-wide text-gray-500">
+              <div className="text-4xl font-black text-[#0B3D6B] dark:text-[#E8A020]">{s.number}</div>
+              <div className="mt-1 text-xs uppercase tracking-wide text-gray-500 dark:text-white/50">
                 {s.label}
               </div>
             </div>
@@ -126,11 +126,11 @@ export function TimelineSteps({
       <div className={`grid grid-cols-1 gap-8 ${colClass}`}>
         {steps.map((step, i) => (
           <div key={step.title} className="relative text-center">
-            <div className="relative z-10 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border-2 border-[#E8A020] bg-white">
+            <div className="relative z-10 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border-2 border-[#E8A020] bg-white dark:bg-[#1A1535]">
               <span className="font-bold text-[#E8A020]">{i + 1}</span>
             </div>
-            <h3 className="mb-2 font-semibold text-[#0B3D6B]">{step.title}</h3>
-            <p className="text-sm text-gray-500">{step.desc}</p>
+            <h3 className="mb-2 font-semibold text-[#0B3D6B] dark:text-white">{step.title}</h3>
+            <p className="text-sm text-gray-500 dark:text-white/60">{step.desc}</p>
           </div>
         ))}
       </div>
@@ -168,4 +168,4 @@ export function CtaSection({
 }
 
 export const CARD =
-  'bg-white rounded-2xl shadow-sm border border-gray-100 p-8 hover:shadow-lg hover:-translate-y-1 transition-all duration-300'
+  'card-hover bg-white rounded-2xl shadow-sm border border-gray-100 p-8 hover:shadow-lg dark:bg-white/[0.04] dark:border-white/[0.08] dark:hover:border-[#E8A020]/40'

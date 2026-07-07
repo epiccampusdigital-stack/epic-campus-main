@@ -34,13 +34,14 @@ html.dark { color-scheme: dark; }
   --glass-bg:      rgba(255, 255, 255, 0.05);
   --glass-border:  rgba(255, 255, 255, 0.08);
   --glass-blur:    blur(24px);
-  --sidebar-bg:    rgba(11, 61, 107, 0.2);
+  --sidebar-bg:    rgba(13, 11, 30, 0.95);
   --card-bg:       rgba(255, 255, 255, 0.04);
-  --page-bg:       #080d18;
-  --text-primary: #e2e8f0;
-  --text-muted:   rgba(255,255,255,0.5);
+  --page-bg:       #0D0B1E;
+  --page-bg-secondary: #130F2A;
+  --text-primary: #FFFFFF;
+  --text-muted:   rgba(255,255,255,0.55);
   --border:       rgba(255,255,255,0.08);
-  --bg:           #080d18;
+  --bg:           #0D0B1E;
 }
 
 /* Fix dark mode scrollbar */
@@ -71,8 +72,8 @@ body {
 }
 
 .dark body {
-  background-color: #080d18;
-  color: #e2e8f0;
+  background-color: #0D0B1E;
+  color: #FFFFFF;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -151,26 +152,136 @@ h1, h2, h3, h4, h5, h6 {
   opacity: 0.035;
 }
 
-/* Dark-mode-only section blend fades (black <-> navy transitions) */
+/* Dark-mode-only section blend fades — smooths transitions between sections */
 .section-fade-top,
 .section-fade-bottom {
   position: absolute;
   left: 0;
   right: 0;
-  height: 80px;
+  height: 100px;
   pointer-events: none;
-  z-index: 10;
+  z-index: 1;
   opacity: 0;
 }
 .section-fade-top {
   top: 0;
-  background: linear-gradient(to bottom, #0a0a0a, transparent);
+  background: linear-gradient(to bottom, #0D0B1E, transparent);
 }
 .section-fade-bottom {
   bottom: 0;
-  background: linear-gradient(to top, #0a0a0a, transparent);
+  background: linear-gradient(to top, #0D0B1E, transparent);
 }
 .dark .section-fade-top,
 .dark .section-fade-bottom {
   opacity: 1;
 }
+
+/* ── Glass morphism cards ─────────────────────────────────────────────── */
+.stat-card-glass {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(11, 61, 107, 0.08);
+  border-top: 2px solid #E8A020;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(11, 61, 107, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.dark .stat-card-glass {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 2px solid #E8A020;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.program-card-glass {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(11, 61, 107, 0.07);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.program-card-glass:hover {
+  border-color: rgba(11, 61, 107, 0.25);
+  box-shadow: 0 8px 32px rgba(11, 61, 107, 0.1);
+}
+.dark .program-card-glass {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+.dark .program-card-glass:hover {
+  border-color: rgba(232, 160, 32, 0.4);
+  box-shadow: 0 8px 32px rgba(232, 160, 32, 0.12);
+}
+
+/* General-purpose glass card (dashboard widgets etc.) */
+.glass-card {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(11, 61, 107, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 16px;
+}
+.dark .glass-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ── Micro-interactions ───────────────────────────────────────────────── */
+* {
+  transition-property: background-color, border-color, color;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+}
+
+.btn-hover {
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+.btn-hover:hover { transform: translateY(-2px); }
+.btn-hover:active { transform: translateY(0); }
+
+.card-hover {
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+.card-hover:hover { transform: translateY(-4px); }
+
+/* ── Dropdown options in dark mode — native <option>/<optgroup> ignore Tailwind
+   classes on the parent <select>, so they need their own dark-mode rule. ───── */
+.dark select option {
+  background-color: #1A1535;
+  color: #ffffff;
+}
+.dark select optgroup {
+  background-color: #130F2A;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ── Homepage-only surfaces (kept separate from shared dashboard/program cards) ─ */
+.home-stat-card {
+  border-radius: 16px;
+  border: 1px solid rgba(11, 61, 107, 0.08);
+  border-top: 2px solid #E8A020;
+  background: linear-gradient(135deg, rgba(232, 160, 32, 0.04) 0%, #ffffff 50%, rgba(11, 61, 107, 0.04) 100%);
+  box-shadow: 0 4px 24px rgba(11, 61, 107, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.dark .home-stat-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 2px solid #E8A020;
+  background: linear-gradient(135deg, rgba(232, 160, 32, 0.06) 0%, rgba(255, 255, 255, 0.04) 50%, rgba(26, 107, 173, 0.08) 100%);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Subtle gradient on hover for the homepage program cards (additive to .program-card-glass) */
+.home-program-card:hover {
+  background: linear-gradient(135deg, rgba(232, 160, 32, 0.04), #ffffff);
+}
+.dark .home-program-card:hover {
+  background: linear-gradient(135deg, rgba(232, 160, 32, 0.08), rgba(255, 255, 255, 0.04));
+}
+
+.home-hiw-bg { background: linear-gradient(180deg, #F8FAFC 0%, #ffffff 100%); }
+.dark .home-hiw-bg { background: linear-gradient(180deg, #0D0B1E 0%, #130F2A 100%); }
+
+/* CTA is a dark block in both themes — gradient applies always */
+.home-cta-bg { background: linear-gradient(135deg, #0D0B1E 0%, #1A1535 50%, #0D0B1E 100%); }
+
+.home-hero-bg { background: linear-gradient(135deg, #ffffff 0%, #F0F5FF 50%, #FFF8EC 100%); }
+.dark .home-hero-bg { background: #0D0B1E; }

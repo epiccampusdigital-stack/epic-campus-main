@@ -16,11 +16,12 @@ export function useDarkMode() {
       root.classList.add('dark')
       root.classList.remove('light')
     } else {
-      // First visit: no stored preference — default to dark regardless of system preference
+      // First visit: apply dark as the temporary visual default but do NOT
+      // persist it — the one-time ThemeChooser prompt owns the actual choice
+      // (writes both `theme` and `themeChosen`).
       setDark(true)
       root.classList.add('dark')
       root.classList.remove('light')
-      localStorage.setItem('theme', 'dark')
     }
   }, [])
 

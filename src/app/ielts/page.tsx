@@ -127,22 +127,22 @@ export default function IeltsPage() {
       />
       <StatsBar stats={STATS} />
 
-      <section className="bg-white py-24">
+      <section className="bg-white py-24 dark:bg-[#0D0B1E]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="Everything You Need to Hit Your Target Score" />
           <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
             {SKILLS.map((skill) => (
               <div key={skill.title} className={CARD}>
                 <div className="text-4xl">{skill.emoji}</div>
-                <h3 className="mt-3 font-semibold text-[#0B3D6B]">{skill.title}</h3>
-                <p className="mt-1 text-sm text-gray-500">{skill.desc}</p>
+                <h3 className="mt-3 font-semibold text-[#0B3D6B] dark:text-white">{skill.title}</h3>
+                <p className="mt-1 text-sm text-gray-500 dark:text-white/60">{skill.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="bg-[#F5F7FB] py-24">
+      <section className="bg-[#F5F7FB] py-24 dark:bg-[#130F2A]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="Target Band Scores" />
           <div className="grid gap-8 md:grid-cols-3">
@@ -151,31 +151,31 @@ export default function IeltsPage() {
                 <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${band.badgeClass}`}>
                   {band.badge}
                 </span>
-                <h3 className="mt-4 font-semibold text-[#0B3D6B]">{band.title}</h3>
-                <p className="mt-2 text-sm text-gray-500">{band.desc}</p>
-                <p className="mt-3 text-xs text-gray-400">{band.who}</p>
+                <h3 className="mt-4 font-semibold text-[#0B3D6B] dark:text-white">{band.title}</h3>
+                <p className="mt-2 text-sm text-gray-500 dark:text-white/60">{band.desc}</p>
+                <p className="mt-3 text-xs text-gray-400 dark:text-white/40">{band.who}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="bg-white py-24">
+      <section className="bg-white py-24 dark:bg-[#0D0B1E]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="Who Is This Program For?" />
           <div className="grid gap-8 md:grid-cols-3">
             {AUDIENCE.map((item) => (
               <div key={item.title} className={CARD}>
                 <div className="text-4xl">{item.emoji}</div>
-                <h3 className="mt-4 font-semibold text-[#0B3D6B]">{item.title}</h3>
-                <p className="mt-2 text-sm text-gray-500">{item.desc}</p>
+                <h3 className="mt-4 font-semibold text-[#0B3D6B] dark:text-white">{item.title}</h3>
+                <p className="mt-2 text-sm text-gray-500 dark:text-white/60">{item.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="programs" className="bg-[#F5F7FB] py-24">
+      <section id="programs" className="bg-[#F5F7FB] py-24 dark:bg-[#130F2A]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="Pathway" />
           <TimelineSteps steps={PATHWAY_STEPS} columns={3} />
@@ -189,7 +189,7 @@ export default function IeltsPage() {
         <div className="flex flex-wrap justify-center gap-4">
           <Link
             href="/contact"
-            className="rounded-full bg-[#E8A020] px-10 py-4 text-lg font-semibold text-[#0B3D6B] transition-all hover:bg-[#F5B942]"
+            className="rounded-full bg-[#E8A020] px-10 py-4 text-lg font-semibold text-[#0B3D6B] dark:text-white transition-all hover:bg-[#F5B942]"
           >
             Enroll in IELTS Program
           </Link>

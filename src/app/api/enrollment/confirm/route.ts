@@ -67,26 +67,41 @@ export async function POST(req: NextRequest) {
       phone,
       address: String(e.address ?? ''),
       dateOfBirth: String(e.dateOfBirth ?? ''),
-      program: String(e.program ?? 'japan-ssw'),
-      location: String(location ?? e.location ?? 'galle'),
+      // Left undefined (not defaulted) when the enrollment doc itself lacks a
+      // value — createStudentAccount() applies its own fallback only for a
+      // brand-new record, and never overwrites a pre-existing real one with it.
+      program: e.program ? String(e.program) : undefined,
+      location: location ? String(location) : e.location ? String(e.location) : undefined,
       batchIntake: batchIntake ? String(batchIntake) : undefined,
-      batchDuration: String(e.batchDuration ?? '45days'),
+      batchDuration: e.batchDuration ? String(e.batchDuration) : undefined,
       batchCustomDays: e.batchCustomDays ?? null,
       registrationFeePaid: Boolean(e.registrationFeePaid),
       courseFeePaid: Boolean(e.courseFeePaid),
       totalPaid: Number(e.totalPaid ?? 0),
       createdBy: staffUid,
+      // Real enrollment data — takes priority over the legacy
+      // registrationFeePaid/courseFeePaid/totalPaid-derived defaults.
+      feeAmount: e.totalFee != null ? Number(e.totalFee) : e.feeAmount != null ? Number(e.feeAmount) : undefined,
+      paymentStatus: e.paymentStatus ? String(e.paymentStatus) : undefined,
+      paidAmount: e.paidAmount != null ? Number(e.paidAmount) : undefined,
+      pendingAmount: e.pendingAmount != null ? Number(e.pendingAmount) : undefined,
+      courseId: e.courseId ? String(e.courseId) : undefined,
+      batchId: e.batch ? String(e.batch) : e.batchId ? String(e.batchId) : undefined,
+      agentId: e.agentId ? String(e.agentId) : null,
+      notes: e.notes ? String(e.notes) : undefined,
     })
 
     await enrollRef.update({
-      studentId: result.uid,
+      studentId: result.studentDocId,
       status: 'confirmed',
       studentCode: result.studentCode,
       approvedAt: FieldValue.serverTimestamp(),
       approvedBy: staffUid,
     })
 
-    if (phone) {
+    // Only send login credentials when we actually created a new account —
+    // for a reused existing account the real password wasn't changed.
+    if (phone && result.created) {
       const firstName = String(e.firstName ?? fullName)
       await sendWhatsApp(
         phone,

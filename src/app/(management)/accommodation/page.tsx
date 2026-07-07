@@ -7,6 +7,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   orderBy,
   query,
@@ -95,9 +96,16 @@ function emptyForm(): HouseForm {
   }
 }
 
+// Current month key "YYYY-MM" for reading each house's current-month bill total.
+const CURRENT_MONTH_KEY = (() => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+})()
+
 function AccommodationPageContent() {
   const { user, hasRole } = useManagement()
   const [houses, setHouses] = useState<House[]>([])
+  const [billTotals, setBillTotals] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [formOpen, setFormOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -120,6 +128,23 @@ function AccommodationPageContent() {
       const snap = await getDocs(query(collection(db, 'accommodations'), orderBy('createdAt', 'desc')))
       const data = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<House, 'id'>) }))
       setHouses(data)
+
+      // Fetch each house's current-month bill total (best-effort; roles without bill
+      // read access simply resolve to "no total" and show "—").
+      const totals: Record<string, number> = {}
+      await Promise.all(
+        data.map(async (h) => {
+          try {
+            const billSnap = await getDoc(doc(db, 'accommodations', h.id, 'bills', CURRENT_MONTH_KEY))
+            if (billSnap.exists()) {
+              totals[h.id] = Number((billSnap.data() as { totalAmount?: number }).totalAmount ?? 0)
+            }
+          } catch {
+            /* no access or no bill — leave undefined */
+          }
+        }),
+      )
+      setBillTotals(totals)
     } catch (err) {
       console.error('[AccommodationPage]', err)
       setHouses([])
@@ -317,6 +342,15 @@ function AccommodationPageContent() {
                 <p>Capacity: {Number(house.capacity || 0)} students</p>
                 <p>
                   Lease period: {house.leaseStart || '-'} → {house.leaseEnd || '-'}
+                </p>
+                <p className="flex items-center gap-2">
+                  <span className="ti ti-receipt text-[#0B3D6B]" />
+                  <span>
+                    This month&apos;s bills:{' '}
+                    <span className="font-semibold text-[#0B3D6B] dark:text-[#E8A020]">
+                      {billTotals[house.id] != null ? formatLKR(billTotals[house.id]) : '—'}
+                    </span>
+                  </span>
                 </p>
                 {house.notes && (
                   <p className="text-xs text-[#5A6A7A] dark:text-white/50">{house.notes}</p>

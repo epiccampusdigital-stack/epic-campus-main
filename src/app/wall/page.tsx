@@ -9,11 +9,11 @@ export const metadata = {
 
 export default function PublicEpicWallPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[#F5F7FB] dark:bg-[#04090f]">
+    <div className="flex min-h-screen flex-col bg-[#F5F7FB] dark:bg-[#0D0B1E]">
       <PublicNav />
       <main className="flex-1">
         {/* Header */}
-        <section className="relative overflow-hidden bg-[#03080f] py-20 sm:py-24">
+        <section className="relative overflow-hidden bg-[#0D0B1E] py-20 sm:py-24">
           <div className="absolute inset-0 bg-[linear-gradient(rgba(26,107,173,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(26,107,173,0.07)_1px,transparent_1px)] bg-[size:40px_40px]" />
           <div className="pointer-events-none absolute left-1/2 top-0 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(11,61,107,0.45)_0%,transparent_70%)]" />
           <div className="relative mx-auto max-w-4xl px-4 text-center sm:px-6">
@@ -28,7 +28,7 @@ export default function PublicEpicWallPage() {
         </section>
 
         {/* Feed */}
-        <section className="bg-[#F5F7FB] py-16 dark:bg-[#04090f]">
+        <section className="bg-[#F5F7FB] py-16 dark:bg-[#0D0B1E]">
           <div className="mx-auto max-w-2xl px-4 sm:px-6">
             <PublicEpicWall />
           </div>

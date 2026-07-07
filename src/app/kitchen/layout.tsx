@@ -12,6 +12,7 @@ import { isNavActive, navLinkClasses } from '@/lib/utils/nav'
 import { KitchenContext } from '@/app/kitchen/context'
 import type { EpicUser } from '@/types'
 
+// Kitchen staff see operations only — no finance/cost reports, payments, or admin items.
 const NAV = [
   { label: 'Dashboard', href: '/kitchen/dashboard', icon: 'ti-home' },
   { label: 'Inventory', href: '/kitchen/inventory', icon: 'ti-package' },
@@ -19,7 +20,6 @@ const NAV = [
   { label: 'Daily Menus', href: '/kitchen/menus', icon: 'ti-book-2' },
   { label: 'Waste Tracker', href: '/kitchen/waste', icon: 'ti-trash' },
   { label: 'Order Requests', href: '/kitchen/orders', icon: 'ti-clipboard-list' },
-  { label: 'Reports', href: '/kitchen/reports', icon: 'ti-chart-bar' },
 ]
 
 function KitchenSidebar({

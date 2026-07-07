@@ -77,6 +77,182 @@ function Avatar({ name, photoUrl, size = 'sm' }: { name: string; photoUrl?: stri
   )
 }
 
+// ── Instagram-style full-screen story viewer ──────────────────────────────────
+const STORY_DURATION = 5000
+
+function StoryViewer({
+  stories,
+  initialIndex,
+  onClose,
+}: {
+  stories: EpicWallStory[]
+  initialIndex: number
+  onClose: () => void
+}) {
+  const [index, setIndex] = useState(initialIndex)
+  const [progress, setProgress] = useState(0)
+  const [paused, setPaused] = useState(false)
+  const pausedRef = useRef(false)
+  const downRef = useRef<{ x: number; t: number } | null>(null)
+
+  const goNext = useCallback(() => {
+    setIndex((i) => {
+      if (i >= stories.length - 1) {
+        onClose()
+        return i
+      }
+      return i + 1
+    })
+  }, [stories.length, onClose])
+
+  const goPrev = useCallback(() => {
+    setIndex((i) => Math.max(0, i - 1))
+  }, [])
+
+  const goNextRef = useRef(goNext)
+  useEffect(() => { goNextRef.current = goNext }, [goNext])
+  useEffect(() => { pausedRef.current = paused }, [paused])
+
+  // Auto-advance with a smooth progress bar; pauses while held.
+  useEffect(() => {
+    setProgress(0)
+    let raf = 0
+    let last: number | null = null
+    let acc = 0
+    const step = (ts: number) => {
+      if (last === null) last = ts
+      const dt = ts - last
+      last = ts
+      if (!pausedRef.current) {
+        acc += dt
+        setProgress(Math.min(100, (acc / STORY_DURATION) * 100))
+        if (acc >= STORY_DURATION) {
+          goNextRef.current()
+          return
+        }
+      }
+      raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [index])
+
+  // Keyboard: ← → navigate, Escape closes.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      else if (e.key === 'ArrowRight') goNext()
+      else if (e.key === 'ArrowLeft') goPrev()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [goNext, goPrev, onClose])
+
+  function onPointerDown(e: React.PointerEvent) {
+    downRef.current = { x: e.clientX, t: Date.now() }
+    setPaused(true)
+  }
+  function onPointerUp(e: React.PointerEvent) {
+    setPaused(false)
+    const d = downRef.current
+    downRef.current = null
+    if (!d) return
+    const dx = e.clientX - d.x
+    const dt = Date.now() - d.t
+    if (Math.abs(dx) > 60) {
+      if (dx < 0) goNext()
+      else goPrev()
+      return
+    }
+    if (dt < 250) {
+      const el = e.currentTarget as HTMLElement
+      const localX = e.clientX - el.getBoundingClientRect().left
+      if (localX < el.clientWidth / 2) goPrev()
+      else goNext()
+    }
+  }
+
+  const story = stories[index]
+  if (!story) return null
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black" onClick={onClose}>
+      {/* Desktop prev arrow */}
+      <button
+        type="button"
+        aria-label="Previous story"
+        onClick={(e) => { e.stopPropagation(); goPrev() }}
+        className="absolute left-4 z-10 hidden h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 sm:flex"
+      >
+        <span className="ti ti-chevron-left text-2xl" />
+      </button>
+
+      <div
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        className="relative h-screen w-full max-w-[390px] select-none overflow-hidden bg-black sm:h-[min(844px,100vh)] sm:rounded-xl"
+      >
+        <img
+          src={story.photoUrl}
+          alt=""
+          draggable={false}
+          className="h-full w-full object-cover object-center"
+        />
+
+        {/* Top gradient overlay */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/50 to-transparent" />
+
+        {/* Progress bars */}
+        <div className="absolute inset-x-0 top-0 z-10 flex gap-1 px-2 pt-2">
+          {stories.map((_, i) => (
+            <div key={i} className="h-0.5 flex-1 overflow-hidden rounded-full bg-white/30">
+              <div
+                className="h-full bg-white"
+                style={{ width: i < index ? '100%' : i === index ? `${progress}%` : '0%' }}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Author row */}
+        <div className="absolute inset-x-0 top-4 z-10 flex items-center gap-2 px-3">
+          <Avatar name={story.authorName} photoUrl={story.authorPhotoUrl ?? undefined} size="sm" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-white">{story.authorName}</p>
+            <p className="text-[11px] text-white/70">{timeAgo(story.createdAt)}</p>
+          </div>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={(e) => { e.stopPropagation(); onClose() }}
+            className="text-white"
+          >
+            <span className="ti ti-x text-2xl" />
+          </button>
+        </div>
+
+        {/* Caption */}
+        {story.caption && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-8 px-6 text-center">
+            <p className="text-sm text-white drop-shadow">{story.caption}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop next arrow */}
+      <button
+        type="button"
+        aria-label="Next story"
+        onClick={(e) => { e.stopPropagation(); goNext() }}
+        className="absolute right-4 z-10 hidden h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 sm:flex"
+      >
+        <span className="ti ti-chevron-right text-2xl" />
+      </button>
+    </div>
+  )
+}
+
 export default function EpicWallPage() {
   const { student, user } = useStudentPortal()
   const [posts, setPosts] = useState<EpicWallPost[]>([])
@@ -109,7 +285,7 @@ export default function EpicWallPage() {
   const [storyPreview, setStoryPreview] = useState<string | null>(null)
   const [storyCaption, setStoryCaption] = useState('')
   const [postingStory, setPostingStory] = useState(false)
-  const [viewingStory, setViewingStory] = useState<EpicWallStory | null>(null)
+  const [storyViewerIndex, setStoryViewerIndex] = useState<number | null>(null)
 
   const isStaff = user?.role === 'admin' || user?.role === 'owner' || user?.role === 'teacher' || user?.role === 'reception'
   const authorName = student?.name ?? user?.displayName ?? user?.email ?? 'Student'
@@ -410,11 +586,11 @@ export default function EpicWallPage() {
           </div>
           <span className="text-[10px] text-[#5A6A7A] dark:text-white/50">Add Story</span>
         </button>
-        {stories.map((story) => (
+        {stories.map((story, idx) => (
           <button
             key={story.id}
             type="button"
-            onClick={() => setViewingStory(story)}
+            onClick={() => setStoryViewerIndex(idx)}
             className="flex shrink-0 flex-col items-center gap-1"
           >
             <div className="h-16 w-16 rounded-full border-2 border-[#E8A020] p-0.5">
@@ -906,23 +1082,12 @@ export default function EpicWallPage() {
       )}
 
       {/* Story viewer */}
-      {viewingStory && (
-        <div className="fixed inset-0 z-50 bg-black" onClick={() => setViewingStory(null)}>
-          <button type="button" className="absolute right-4 top-4 z-10 text-white" onClick={() => setViewingStory(null)}>
-            <span className="ti ti-x text-2xl" />
-          </button>
-          <img
-            src={viewingStory.photoUrl}
-            alt=""
-            className="h-full w-full object-contain"
-          />
-          <div className="absolute bottom-8 left-0 right-0 px-6 text-center">
-            <p className="font-semibold text-white">{viewingStory.authorName}</p>
-            {viewingStory.caption && (
-              <p className="mt-1 text-sm text-white/80">{viewingStory.caption}</p>
-            )}
-          </div>
-        </div>
+      {storyViewerIndex !== null && stories.length > 0 && (
+        <StoryViewer
+          stories={stories}
+          initialIndex={storyViewerIndex}
+          onClose={() => setStoryViewerIndex(null)}
+        />
       )}
     </div>
   )

@@ -108,6 +108,7 @@ export default function PaymentTrackerPage() {
   const [receiptTab, setReceiptTab] = useState(false)
   const [receipts, setReceipts] = useState<PaymentReceipt[]>([])
   const [migrating, setMigrating] = useState(false)
+  const [syncingEnrollments, setSyncingEnrollments] = useState(false)
   const isAdmin = hasRole('admin') || hasRole('owner')
 
   async function migrateLegacyPlans() {
@@ -129,6 +130,27 @@ export default function PaymentTrackerPage() {
       hotToast.error(err instanceof Error ? err.message : 'Migration failed')
     } finally {
       setMigrating(false)
+    }
+  }
+
+  async function syncEnrollmentPayments() {
+    if (!auth.currentUser) return
+    setSyncingEnrollments(true)
+    try {
+      const token = await auth.currentUser.getIdToken()
+      const res = await fetch('/api/admin/sync-enrollment-payments', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = (await res.json()) as { fixed?: number; skipped?: number; errors?: string[]; error?: string }
+      if (!res.ok) throw new Error(data.error ?? 'Sync failed')
+      hotToast.success(`Fixed ${data.fixed ?? 0} student(s) · ${data.skipped ?? 0} already correct`)
+      if (data.errors?.length) console.error('[sync-enrollment-payments] errors:', data.errors)
+      await load()
+    } catch (err) {
+      hotToast.error(err instanceof Error ? err.message : 'Sync failed')
+    } finally {
+      setSyncingEnrollments(false)
     }
   }
 
@@ -387,6 +409,17 @@ export default function PaymentTrackerPage() {
               title="One-time: copy any legacy studentPaymentPlans docs into payments"
             >
               {migrating ? 'Migrating…' : 'Migrate legacy plans'}
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              type="button"
+              disabled={syncingEnrollments}
+              onClick={() => void syncEnrollmentPayments()}
+              className="rounded-xl border border-[#DDE3EC] dark:border-white/20 px-4 py-2.5 text-sm font-semibold text-[#0B3D6B] dark:text-white/70 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.05] disabled:opacity-60"
+              title="One-time: fix students whose fee data was defaulted during enrollment approval"
+            >
+              {syncingEnrollments ? 'Syncing…' : 'Sync Enrollment Payments'}
             </button>
           )}
         {canMarkPaid && unpaidSelected.length > 0 && (

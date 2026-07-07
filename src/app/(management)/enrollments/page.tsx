@@ -344,7 +344,7 @@ export default function EnrollmentsPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search name or email..."
-            className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] py-2.5 pl-9 pr-3 text-sm dark:text-white outline-none focus:border-[#E8A020]"
+            className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] py-2.5 pl-9 pr-3 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
           />
         </div>
       </div>
@@ -354,7 +354,7 @@ export default function EnrollmentsPage() {
         <select
           value={dateSort}
           onChange={e => setDateSort(e.target.value as 'newest' | 'oldest')}
-          className="rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] px-3 py-2.5 text-sm dark:text-white outline-none focus:border-[#E8A020]"
+          className="rounded-xl border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
         >
           <option value="newest">Newest First</option>
           <option value="oldest">Oldest First</option>
@@ -363,12 +363,12 @@ export default function EnrollmentsPage() {
           value={batchFilter}
           onChange={e => setBatchFilter(e.target.value)}
           placeholder="Filter by batch..."
-          className="rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] px-3 py-2.5 text-sm dark:text-white outline-none focus:border-[#E8A020]"
+          className="rounded-xl border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
         />
         <select
           value={courseFilter}
           onChange={e => setCourseFilter(e.target.value)}
-          className="rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-white dark:bg-white/[0.04] px-3 py-2.5 text-sm dark:text-white outline-none focus:border-[#E8A020]"
+          className="rounded-xl border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
         >
           <option value="">All Courses</option>
           {Object.entries(COURSE_LABELS).map(([id, label]) => (

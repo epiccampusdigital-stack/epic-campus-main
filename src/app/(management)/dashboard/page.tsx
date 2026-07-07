@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, query, where, orderBy } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { formatLKR } from '@/lib/utils/formatCurrency'
 import { parsePayment, getStatusColor } from '@/lib/payments/helpers'
@@ -32,13 +32,14 @@ interface DashboardStats {
   pendingPayments: number
   attendanceSessions: number
   attendancePresent: number
+  totalPendingFees: number
 }
 
 const STATUS_STYLES: Record<Student['status'], string> = {
-  active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  pending: 'bg-amber-50 text-amber-700 border-amber-200',
-  completed: 'bg-blue-50 text-blue-700 border-blue-200',
-  withdrawn: 'bg-red-50 text-red-700 border-red-200',
+  active: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800',
+  pending: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800',
+  completed: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800',
+  withdrawn: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800',
 }
 
 const PAYMENT_STATUS_STYLES: Record<Payment['status'], string> = {
@@ -94,6 +95,7 @@ export default function DashboardPage() {
   const isPureReception = userRoles.length > 0 && userRoles.every((r) => r === 'reception')
   const [loading, setLoading] = useState(true)
   const [kitchenOverview, setKitchenOverview] = useState<KitchenOverview | null>(null)
+  const [accomOverview, setAccomOverview] = useState<{ rent: number; billsThis: number; billsPrev: number } | null>(null)
   const [courseFilter, setCourseFilter] = useState<CourseId | ''>('')
   const [locationFilter, setLocationFilter] = useState<StudentLocation | ''>('')
   const [monthFilter, setMonthFilter] = useState(currentMonthKey())
@@ -228,6 +230,38 @@ export default function DashboardPage() {
   }, [user, hasRole])
 
   useEffect(() => {
+    if (!user || !(hasRole('admin') || hasRole('owner'))) return
+    async function loadAccommodation() {
+      try {
+        const now = new Date()
+        const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+        const prevDt = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+        const prevKey = `${prevDt.getFullYear()}-${String(prevDt.getMonth() + 1).padStart(2, '0')}`
+
+        const housesSnap = await getDocs(collection(db, 'accommodations'))
+        let rent = 0
+        let billsThis = 0
+        let billsPrev = 0
+        await Promise.all(
+          housesSnap.docs.map(async (h) => {
+            rent += Number(h.data().monthlyRent || 0)
+            const [curSnap, prevSnap] = await Promise.all([
+              getDoc(doc(db, 'accommodations', h.id, 'bills', curKey)).catch(() => null),
+              getDoc(doc(db, 'accommodations', h.id, 'bills', prevKey)).catch(() => null),
+            ])
+            if (curSnap?.exists()) billsThis += Number((curSnap.data() as { totalAmount?: number }).totalAmount || 0)
+            if (prevSnap?.exists()) billsPrev += Number((prevSnap.data() as { totalAmount?: number }).totalAmount || 0)
+          }),
+        )
+        setAccomOverview({ rent, billsThis, billsPrev })
+      } catch {
+        /* ignore — card simply won't render */
+      }
+    }
+    void loadAccommodation()
+  }, [user, hasRole])
+
+  useEffect(() => {
     if (
       user &&
       (hasRole('reception') || hasRole('teacher')) &&
@@ -278,6 +312,9 @@ export default function DashboardPage() {
 
     const activeStudents = filteredStudents.filter((s) => s.status === 'active').length
     const attendancePresent = filteredAttendance.filter((a) => a.status === 'present').length
+    const totalPendingFees = filteredStudents
+      .filter((s) => s.paymentStatus === 'partial')
+      .reduce((sum, s) => sum + (s.pendingAmount ?? 0), 0)
 
     return {
       monthIncome,
@@ -286,6 +323,7 @@ export default function DashboardPage() {
       pendingPayments,
       attendanceSessions: filteredAttendance.length,
       attendancePresent,
+      totalPendingFees,
     }
   }, [filteredPayments, filteredStudents, filteredAttendance, monthFilter])
 
@@ -343,7 +381,7 @@ export default function DashboardPage() {
     return <ReceptionDashboard />
   }
 
-  const statCards = [
+  const statCards: { label: string; value: string; sub: string; amber?: boolean }[] = [
     {
       label: isTodayInMonth(monthFilter) ? "Today's Collection" : 'Month collection',
       value: formatLKR(
@@ -371,6 +409,12 @@ export default function DashboardPage() {
       value: `${stats.attendancePresent} / ${stats.attendanceSessions}`,
       sub: 'Present / sessions',
     },
+    {
+      label: 'Total Pending Fees',
+      value: formatLKR(stats.totalPendingFees),
+      sub: 'Outstanding on partial payments',
+      amber: true,
+    },
   ]
 
   const quickActions = [
@@ -393,19 +437,19 @@ export default function DashboardPage() {
 
       <div className="flex flex-col gap-4 rounded-[12px] border border-white/90 dark:border-white/[0.08] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl p-4 transition-all duration-300 sm:flex-row sm:flex-wrap sm:items-end">
         <div>
-          <label className="mb-1.5 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+          <label className="mb-1.5 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">
             Location
           </label>
           <LocationFilterSelect value={locationFilter} onChange={setLocationFilter} />
         </div>
         <div className="min-w-[200px] flex-1">
-          <label className="mb-1.5 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+          <label className="mb-1.5 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">
             Course / program
           </label>
           <select
             value={courseFilter}
             onChange={(e) => setCourseFilter(e.target.value as CourseId | '')}
-            className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2.5 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
           >
             <option value="">All courses</option>
             {COURSES.map((c) => (
@@ -416,20 +460,20 @@ export default function DashboardPage() {
           </select>
         </div>
         <div>
-          <label className="mb-1.5 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+          <label className="mb-1.5 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">
             Month
           </label>
           <input
             type="month"
             value={monthFilter}
             onChange={(e) => setMonthFilter(e.target.value)}
-            className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2.5 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
           />
         </div>
         <select
           value={monthFilter}
           onChange={(e) => setMonthFilter(e.target.value)}
-          className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+          className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
           aria-label="Month quick select"
         >
           {monthOptions.map((m) => (
@@ -446,24 +490,28 @@ export default function DashboardPage() {
           : statCards.map((card) => (
               <div
                 key={card.label}
-                className="rounded-[12px] p-3 sm:p-[14px] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl border border-white/90 dark:border-white/[0.08] transition-all duration-300"
+                className="stat-card-glass card-hover p-6"
               >
-                <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-gray-400 dark:text-white/40">
+                <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-white/50">
                   {card.label}
                 </p>
-                <p className="mt-2 text-[18px] font-semibold leading-tight text-[#0B3D6B] dark:text-[#E8A020] transition-colors duration-300 sm:text-[24px]">
+                <p className={`mt-2 font-jakarta text-xl font-black leading-tight sm:text-2xl ${
+                  card.amber ? 'text-amber-600 dark:text-amber-400' : 'text-[#0B3D6B] dark:text-[#E8A020]'
+                }`}>
                   {card.value}
                 </p>
-                <p className="mt-1 text-[10px] text-green-500 dark:text-green-400">{card.sub}</p>
+                <p className={`mt-1 text-[11px] font-medium ${
+                  card.amber ? 'text-amber-600/70 dark:text-amber-400/60' : 'text-green-600 dark:text-green-400'
+                }`}>{card.sub}</p>
               </div>
             ))}
 
         {/* Staff count */}
-        <Link href="/staff" className="rounded-[12px] border border-white/90 dark:border-white/[0.08] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl p-3 sm:p-[14px] transition-all duration-300 hover:shadow-md block">
-          <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Active Staff</p>
+        <Link href="/staff" className="stat-card-glass card-hover p-6 block">
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-white/50">Active Staff</p>
           {loading ? <div className="mt-2 h-8 w-16 animate-pulse rounded bg-[#DDE3EC] dark:bg-white/10" /> : (
             <>
-              <p className="mt-1 font-jakarta text-2xl font-bold text-[#0B3D6B] dark:text-white">{staffCount}</p>
+              <p className="mt-2 font-jakarta text-2xl font-black text-[#0B3D6B] dark:text-[#E8A020]">{staffCount}</p>
               <p className="mt-1 font-inter text-xs text-[#5A6A7A] dark:text-white/40">Team members</p>
             </>
           )}
@@ -471,7 +519,7 @@ export default function DashboardPage() {
 
         {/* Pending enrollments */}
         {(hasRole('admin') || hasRole('owner')) && (
-          <Link href="/enrollments" className="rounded-[12px] border border-amber-200/80 dark:border-amber-800/50 bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-2xl p-3 sm:p-[14px] transition-all duration-300 hover:shadow-md block">
+          <Link href="/enrollments" className="card-hover rounded-2xl border border-amber-200/80 dark:border-amber-800/50 bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur-md p-6 block">
             <p className="font-inter text-xs font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">Pending Enrollments</p>
             {loading ? <div className="mt-2 h-8 w-16 animate-pulse rounded bg-amber-200/50" /> : (
               <>
@@ -483,11 +531,11 @@ export default function DashboardPage() {
         )}
 
         {/* Today's exam attempts */}
-        <Link href="/exam-results" className="rounded-[12px] border border-white/90 dark:border-white/[0.08] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl p-3 sm:p-[14px] transition-all duration-300 hover:shadow-md block">
-          <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Exams Today</p>
+        <Link href="/exam-results" className="stat-card-glass card-hover p-6 block">
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-white/50">Exams Today</p>
           {loading ? <div className="mt-2 h-8 w-16 animate-pulse rounded bg-[#DDE3EC] dark:bg-white/10" /> : (
             <>
-              <p className="mt-1 font-jakarta text-2xl font-bold text-[#0B3D6B] dark:text-white">{todayExamAttempts}</p>
+              <p className="mt-2 font-jakarta text-2xl font-black text-[#0B3D6B] dark:text-[#E8A020]">{todayExamAttempts}</p>
               <p className="mt-1 font-inter text-xs text-[#5A6A7A] dark:text-white/40">Attempts today</p>
             </>
           )}
@@ -495,7 +543,7 @@ export default function DashboardPage() {
 
         {/* Pending consultations */}
         {(hasRole('admin') || hasRole('owner')) && (
-          <Link href="/consultations/requests" className="rounded-[12px] border border-blue-200/80 dark:border-blue-800/50 bg-blue-50/80 dark:bg-blue-900/20 backdrop-blur-2xl p-3 sm:p-[14px] transition-all duration-300 hover:shadow-md block">
+          <Link href="/consultations/requests" className="card-hover rounded-2xl border border-blue-200/80 dark:border-blue-800/50 bg-blue-50/80 dark:bg-blue-900/20 backdrop-blur-md p-6 block">
             <p className="font-inter text-xs font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">Consultations</p>
             {loading ? <div className="mt-2 h-8 w-16 animate-pulse rounded bg-blue-200/50" /> : (
               <>
@@ -596,7 +644,7 @@ export default function DashboardPage() {
           <select
             value={courseFilter}
             onChange={(e) => setCourseFilter(e.target.value as CourseId | '')}
-            className="rounded-lg border border-[#DDE3EC] px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            className="rounded-lg border border-[#DDE3EC] px-3 py-2 text-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
             aria-label="Filter pending by course"
           >
             <option value="">All courses</option>
@@ -686,7 +734,7 @@ export default function DashboardPage() {
             <Link
               key={action.href}
               href={action.href}
-              className="group rounded-xl border border-[#DDE3EC] bg-white p-5 transition-all hover:border-[#E8A020] hover:shadow-sm dark:bg-gray-800"
+              className="group card-hover rounded-xl border border-[#DDE3EC] bg-white p-5 hover:border-[#E8A020] hover:shadow-sm dark:border-white/[0.08] dark:bg-white/[0.04]"
             >
               <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#0B3D6B] text-white">
                 <span className={`ti ${action.icon} text-lg`} aria-hidden="true" />
@@ -702,8 +750,8 @@ export default function DashboardPage() {
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-5">
         <div className="xl:col-span-3">
-          <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:bg-gray-800">
-            <div className="border-b border-[#DDE3EC] px-5 py-4 dark:border-gray-600">
+          <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:border-white/[0.08] dark:bg-white/[0.04]">
+            <div className="border-b border-[#DDE3EC] px-5 py-4 dark:border-white/[0.05]">
               <h2 className="font-jakarta text-base font-bold text-[#0D1B2A] dark:text-white">
                 Recent Students
               </h2>
@@ -718,23 +766,23 @@ export default function DashboardPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left font-inter text-sm">
                   <thead>
-                    <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:bg-gray-900">
-                      <th className="px-5 py-3 text-xs font-medium uppercase text-[#5A6A7A]">Name</th>
-                      <th className="px-5 py-3 text-xs font-medium uppercase text-[#5A6A7A]">Course</th>
-                      <th className="px-5 py-3 text-xs font-medium uppercase text-[#5A6A7A]">Batch</th>
-                      <th className="px-5 py-3 text-xs font-medium uppercase text-[#5A6A7A]">Status</th>
+                    <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:bg-white/[0.02]">
+                      <th className="px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#5A6A7A] dark:text-white/40">Name</th>
+                      <th className="px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#5A6A7A] dark:text-white/40">Course</th>
+                      <th className="px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#5A6A7A] dark:text-white/40">Batch</th>
+                      <th className="px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#5A6A7A] dark:text-white/40">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {recentStudents.map((student) => {
                       const course = COURSE_MAP[student.courseId]
                       return (
-                        <tr key={student.id} className="border-b border-[#DDE3EC] last:border-0 dark:border-gray-600">
+                        <tr key={student.id} className="border-b border-[#DDE3EC] last:border-0 dark:border-white/[0.05] hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors">
                           <td className="px-5 py-3 font-medium text-[#0D1B2A] dark:text-white">
                             {student.name}
                           </td>
                           <td className="px-5 py-3">
-                            <span className="inline-flex items-center gap-1 rounded-full border border-[#DDE3EC] bg-[#F5F7FB] px-2.5 py-0.5 text-xs text-[#0B3D6B]">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-[#DDE3EC] bg-[#F5F7FB] px-2.5 py-0.5 text-xs text-[#0B3D6B] dark:border-white/[0.08] dark:bg-white/[0.06] dark:text-blue-300">
                               {course?.flag} {course?.label.split(' ')[0] ?? student.courseId}
                             </span>
                           </td>
@@ -757,7 +805,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="xl:col-span-2">
-          <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
+          <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:border-white/[0.08] dark:bg-white/[0.04]">
             <h2 className="font-jakarta mb-5 text-base font-bold text-[#0D1B2A] dark:text-white">
               Course Enrollment
             </h2>
@@ -793,6 +841,47 @@ export default function DashboardPage() {
           </div>
         </div>
       </section>
+
+      {/* Accommodation Expenses — admin/owner only */}
+      {(hasRole('admin') || hasRole('owner')) && accomOverview && (
+        <section>
+          <div className="rounded-xl border border-white/90 bg-white/65 p-5 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05]">
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="ti ti-home text-[#0B3D6B] dark:text-[#E8A020]" />
+                <h2 className="font-bold text-[#0D1B2A] dark:text-white">Accommodation Expenses</h2>
+                <span className="rounded-full bg-[#0B3D6B]/10 dark:bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-[#0B3D6B] dark:text-white/60">This month</span>
+              </div>
+              <Link href="/accommodation" className="rounded-lg border border-[#DDE3EC] px-3 py-1.5 text-xs font-medium text-[#0B3D6B] hover:bg-[#F5F7FB] dark:border-white/[0.08] dark:text-white/70">
+                Manage Houses
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {(() => {
+                const momPct = accomOverview.billsPrev > 0
+                  ? Math.round(((accomOverview.billsThis - accomOverview.billsPrev) / accomOverview.billsPrev) * 100)
+                  : null
+                const cards = [
+                  { label: 'Rent This Month', value: formatLKR(accomOverview.rent), color: 'text-[#0B3D6B] dark:text-white' },
+                  { label: 'Bills This Month', value: formatLKR(accomOverview.billsThis), color: 'text-[#0B3D6B] dark:text-white' },
+                  { label: 'Combined Cost', value: formatLKR(accomOverview.rent + accomOverview.billsThis), color: 'text-[#E8A020]' },
+                  {
+                    label: 'Bills vs Last Month',
+                    value: momPct === null ? '—' : `${momPct > 0 ? '+' : ''}${momPct}%`,
+                    color: momPct === null ? 'text-gray-400 dark:text-white/40' : momPct > 0 ? 'text-red-600' : 'text-emerald-600',
+                  },
+                ]
+                return cards.map((s) => (
+                  <div key={s.label} className="rounded-[10px] border border-[#DDE3EC] bg-white p-3 dark:border-white/[0.07] dark:bg-white/[0.04]">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-gray-400 dark:text-white/40">{s.label}</p>
+                    <p className={`mt-1.5 text-base font-bold ${s.color}`}>{s.value}</p>
+                  </div>
+                ))
+              })()}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Kitchen Overview Widget — admin/owner only */}
       {(hasRole('admin') || hasRole('owner')) && kitchenOverview && (
@@ -837,8 +926,8 @@ export default function DashboardPage() {
       )}
 
       <section>
-        <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:bg-gray-800">
-          <div className="border-b border-[#DDE3EC] px-5 py-4 dark:border-gray-600">
+        <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:border-white/[0.08] dark:bg-white/[0.04]">
+          <div className="border-b border-[#DDE3EC] px-5 py-4 dark:border-white/[0.05]">
             <h2 className="font-jakarta text-base font-bold text-[#0D1B2A] dark:text-white">
               Recent Payments
             </h2>
@@ -853,21 +942,21 @@ export default function DashboardPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left font-inter text-sm">
                 <thead>
-                  <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:bg-gray-900">
-                    <th className="px-5 py-3 text-xs font-medium uppercase text-[#5A6A7A]">Receipt</th>
-                    <th className="px-5 py-3 text-xs font-medium uppercase text-[#5A6A7A]">Student</th>
-                    <th className="px-5 py-3 text-xs font-medium uppercase text-[#5A6A7A]">Amount</th>
-                    <th className="px-5 py-3 text-xs font-medium uppercase text-[#5A6A7A]">Status</th>
+                  <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:bg-white/[0.02]">
+                    <th className="px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#5A6A7A] dark:text-white/40">Receipt</th>
+                    <th className="px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#5A6A7A] dark:text-white/40">Student</th>
+                    <th className="px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#5A6A7A] dark:text-white/40">Amount</th>
+                    <th className="px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#5A6A7A] dark:text-white/40">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {recentPayments.map((payment) => (
-                    <tr key={payment.id} className="border-b border-[#DDE3EC] last:border-0 dark:border-gray-600">
+                    <tr key={payment.id} className="border-b border-[#DDE3EC] last:border-0 dark:border-white/[0.05] hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors">
                       <td className="px-5 py-3 font-medium text-[#0D1B2A] dark:text-white">
                         {payment.receiptNumber || '—'}
                       </td>
                       <td className="px-5 py-3 text-[#0D1B2A] dark:text-white">{payment.studentName}</td>
-                      <td className="px-5 py-3 font-medium text-[#0B3D6B]">{formatLKR(payment.amount)}</td>
+                      <td className="px-5 py-3 font-medium text-[#0B3D6B] dark:text-[#E8A020]">{formatLKR(payment.amount)}</td>
                       <td className="px-5 py-3">
                         <span
                           className={`inline-block rounded-full border px-2.5 py-0.5 text-xs capitalize ${PAYMENT_STATUS_STYLES[payment.status]}`}

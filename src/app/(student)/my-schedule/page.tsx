@@ -329,7 +329,7 @@ function MonthGrid({
     <div>
       <div className="grid grid-cols-7">
         {WEEKDAYS_SHORT.map(d => (
-          <div key={d} className="py-1 text-center text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          <div key={d} className="py-1.5 text-center text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
             {d}
           </div>
         ))}
@@ -342,8 +342,8 @@ function MonthGrid({
 
           if (!cell.inMonth) {
             return (
-              <div key={cell.iso} className="flex min-h-[44px] items-start justify-center pt-2">
-                <span className="text-xs text-gray-300 dark:text-gray-600">{cell.day}</span>
+              <div key={cell.iso} className="flex min-h-[44px] sm:min-h-[48px] items-start justify-center pt-2">
+                <span className="text-sm text-gray-300 dark:text-gray-600">{cell.day}</span>
               </div>
             )
           }
@@ -353,10 +353,10 @@ function MonthGrid({
               key={cell.iso}
               type="button"
               onClick={() => onSelect(cell.iso)}
-              className="relative flex min-h-[44px] flex-col items-center justify-start gap-0.5 rounded-xl pt-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="relative flex min-h-[44px] sm:min-h-[48px] flex-col items-center justify-start gap-0.5 rounded-xl pt-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
             >
               <span
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+                className={`flex h-9 w-9 items-center justify-center rounded-full text-base font-medium ${
                   isSelected
                     ? 'bg-[#0B3D6B] text-white'
                     : isTdy
@@ -616,7 +616,7 @@ export default function MySchedulePage() {
       ) : (
         <>
           {/* ── TOP CONTROLS BAR ─────────────────────────────────────────── */}
-          <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+          <div className="sticky top-0 z-20 flex min-h-[64px] flex-wrap items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-4">
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -630,7 +630,7 @@ export default function MySchedulePage() {
                 onClick={goPrev}
                 disabled={view === 'list'}
                 aria-label="Previous"
-                className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:pointer-events-none"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:pointer-events-none"
               >
                 <span className="ti ti-chevron-left text-lg" />
               </button>
@@ -639,11 +639,11 @@ export default function MySchedulePage() {
                 onClick={goNext}
                 disabled={view === 'list'}
                 aria-label="Next"
-                className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:pointer-events-none"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:pointer-events-none"
               >
                 <span className="ti ti-chevron-right text-lg" />
               </button>
-              <span className="font-jakarta text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+              <span className="font-jakarta text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
                 {view === 'week' ? fmtWeekRange(weekAnchor) : view === 'month' ? fmtMonthYear(monthAnchor) : 'Upcoming'}
               </span>
             </div>
@@ -670,7 +670,7 @@ export default function MySchedulePage() {
           <div className="flex flex-col md:flex-row">
             {view !== 'list' && (
               <>
-                <div className="w-full md:w-[320px] md:shrink-0 bg-white dark:bg-gray-900 p-4">
+                <div className="w-full md:w-[380px] lg:w-[420px] md:shrink-0 bg-white dark:bg-gray-900 p-4">
                   {view === 'month' ? (
                     <MonthGrid cells={monthCells} today={today} selectedDate={selectedDate} byDate={byDate} onSelect={selectDay} />
                   ) : (

@@ -14,10 +14,10 @@ import DarkModeToggle from '@/components/ui/DarkModeToggle'
 import { isNavActive } from '@/lib/utils/nav'
 
 function studentNavLinkClasses(active: boolean): string {
-  const base = 'flex items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] transition-all duration-200 min-h-[44px] sm:min-h-0'
+  const base = 'flex items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] transition-all duration-200 min-h-[44px] sm:min-h-0 border-l-2'
   return active
-    ? `${base} bg-gradient-to-r from-[#E8A020]/20 to-[#E8A020]/5 text-[#E8A020] font-bold border-r-2 border-[#E8A020]`
-    : `${base} text-[#5A6A7A] hover:bg-white/[0.06] hover:text-white transition-all duration-200`
+    ? `${base} bg-[#0B3D6B]/8 dark:bg-[#E8A020]/12 border-[#0B3D6B] dark:border-[#E8A020] text-[#0B3D6B] dark:text-white font-bold`
+    : `${base} border-transparent text-gray-500 dark:text-white/50 hover:text-[#0B3D6B] dark:hover:text-white hover:bg-[#0B3D6B]/4 dark:hover:bg-white/4`
 }
 
 function getStudentInitials(name: string): string {
@@ -133,7 +133,7 @@ export default function StudentSidebar() {
   const navItems = [...BASE_NAV_ITEMS.slice(0, 1), EXAM_NAV_ITEM, EXAM_CODE_NAV_ITEM, ...BASE_NAV_ITEMS.slice(1)]
 
   const sidebarContent = (
-    <div className="flex h-full w-[240px] flex-col bg-white/60 dark:bg-[#0B3D6B]/20 backdrop-blur-2xl border-r border-white/80 dark:border-white/[0.06] transition-all duration-300">
+    <div className="flex h-full w-[240px] flex-col bg-white/95 dark:bg-[#0D0B1E]/95 backdrop-blur-xl border-r border-[#0B3D6B]/8 dark:border-white/[0.06] transition-all duration-300">
       {/* Logo */}
       <div className="px-4 py-4">
         <div className="flex items-center gap-2 px-2 py-1">

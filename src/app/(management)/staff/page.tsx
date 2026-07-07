@@ -242,11 +242,11 @@ export default function StaffPage() {
         />
       )}
 
-      <div className="rounded-xl border border-[#DDE3EC] bg-white p-4">
+      <div className="rounded-xl border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] p-4">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <div className="relative md:col-span-1">
             <span
-              className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A7A]"
+              className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A7A] dark:text-white/40"
               aria-hidden="true"
             />
             <input
@@ -254,13 +254,13 @@ export default function StaffPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search name or email…"
-              className="w-full rounded-lg border border-[#DDE3EC] py-2.5 pl-10 pr-3 font-inter text-base outline-none focus:border-[#E8A020] sm:text-sm"
+              className="w-full rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] py-2.5 pl-10 pr-3 font-inter text-base text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020] sm:text-sm"
             />
           </div>
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value as StaffRole | '')}
-            className="rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
+            className="rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 font-inter text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
           >
             <option value="">All roles</option>
             <option value="admin">Admin</option>
@@ -275,7 +275,7 @@ export default function StaffPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as StaffStatus | '')}
-            className="rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
+            className="rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 font-inter text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
           >
             <option value="">All statuses</option>
             <option value="active">Active</option>

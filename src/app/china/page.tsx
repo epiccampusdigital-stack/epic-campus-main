@@ -97,58 +97,58 @@ export default function ChinaPage() {
       />
       <StatsBar stats={STATS} />
 
-      <section className="bg-white py-24">
+      <section className="bg-white py-24 dark:bg-[#0D0B1E]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="Why Study in China?" />
           <div className="grid gap-8 md:grid-cols-3">
             {WHY_CHINA.map((item) => (
               <div key={item.title} className={CARD}>
                 <div className="text-4xl">{item.emoji}</div>
-                <h3 className="mt-4 font-semibold text-[#0B3D6B]">{item.title}</h3>
-                <p className="mt-2 text-sm text-gray-500">{item.desc}</p>
+                <h3 className="mt-4 font-semibold text-[#0B3D6B] dark:text-white">{item.title}</h3>
+                <p className="mt-2 text-sm text-gray-500 dark:text-white/60">{item.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="programs" className="bg-[#F5F7FB] py-24">
+      <section id="programs" className="bg-[#F5F7FB] py-24 dark:bg-[#130F2A]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="What Can You Study?" />
           <div className="grid grid-cols-2 gap-6 md:grid-cols-3">
             {STUDY_FIELDS.map((field) => (
               <div key={field.title} className={CARD}>
                 <div className="text-4xl">{field.emoji}</div>
-                <h3 className="mt-3 font-semibold text-[#0B3D6B]">{field.title}</h3>
-                <p className="mt-1 text-sm text-gray-500">{field.desc}</p>
+                <h3 className="mt-3 font-semibold text-[#0B3D6B] dark:text-white">{field.title}</h3>
+                <p className="mt-1 text-sm text-gray-500 dark:text-white/60">{field.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="bg-white py-24">
+      <section className="bg-white py-24 dark:bg-[#0D0B1E]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="Your Pathway to China" />
           <TimelineSteps steps={PATHWAY_STEPS} columns={3} />
         </div>
       </section>
 
-      <section className="bg-[#F5F7FB] py-24">
+      <section className="bg-[#F5F7FB] py-24 dark:bg-[#130F2A]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="Scholarship Opportunities" />
           <div className="grid gap-8 md:grid-cols-2">
             {SCHOLARSHIPS.map((sch) => (
               <div key={sch.title} className={`${CARD} ${sch.borderClass}`}>
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-[#0B3D6B]">{sch.title}</h3>
-                  <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                  <h3 className="font-semibold text-[#0B3D6B] dark:text-white">{sch.title}</h3>
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600 dark:bg-white/[0.08] dark:text-white/70">
                     {sch.badge}
                   </span>
                 </div>
                 <ul className="mt-4 space-y-2">
                   {sch.items.map((item) => (
-                    <li key={item} className="text-sm text-gray-500">
+                    <li key={item} className="text-sm text-gray-500 dark:text-white/60">
                       • {item}
                     </li>
                   ))}

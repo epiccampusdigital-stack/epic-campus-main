@@ -124,7 +124,7 @@ export default function StaffTable({
   if (staff.length === 0) {
     if (onAdd) return <StaffTableEmpty onAdd={onAdd} />
     return (
-      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#DDE3EC] bg-white px-6 py-16 text-center dark:border-gray-600 dark:bg-gray-800">
+      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#DDE3EC] bg-white px-6 py-16 text-center dark:border-white/10 dark:bg-white/[0.04]">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#0B3D6B]/10">
           <span className="ti ti-id-badge text-3xl text-[#0B3D6B]" aria-hidden="true" />
         </div>
@@ -137,11 +137,11 @@ export default function StaffTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:border-gray-700 dark:bg-gray-800">
+    <div className="overflow-hidden rounded-xl border border-gray-100 bg-white dark:border-white/[0.05] dark:bg-white/[0.04]">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1024px] text-left text-sm">
           <thead>
-            <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:border-gray-700 dark:bg-gray-900">
+            <tr className="border-b border-gray-100 bg-gray-50 dark:border-white/[0.05] dark:bg-white/[0.03]">
               {[
                 { h: 'Avatar', hide: 'hidden sm:table-cell' },
                 { h: 'Name', hide: '' },
@@ -155,25 +155,25 @@ export default function StaffTable({
               ].map(({ h, hide }) => (
                 <th
                   key={h}
-                  className={`px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] ${hide}`}
+                  className={`px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-white/40 ${hide}`}
                 >
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#DDE3EC]">
+          <tbody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
             {staff.map((member) => (
-              <tr key={member.id} className="transition-colors hover:bg-[#F5F7FB]/60 dark:hover:bg-gray-700/40">
+              <tr key={member.id} className="bg-white dark:bg-transparent transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.03]">
                 <td className="hidden px-4 py-3 sm:table-cell">
                   <Avatar member={member} />
                 </td>
                 <td className="px-4 py-3">
-                  <p className="font-medium text-[#0D1B2A] dark:text-white">
+                  <p className="font-medium text-gray-900 dark:text-white">
                     {member.displayName}
                   </p>
                   {member.nic && (
-                    <p className="text-xs text-[#5A6A7A] dark:text-gray-400">{member.nic}</p>
+                    <p className="text-xs text-gray-500 dark:text-white/40">{member.nic}</p>
                   )}
                 </td>
                 <td className="hidden px-4 py-3 md:table-cell">
@@ -201,7 +201,7 @@ export default function StaffTable({
                       {LOCATION_LABELS[member.locationAssigned]}
                     </span>
                   ) : (
-                    <span className="text-[#5A6A7A] dark:text-gray-400">—</span>
+                    <span className="text-gray-500 dark:text-white/40">—</span>
                   )}
                 </td>
                 <td className="hidden px-4 py-3 text-[#5A6A7A] lg:table-cell dark:text-gray-400">{member.email || '—'}</td>

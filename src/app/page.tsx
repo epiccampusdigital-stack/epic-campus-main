@@ -100,10 +100,10 @@ function HowItWorksTimeline() {
         <div className="relative grid grid-cols-5 gap-4">
           {TIMELINE_STEPS.map(step => (
             <div key={step.n} className="group flex flex-col items-center text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0B3D6B] font-jakarta text-[16px] font-black text-white ring-0 ring-[#E8A020] transition-all duration-200 group-hover:ring-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0B3D6B] dark:bg-[#1A1535] font-jakarta text-[16px] font-black text-white ring-0 ring-[#E8A020] transition-all duration-200 group-hover:ring-2">
                 {step.n}
               </div>
-              <h3 className="mt-5 font-jakarta text-[16px] font-bold text-[#0B1220] dark:text-white">{step.title}</h3>
+              <h3 className="mt-5 font-jakarta text-[16px] font-bold text-[#0B3D6B] dark:text-white">{step.title}</h3>
               <p className="mt-2 max-w-[180px] text-[13px] leading-relaxed text-gray-500 dark:text-white/40">{step.desc}</p>
             </div>
           ))}
@@ -117,11 +117,11 @@ function HowItWorksTimeline() {
             {i < TIMELINE_STEPS.length - 1 && (
               <div className="absolute left-6 top-12 h-full w-[2px] bg-gradient-to-b from-[#0B3D6B] to-[#E8A020]" />
             )}
-            <div className="z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#0B3D6B] font-jakarta text-[16px] font-black text-white">
+            <div className="z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#0B3D6B] dark:bg-[#1A1535] font-jakarta text-[16px] font-black text-white">
               {step.n}
             </div>
             <div className="pt-2">
-              <h3 className="font-jakarta text-[16px] font-bold text-[#0B1220] dark:text-white">{step.title}</h3>
+              <h3 className="font-jakarta text-[16px] font-bold text-[#0B3D6B] dark:text-white">{step.title}</h3>
               <p className="mt-1 text-[13px] leading-relaxed text-gray-500 dark:text-white/40">{step.desc}</p>
             </div>
           </div>
@@ -208,9 +208,10 @@ function HeroParticles() {
     function draw() {
       if (!ctx || !canvas) return
       const dark = isDarkRef.current
-      const rgb = dark ? '232,160,32' : '11,61,107'
-      const alphaScale = dark ? 1 : 0.5
-      const lineBaseAlpha = dark ? 0.14 : 0.08
+      const rgb = '232,160,32'
+      // Remap each particle's 0.2–0.8 breathing range into the theme's target band.
+      const [minA, maxA] = dark ? [0.6, 0.8] : [0.25, 0.4]
+      const lineBaseAlpha = dark ? 0.12 : 0.08
 
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       particles.forEach(p => {
@@ -220,9 +221,11 @@ function HeroParticles() {
         if (p.a <= 0.2 || p.a >= 0.8) p.va *= -1
         if (p.x < 0 || p.x > canvas.width) p.vx *= -1
         if (p.y < 0 || p.y > canvas.height) p.vy *= -1
+        const norm = (p.a - 0.2) / 0.6
+        const alpha = minA + norm * (maxA - minA)
         ctx.beginPath()
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(${rgb},${p.a * alphaScale})`
+        ctx.fillStyle = `rgba(${rgb},${alpha})`
         ctx.fill()
       })
       // Connect nearby particles with faint lines
@@ -249,18 +252,18 @@ function HeroParticles() {
     <canvas
       ref={canvasRef}
       className="absolute inset-0 z-[1] h-full w-full pointer-events-none"
-      style={{ opacity: isDark ? 0.85 : 0.4 }}
+      style={{ opacity: isDark ? 0.85 : 0.5 }}
     />
   )
 }
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen overflow-x-hidden bg-white dark:bg-[#04090f]">
+    <div className="min-h-screen overflow-x-hidden bg-white dark:bg-[#0D0B1E]">
       <PublicNav />
 
       {/* ── HERO ── */}
-      <section className="relative flex min-h-[92vh] items-center justify-center overflow-hidden bg-[#F8FAFC] dark:bg-[#03080f] pt-24 pb-16 sm:pt-0 sm:pb-0">
+      <section className="relative flex min-h-[92vh] items-center justify-center overflow-hidden home-hero-bg pt-24 pb-16 sm:pt-0 sm:pb-0">
         <HeroParticles />
         {/* Grid — light mode */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(11,61,107,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(11,61,107,0.06)_1px,transparent_1px)] bg-[size:40px_40px] dark:hidden" />
@@ -318,19 +321,20 @@ export default function HomePage() {
 
           <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row justify-center gap-4">
             <Link href="/enroll"
-              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-[#E8A020] px-9 py-4 text-base font-semibold text-[#03080f] shadow-[0_0_40px_rgba(232,160,32,0.2)] hover:bg-[#f0b030] hover:-translate-y-0.5 transition-all duration-200">
+              className="btn-hover w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-[#E8A020] px-9 py-4 text-base font-semibold text-[#0D0B1E] shadow-[0_0_40px_rgba(232,160,32,0.2)] hover:bg-[#f0b030] transition-all duration-200">
               Apply now
               <span className="ti ti-arrow-right text-[16px]" />
             </Link>
             <a href="#programs"
-              className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl border border-gray-300 dark:border-white/20 px-9 py-4 text-[14px] font-semibold text-gray-700 dark:text-white/60 hover:border-gray-400 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white transition-all duration-200">
+              className="btn-hover w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl border border-gray-300 dark:border-white/20 px-9 py-4 text-[14px] font-semibold text-gray-700 dark:text-white/60 hover:border-gray-400 dark:hover:border-white/20 hover:text-gray-900 dark:hover:text-white transition-all duration-200">
               Explore programs
             </a>
           </div>
 
           <div className="mt-6 sm:mt-8 flex flex-wrap justify-center gap-3">
             {['TVEC Approved', 'Est. 2011', 'Galle, Sri Lanka', 'PV 00265988'].map(b => (
-              <span key={b} className="rounded-md border border-gray-200 dark:border-white/[0.05] bg-white/80 dark:bg-white/[0.02] px-3 py-1 text-[10px] text-gray-600 dark:text-white/20">
+              <span key={b} className="flex items-center gap-1.5 rounded-md border border-[#E8A020]/40 dark:border-[#E8A020]/30 bg-[rgba(232,160,32,0.06)] dark:bg-[rgba(232,160,32,0.08)] px-3 py-1 text-[10px] text-[#E8A020]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#E8A020]" />
                 {b}
               </span>
             ))}
@@ -344,42 +348,59 @@ export default function HomePage() {
           }
           .hero-stroke-text {
             color: transparent;
-            -webkit-text-stroke: 1.5px rgba(11,61,107,0.35);
+            -webkit-text-stroke: 2px rgba(255,255,255,0.22);
           }
-          @media (min-width: 640px) {
-            .dark .hero-stroke-text {
-              -webkit-text-stroke: 1.5px rgba(255,255,255,0.22);
-            }
+          /* Light mode desktop */
+          html:not(.dark) .hero-stroke-text {
+            -webkit-text-stroke: 2px rgba(11,61,107,0.5);
           }
+          /* Mobile both modes */
           @media (max-width: 639px) {
             .hero-stroke-text {
-              color: #E8A020;
-              -webkit-text-stroke: 0;
+              color: #E8A020 !important;
+              -webkit-text-stroke: 0 !important;
             }
           }
         `}</style>
       </section>
 
       {/* ── STATS BAR ── */}
-      <section className="relative overflow-hidden bg-[#F8FAFC] py-20 dark:bg-[#0B1A2E]">
+      <section className="relative mt-0 overflow-hidden bg-[#F8FAFC] py-16 dark:bg-[#130F2A] sm:py-20">
         <div className="section-fade-top" />
         <div className="section-fade-bottom" />
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(26,107,173,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(26,107,173,0.08)_1px,transparent_1px)] bg-[size:30px_30px]" />
-        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="grid grid-cols-2 items-stretch gap-3 sm:gap-6 md:mx-auto md:max-w-4xl md:grid-cols-4">
-            {[
+        <div className="relative z-10 mx-auto max-w-4xl px-4">
+          <div className="grid grid-cols-2 items-stretch gap-3 sm:gap-4 md:grid-cols-4">
+            {([
               { end: 1500, suffix: '+', label: 'Students Placed Abroad' },
               { end: 98, suffix: '%', label: 'Visa Approval Rate' },
               { end: 50, suffix: '+', label: 'Partner Institutions' },
-              { end: 15, suffix: ' Years', label: 'Established in Sri Lanka' },
-            ].map(s => (
-              <div key={s.label} className="rounded-2xl border-x border-b border-t-2 border-gray-100 border-t-[#E8A020] bg-white p-6 text-center shadow-sm dark:border-x-0 dark:border-b-0 dark:bg-white/5 dark:shadow-none dark:backdrop-blur-sm">
-                <p className="font-jakarta text-5xl font-black text-[#0B3D6B] dark:text-[#E8A020]">
-                  <AnimatedStat end={s.end} suffix={s.suffix} />
-                </p>
-                <p className="mt-2 text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-                  {s.label}
-                </p>
+              { end: 15, unit: 'Years', label: 'Established in Sri Lanka' },
+            ] as { end: number; suffix?: string; unit?: string; label: string }[]).map(s => (
+              <div key={s.label} className="home-stat-card card-hover flex min-h-[140px] flex-col items-center justify-center p-5 text-center sm:min-h-[160px] sm:p-6">
+                {s.unit ? (
+                  // Static — "Years" is a unit, not a counted-up number, so no AnimatedStat here.
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <p className="text-5xl font-black tabular-nums text-[#E8A020] dark:text-[#E8A020] lg:text-6xl">
+                      {s.end}
+                    </p>
+                    <p className="-mt-1 text-lg font-bold text-[#E8A020] dark:text-[#E8A020]">
+                      {s.unit}
+                    </p>
+                    <p className="mx-auto mt-3 max-w-[100px] text-[10px] uppercase tracking-widest text-gray-500 dark:text-white/40 sm:text-xs">
+                      {s.label}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="font-jakarta text-4xl font-black tabular-nums leading-none text-[#0B3D6B] dark:text-[#E8A020] sm:text-5xl lg:text-6xl">
+                      <AnimatedStat end={s.end} suffix={s.suffix} />
+                    </p>
+                    <p className="mx-auto mt-2 max-w-[100px] text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400 sm:mt-3 sm:text-xs">
+                      {s.label}
+                    </p>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -387,7 +408,7 @@ export default function HomePage() {
       </section>
 
       {/* ── PROGRAMS ── */}
-      <section id="programs" className="relative bg-[#F8FAFC] py-28 dark:bg-[#04090f]">
+      <section id="programs" className="relative bg-[#F8FAFC] py-28 dark:bg-[#0D0B1E]">
         <div className="section-fade-top" />
         <div className="section-fade-bottom" />
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -402,7 +423,7 @@ export default function HomePage() {
             {COURSES.map(course => (
               course.comingSoon ? (
                 <div key={course.title}
-                  className="group relative rounded-2xl border border-gray-100 shadow-sm bg-white p-7 opacity-75 dark:border-[#1A6BAD]/40 dark:bg-[#0B3D6B]/20 overflow-hidden">
+                  className="program-card-glass home-program-card card-hover group relative rounded-2xl p-7 opacity-75 overflow-hidden">
                   <div className="absolute top-3 right-3 rounded-full bg-[#E8A020] px-2.5 py-0.5 text-[9px] font-black text-white uppercase tracking-wider">Coming Soon</div>
                   <div className="mb-5 flex items-center justify-between">
                     <span className={`inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-[13px] font-black tracking-wide ${course.flagClass}`}>{course.flag}</span>
@@ -417,7 +438,7 @@ export default function HomePage() {
                 </div>
               ) : (
                 <Link key={course.title} href={course.href}
-                  className="group rounded-2xl border border-gray-100 shadow-sm bg-white p-7 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_4px_20px_rgba(11,61,107,0.2)] dark:border-[#1A6BAD]/40 dark:bg-[#0B3D6B]/20">
+                  className="program-card-glass home-program-card card-hover group rounded-2xl p-7">
                   <div className="mb-5 flex items-center justify-between">
                     <span className={`inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-[13px] font-black tracking-wide ${course.flagClass}`}>{course.flag}</span>
                     <span className="ti ti-arrow-right text-[#DDE3EC] transition-all group-hover:translate-x-1 group-hover:text-[#E8A020] dark:text-white/20" />
@@ -439,14 +460,16 @@ export default function HomePage() {
       </section>
 
       {/* ── HOW IT WORKS TIMELINE ── */}
-      <section className="relative py-28">
+      <section className="relative home-hiw-bg py-28">
         <div className="section-fade-top" />
         <div className="section-fade-bottom" />
         <HowItWorksTimeline />
       </section>
 
       {/* ── PROCESS ── */}
-      <section id="process" className="bg-white py-28 dark:bg-[#071428]">
+      <section id="process" className="relative bg-white py-28 dark:bg-[#130F2A]">
+        <div className="section-fade-top" />
+        <div className="section-fade-bottom" />
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="mb-16 text-center">
             <p className="mb-3 text-[11px] font-bold uppercase tracking-[4px] text-[#E8A020]">How it works</p>
@@ -473,11 +496,13 @@ export default function HomePage() {
       </section>
 
       {/* ── CTA ── */}
-      <section className="relative overflow-hidden bg-[#03080f] py-28">
+      <section className="relative overflow-hidden home-cta-bg py-28">
         <div className="section-fade-top" />
         <div className="section-fade-bottom" />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(26,107,173,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(26,107,173,0.06)_1px,transparent_1px)] bg-[size:40px_40px]" />
         <div className="pointer-events-none absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(11,61,107,0.4)_0%,transparent_70%)]" />
+        {/* Gold radial glow behind heading */}
+        <div className="pointer-events-none absolute left-1/2 top-1/2 h-[300px] w-[600px] max-w-full -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse_at_center,rgba(232,160,32,0.08)_0%,transparent_70%)]" />
         <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
           <h2 className="font-jakarta font-black leading-tight text-white" style={{ fontSize: 'clamp(32px, 5vw, 52px)' }}>
             Ready to build your
@@ -488,12 +513,12 @@ export default function HomePage() {
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-4">
             <Link href="/enroll"
-              className="flex items-center gap-2 rounded-xl bg-[#E8A020] px-10 py-4 text-[15px] font-black text-[#03080f] shadow-[0_0_40px_rgba(232,160,32,0.2)] hover:bg-[#f0b030] hover:-translate-y-0.5 transition-all duration-200">
+              className="btn-hover flex items-center gap-2 rounded-xl bg-[#E8A020] px-10 py-4 text-[15px] font-black text-[#0D0B1E] shadow-[0_0_40px_rgba(232,160,32,0.2)] hover:bg-[#f0b030] transition-all duration-200">
               Apply now
               <span className="ti ti-arrow-right text-[16px]" />
             </Link>
             <Link href="/login"
-              className="flex items-center gap-2 rounded-xl border border-white/10 px-10 py-4 text-[15px] font-semibold text-white/55 hover:border-white/20 hover:text-white transition-all duration-200">
+              className="btn-hover flex items-center gap-2 rounded-xl border border-white/10 px-10 py-4 text-[15px] font-semibold text-white/55 hover:border-white/20 hover:text-white transition-all duration-200">
               Student login
             </Link>
           </div>

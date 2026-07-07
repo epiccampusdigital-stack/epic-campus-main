@@ -113,15 +113,15 @@ export default function TeacherDashboardPage() {
         </p>
         <div className="mt-4 grid grid-cols-3 gap-3">
           <div className="rounded-xl bg-white/10 p-3 text-center">
-            <p className="text-2xl font-bold">{todaySessions.length}</p>
+            <p className="text-2xl font-black text-[#E8A020]">{todaySessions.length}</p>
             <p className="text-xs text-white/60">Today&apos;s Sessions</p>
           </div>
           <div className="rounded-xl bg-white/10 p-3 text-center">
-            <p className="text-2xl font-bold">{studentCount}</p>
+            <p className="text-2xl font-black text-[#E8A020]">{studentCount}</p>
             <p className="text-xs text-white/60">Total Students</p>
           </div>
           <div className="rounded-xl bg-white/10 p-3 text-center">
-            <p className="text-2xl font-bold">{recentAttempts.length}</p>
+            <p className="text-2xl font-black text-[#E8A020]">{recentAttempts.length}</p>
             <p className="text-xs text-white/60">Recent Exams</p>
           </div>
         </div>
@@ -208,7 +208,7 @@ export default function TeacherDashboardPage() {
                   <p className="text-sm font-semibold text-[#0D1B2A] dark:text-white truncate">{a.studentName}</p>
                   <p className="text-xs text-[#5A6A7A] dark:text-white/40 truncate">{a.paperTitle}</p>
                 </div>
-                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold border ${a.percentage >= 80 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold border ${a.percentage >= 80 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'}`}>
                   {a.percentage >= 80 ? 'Passed' : 'Failed'}
                 </span>
               </div>
@@ -226,8 +226,8 @@ export default function TeacherDashboardPage() {
           { label: 'Exam Manager', href: '/admin-exams', icon: 'ti-writing' },
         ].map(link => (
           <Link key={link.href} href={link.href}
-            className="flex flex-col items-center gap-2 rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-4 text-center hover:border-[#E8A020] transition-all">
-            <span className={`ti ${link.icon} text-2xl text-[#0B3D6B] dark:text-blue-300`} />
+            className="card-hover flex flex-col items-center gap-2 rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-6 text-center hover:border-[#E8A020]">
+            <span className={`ti ${link.icon} text-2xl text-[#0B3D6B] dark:text-[#E8A020]`} />
             <span className="text-xs font-semibold text-[#5A6A7A] dark:text-white/60">{link.label}</span>
           </Link>
         ))}

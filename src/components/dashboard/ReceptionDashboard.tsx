@@ -9,7 +9,7 @@ import { useManagement } from '@/components/layout/ManagementContext'
 
 function StatSkeleton() {
   return (
-    <div className="animate-pulse rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
+    <div className="animate-pulse stat-card-glass card-hover p-6">
       <div className="mb-3 h-3 w-24 rounded bg-[#DDE3EC]" />
       <div className="h-8 w-16 rounded bg-[#DDE3EC]" />
     </div>
@@ -100,7 +100,7 @@ export default function ReceptionDashboard() {
           Array.from({ length: 4 }).map((_, i) => <StatSkeleton key={i} />)
         ) : (
           <>
-            <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
+            <div className="stat-card-glass card-hover p-6">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Pending Enrollments</p>
                 <span className="ti ti-clipboard-list text-base text-[#0B3D6B] dark:text-[#E8A020]" aria-hidden="true" />
@@ -110,7 +110,7 @@ export default function ReceptionDashboard() {
               </p>
             </div>
 
-            <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
+            <div className="stat-card-glass card-hover p-6">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">New Students This Month</p>
                 <span className="ti ti-user-plus text-base text-[#0B3D6B] dark:text-[#E8A020]" aria-hidden="true" />
@@ -118,7 +118,7 @@ export default function ReceptionDashboard() {
               <p className="mt-2 text-2xl font-bold text-[#0B3D6B] dark:text-[#E8A020]">{newStudentsCount}</p>
             </div>
 
-            <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
+            <div className="stat-card-glass card-hover p-6">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Unread Messages</p>
                 <span className="ti ti-message text-base text-[#0B3D6B] dark:text-[#E8A020]" aria-hidden="true" />
@@ -128,7 +128,7 @@ export default function ReceptionDashboard() {
               </p>
             </div>
 
-            <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
+            <div className="stat-card-glass card-hover p-6">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Today's Consultations</p>
                 <span className="ti ti-calendar-event text-base text-[#0B3D6B] dark:text-[#E8A020]" aria-hidden="true" />

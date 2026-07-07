@@ -10,13 +10,13 @@ export const metadata = {
 
 export default function EnrollPage() {
   return (
-    <div className="min-h-screen bg-[#F5F7FB] dark:bg-[#04090f]">
+    <div className="min-h-screen bg-[#F5F7FB] dark:bg-[#130F2A]">
       <PublicNav />
       <main className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-5">
           {/* Trust panel */}
           <div className="lg:col-span-2">
-            <Link href="/" className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-[#5A6A7A] hover:text-[#0B3D6B] transition-colors">
+            <Link href="/" className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-[#5A6A7A] dark:text-white/50 hover:text-[#0B3D6B] dark:hover:text-white transition-colors">
               <span className="ti ti-arrow-left" /> Back to home
             </Link>
             <div className="rounded-2xl bg-[#0B3D6B] p-7 text-white sticky top-24">
@@ -54,7 +54,7 @@ export default function EnrollPage() {
           <div className="lg:col-span-3">
             <div className="rounded-2xl border border-[#DDE3EC] bg-white p-8 dark:border-white/[0.08] dark:bg-white/[0.04]">
               <h1 className="font-jakarta text-[28px] font-black text-[#0B3D6B] dark:text-white mb-1">Enroll at EPIC Campus</h1>
-              <p className="text-[14px] text-[#5A6A7A] mb-8">Start your journey to Japan, Korea, China or global career success.</p>
+              <p className="text-[14px] text-[#5A6A7A] dark:text-white/50 mb-8">Start your journey to Japan, Korea, China or global career success.</p>
               <EnrollmentForm />
             </div>
           </div>

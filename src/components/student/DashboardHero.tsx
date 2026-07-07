@@ -96,7 +96,7 @@ export default function DashboardHero({
   return (
     <div
       style={{ background: '#0B3D6B' }}
-      className="rounded-2xl p-5 sm:p-6 
+      className="rounded-2xl border-t-2 border-[#E8A020] p-5 sm:p-6
         text-white overflow-hidden relative"
     >
       <div style={{
@@ -119,20 +119,20 @@ export default function DashboardHero({
             font-medium mb-0.5">
             Welcome back
           </p>
-          <h1 className="font-jakarta text-2xl 
-            font-bold text-white leading-tight">
+          <h1 className="font-jakarta text-2xl
+            font-black text-white leading-tight">
             {firstName}!
           </h1>
-          <div className="mt-2 inline-flex 
-            items-center gap-1.5 rounded-full 
-            bg-white/10 px-3 py-1">
+          <div className="mt-2 inline-flex
+            items-center gap-1.5 rounded-full
+            bg-[#E8A020] px-3 py-1">
             {courseFlag && (
               <span className="text-sm">
                 {courseFlag}
               </span>
             )}
-            <span className="text-xs font-semibold 
-              text-[#E8A020]">
+            <span className="text-xs font-bold
+              text-[#0B3D6B]">
               {courseLabel}
             </span>
           </div>
@@ -154,7 +154,7 @@ export default function DashboardHero({
         <div className="rounded-xl bg-gradient-to-br from-emerald-500/25 to-teal-500/10
           px-3 py-2.5 text-center">
           <p className="font-jakarta text-xl
-            font-bold text-white">
+            font-black text-[#E8A020]">
             {attendance.length}
           </p>
           <p className="text-[10px] text-white/50
@@ -165,7 +165,7 @@ export default function DashboardHero({
         <div className="rounded-xl bg-gradient-to-br from-[#0B3D6B]/40 to-[#1A6BAD]/25
           px-3 py-2.5 text-center">
           <p className="font-jakarta text-xl
-            font-bold text-white">
+            font-black text-[#E8A020]">
             {examCount}
           </p>
           <p className="text-[10px] text-white/50

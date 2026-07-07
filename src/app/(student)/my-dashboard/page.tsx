@@ -284,7 +284,7 @@ export default function MyDashboardPage() {
       />
 
       {startMs && (
-        <div className="rounded-2xl bg-gradient-to-r from-[#0B3D6B] to-[#1A6BAD] p-5 text-white">
+        <div className="rounded-2xl border-t-2 border-[#E8A020] bg-gradient-to-r from-[#0B3D6B] to-[#1A6BAD] p-5 text-white">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <p className="text-xs text-white/60 font-bold uppercase tracking-wider">Course Progress</p>
@@ -306,7 +306,7 @@ export default function MyDashboardPage() {
 
       <QuickActions />
       {milestones.length > 0 && (
-        <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+        <div className="glass-card card-hover p-5">
           <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white mb-4">
             Course Progress
           </h3>
@@ -356,7 +356,7 @@ export default function MyDashboardPage() {
         payments={payments}
       />
       {houseInfo && (
-        <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+        <div className="glass-card card-hover p-5">
           <div className="flex items-center gap-2 mb-3">
             <span className="ti ti-home text-lg text-[#0B3D6B] dark:text-[#E8A020]" aria-hidden="true" />
             <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">

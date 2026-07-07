@@ -153,7 +153,8 @@ export default function ExamPage() {
       setPaper(p)
       setTimeLeft(p.timeLimitSeconds ?? 3600)
 
-      if (p.isUnlocked !== true) {
+      // Only block papers explicitly locked. Legacy papers without the field are open.
+      if (p.isUnlocked === false) {
         setPhase('locked')
         return
       }

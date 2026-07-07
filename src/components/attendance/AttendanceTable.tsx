@@ -47,12 +47,12 @@ export default function AttendanceTable({
   if (records.length === 0) {
     if (onMark) return <AttendanceTableEmpty onMark={onMark} />
     return (
-      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#DDE3EC] bg-white px-6 py-16 text-center dark:border-gray-600 dark:bg-gray-800">
+      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#DDE3EC] bg-white px-6 py-16 text-center dark:border-white/10 dark:bg-white/[0.04]">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#0B3D6B]/10">
           <span className="ti ti-calendar-check text-3xl text-[#0B3D6B]" aria-hidden="true" />
         </div>
         <h3 className="font-jakarta text-lg font-bold text-[#0D1B2A] dark:text-white">No attendance yet</h3>
-        <p className="mt-2 max-w-sm font-inter text-sm text-[#5A6A7A]">
+        <p className="mt-2 max-w-sm font-inter text-sm text-[#5A6A7A] dark:text-white/50">
           Mark attendance for a course batch to track present, absent, and late students.
         </p>
       </div>
@@ -60,11 +60,11 @@ export default function AttendanceTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:border-gray-700 dark:bg-gray-800">
+    <div className="overflow-hidden rounded-xl border border-gray-100 bg-white dark:border-white/[0.05] dark:bg-white/[0.04]">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[960px] text-left text-sm">
           <thead>
-            <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:border-gray-700 dark:bg-gray-900">
+            <tr className="border-b border-gray-100 bg-gray-50 dark:border-white/[0.05] dark:bg-white/[0.03]">
               {[
                 { h: 'Student Name', hide: '' },
                 { h: 'Course', hide: 'hidden sm:table-cell' },
@@ -76,26 +76,26 @@ export default function AttendanceTable({
               ].map(({ h, hide }) => (
                 <th
                   key={h}
-                  className={`px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] ${hide}`}
+                  className={`px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-white/40 ${hide}`}
                 >
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#DDE3EC]">
+          <tbody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
             {records.map((r) => (
-              <tr key={r.id} className="transition-colors hover:bg-[#F5F7FB]/60">
+              <tr key={r.id} className="bg-white dark:bg-transparent transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.03]">
                 <td className="px-4 py-3">
-                  <p className="font-medium text-[#0D1B2A]">{r.studentName}</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{r.studentName}</p>
                   {r.studentCode && (
-                    <p className="text-xs text-[#5A6A7A]">{r.studentCode}</p>
+                    <p className="text-xs text-gray-500 dark:text-white/40">{r.studentCode}</p>
                   )}
                 </td>
-                <td className="hidden max-w-[160px] truncate px-4 py-3 text-[#5A6A7A] sm:table-cell dark:text-gray-400">
+                <td className="hidden max-w-[160px] truncate px-4 py-3 text-gray-500 dark:text-white/40 sm:table-cell">
                   {r.courseName || '—'}
                 </td>
-                <td className="hidden px-4 py-3 text-[#5A6A7A] md:table-cell dark:text-gray-400">{r.batchName || '—'}</td>
+                <td className="hidden px-4 py-3 text-gray-500 dark:text-white/40 md:table-cell">{r.batchName || '—'}</td>
                 <td className="px-4 py-3">
                   <span
                     className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${getStatusColor(r.status)}`}
@@ -103,10 +103,10 @@ export default function AttendanceTable({
                     {getStatusLabel(r.status)}
                   </span>
                 </td>
-                <td className="hidden px-4 py-3 text-[#5A6A7A] sm:table-cell dark:text-gray-400">
+                <td className="hidden px-4 py-3 text-gray-500 dark:text-white/40 sm:table-cell">
                   {formatSessionTime(r.sessionStart, r.sessionEnd)}
                 </td>
-                <td className="hidden max-w-[180px] truncate px-4 py-3 text-[#5A6A7A] sm:table-cell dark:text-gray-400">
+                <td className="hidden max-w-[180px] truncate px-4 py-3 text-gray-500 dark:text-white/40 sm:table-cell">
                   {r.notes || '—'}
                 </td>
                 <td className="px-4 py-3">

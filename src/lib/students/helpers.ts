@@ -187,6 +187,8 @@ export function parseStudent(id: string, data: Record<string, unknown>): Student
     feeCurrency: (data.feeCurrency as Student['feeCurrency']) ?? 'LKR',
     registrationFee: Number(data.registrationFee ?? data.feeAmount ?? 0),
     paymentStatus: (data.paymentStatus as Student['paymentStatus']) ?? 'pending',
+    paidAmount: data.paidAmount != null ? Number(data.paidAmount) : undefined,
+    pendingAmount: data.pendingAmount != null ? Number(data.pendingAmount) : undefined,
     status: (data.status as Student['status']) ?? 'pending',
     visaStatus: (data.visaStatus as Student['visaStatus']) ?? 'not-started',
     notes: data.notes ? String(data.notes) : undefined,

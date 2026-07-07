@@ -39,10 +39,8 @@ export default function PublicNav() {
 
   return (
     <header
-      className={`sticky top-0 z-50 h-[58px] border-b transition-all duration-300 bg-white dark:bg-[#080d18]/85 backdrop-blur-xl ${
-        scrolled
-          ? 'border-gray-100 dark:border-white/[0.06] shadow-sm'
-          : 'border-gray-100 dark:border-white/[0.04]'
+      className={`sticky top-0 z-50 h-[58px] border-b transition-all duration-300 bg-white/[0.92] dark:bg-[#0D0B1E]/[0.85] backdrop-blur-xl border-[rgba(11,61,107,0.08)] dark:border-[rgba(255,255,255,0.06)] ${
+        scrolled ? 'shadow-sm' : ''
       }`}
     >
       <div className="mx-auto flex h-full max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -61,7 +59,9 @@ export default function PublicNav() {
               key={link.href}
               href={link.href}
               className={`text-[13px] font-medium transition-colors hover:text-[#0B3D6B] dark:hover:text-white ${
-                pathname === link.href ? 'text-[#0B3D6B] dark:text-white' : 'text-gray-600 dark:text-white/60'
+                pathname === link.href
+                  ? 'text-[#0B3D6B] dark:text-white dark:border-b-2 dark:border-[#E8A020] pb-1'
+                  : 'text-gray-600 dark:text-white/60'
               }`}
             >
               {link.label}
@@ -115,7 +115,9 @@ export default function PublicNav() {
               key={link.href}
               href={link.href}
               className={`text-[13px] font-medium transition-colors hover:text-[#0B3D6B] dark:hover:text-white ${
-                pathname === link.href ? 'text-[#0B3D6B] dark:text-white' : 'text-gray-600 dark:text-white/60'
+                pathname === link.href
+                  ? 'text-[#0B3D6B] dark:text-white dark:border-b-2 dark:border-[#E8A020] pb-1'
+                  : 'text-gray-600 dark:text-white/60'
               }`}
             >
               {link.label}
@@ -128,13 +130,13 @@ export default function PublicNav() {
           <DarkModeToggle />
           <Link
             href="/enroll"
-            className="inline-flex items-center rounded-full border-[1.5px] border-[#E8A020] px-4 py-1.5 text-[12px] font-medium text-[#E8A020] transition-all hover:bg-[#E8A020] hover:text-white"
+            className="btn-hover inline-flex items-center rounded-full border-[1.5px] border-[#E8A020] px-4 py-1.5 text-[12px] font-medium text-[#E8A020] transition-all hover:bg-[#E8A020] hover:text-white dark:border-0 dark:bg-[#E8A020] dark:text-[#0B3D6B] dark:hover:text-[#0B3D6B] dark:hover:brightness-110"
           >
             Enroll Now
           </Link>
           <Link
             href="/login"
-            className="inline-flex items-center rounded-full bg-[#0B3D6B] px-4 py-1.5 text-[12px] font-medium text-white transition-all hover:bg-[#0a3460]"
+            className="btn-hover inline-flex items-center rounded-full bg-[#0B3D6B] px-4 py-1.5 text-[12px] font-medium text-white transition-all hover:bg-[#0a3460] dark:bg-white/[0.08] dark:border dark:border-white/10 dark:hover:bg-white/[0.12]"
           >
             Login to Portal
           </Link>
@@ -153,7 +155,7 @@ export default function PublicNav() {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="border-t border-[#0B3D6B]/[0.07] dark:border-white/[0.05] bg-white/95 dark:bg-[#080d18]/95 backdrop-blur-xl px-4 py-5 lg:hidden">
+        <div className="border-t border-[#0B3D6B]/[0.07] dark:border-white/[0.05] bg-white/95 dark:bg-[#0D0B1E]/95 backdrop-blur-xl px-4 py-5 lg:hidden">
           <div className="mb-4 flex items-center justify-between rounded-xl bg-[#F5F7FB] dark:bg-white/[0.04] px-4 py-3">
             <span className="text-[13px] font-medium text-gray-700 dark:text-white/60">Theme</span>
             <DarkModeToggle />
@@ -194,13 +196,13 @@ export default function PublicNav() {
             )}
             <Link
               href="/enroll"
-              className="mt-4 block rounded-full border-[1.5px] border-[#E8A020] px-6 py-3.5 text-center text-[13px] font-medium text-[#E8A020]"
+              className="btn-hover mt-4 block rounded-full border-[1.5px] border-[#E8A020] px-6 py-3.5 text-center text-[13px] font-medium text-[#E8A020] dark:border-0 dark:bg-[#E8A020] dark:text-[#0B3D6B] dark:hover:brightness-110"
             >
               Enroll Now
             </Link>
             <Link
               href="/login"
-              className="mt-2 block rounded-full bg-[#0B3D6B] px-6 py-3.5 text-center text-[13px] font-semibold text-white"
+              className="btn-hover mt-2 block rounded-full bg-[#0B3D6B] px-6 py-3.5 text-center text-[13px] font-semibold text-white dark:bg-white/[0.08] dark:border dark:border-white/10 dark:hover:bg-white/[0.12]"
             >
               Login to Portal
             </Link>

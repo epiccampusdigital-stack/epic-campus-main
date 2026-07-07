@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { addDoc, collection } from 'firebase/firestore'
-import { db } from '@/lib/firebase/client'
+import { auth, db } from '@/lib/firebase/client'
 import { useManagement } from '@/components/layout/ManagementContext'
 
 // ── Collection targets ────────────────────────────────────────────────────────
@@ -279,10 +279,52 @@ async function parseWithAI(
   }
 }
 
+// ── File upload types ─────────────────────────────────────────────────────────
+interface Detection {
+  fileName: string
+  type: string
+  confidence: number
+  suggestedCollection: string
+  detectedFields: string[]
+  recordCount: number
+  error?: string
+}
+interface FileResult {
+  success: boolean
+  fileName: string
+  detectedType: string
+  confidence: number
+  totalRows: number
+  imported: number
+  failed: number
+  skipped: number
+  errors: { row: number; reason: string }[]
+  collection: string
+}
+const ACCEPTED = '.csv,.xlsx,.xls,.pdf,.json,.txt'
+const TYPE_LABELS: Record<string, string> = {
+  students: 'Student Data',
+  exam_results: 'Exam Results',
+  payments: 'Payments',
+  sessions: 'Class Sessions',
+  attendance: 'Attendance',
+  inventory: 'Inventory',
+  unknown: 'Unrecognised',
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function UniversalImportPage() {
   const { user } = useManagement()
   const [targetId, setTargetId] = useState<TargetId>('utilityBills')
+
+  // File-upload flow state
+  const [files, setFiles] = useState<File[]>([])
+  const [dragOver, setDragOver] = useState(false)
+  const [detecting, setDetecting] = useState(false)
+  const [detections, setDetections] = useState<Detection[] | null>(null)
+  const [importingName, setImportingName] = useState<string | null>(null)
+  const [fileResults, setFileResults] = useState<Record<string, FileResult>>({})
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [rawText, setRawText] = useState('')
   const [aiParsed, setAiParsed] = useState<Record<string, unknown>[]>([])
   const [parsing, setParsing] = useState(false)
@@ -297,6 +339,87 @@ export default function UniversalImportPage() {
   function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(''), 4000)
+  }
+
+  // ── File upload flow ───────────────────────────────────────────────────────
+  function addFiles(list: FileList | null) {
+    if (!list) return
+    const incoming = Array.from(list)
+    setFiles(prev => {
+      const merged = [...prev]
+      for (const f of incoming) {
+        if (!merged.some(m => m.name === f.name && m.size === f.size)) merged.push(f)
+      }
+      return merged.slice(0, 5)
+    })
+    setDetections(null)
+    setFileResults({})
+  }
+
+  function removeFile(name: string) {
+    setFiles(prev => prev.filter(f => f.name !== name))
+    setDetections(null)
+    setFileResults({})
+  }
+
+  async function analyzeFiles() {
+    if (files.length === 0) return
+    setDetecting(true)
+    setDetections(null)
+    setFileResults({})
+    try {
+      const token = await auth.currentUser?.getIdToken()
+      const fd = new FormData()
+      fd.append('mode', 'detect')
+      files.forEach(f => fd.append('files', f))
+      const res = await fetch('/api/import-ai', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      })
+      const data = await res.json() as { detections?: Detection[]; error?: string }
+      if (!res.ok) {
+        showToast(data.error ?? 'Analysis failed')
+        return
+      }
+      setDetections(data.detections ?? [])
+    } catch (err) {
+      console.error('[analyzeFiles]', err)
+      showToast('Analysis failed — check your connection')
+    } finally {
+      setDetecting(false)
+    }
+  }
+
+  async function importFile(det: Detection) {
+    const file = files.find(f => f.name === det.fileName)
+    if (!file) return
+    setImportingName(det.fileName)
+    try {
+      const token = await auth.currentUser?.getIdToken()
+      const fd = new FormData()
+      fd.append('mode', 'import')
+      fd.append('files', file)
+      fd.append('type', det.type)
+      fd.append('confidence', String(det.confidence))
+      const res = await fetch('/api/import-ai', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      })
+      const data = await res.json() as FileResult & { error?: string }
+      if (!res.ok && !data.fileName) {
+        showToast(data.error ?? 'Import failed')
+        return
+      }
+      setFileResults(prev => ({ ...prev, [det.fileName]: data }))
+      showToast(data.success ? `${data.imported} imported from ${det.fileName}` : `${data.imported} imported, ${data.failed} failed`)
+    } catch (err) {
+      console.error('[importFile]', err)
+      showToast('Import failed — check your connection')
+    } finally {
+      setImportingName(null)
+    }
   }
 
   // ── Step 1: AI Parse ───────────────────────────────────────────────────────
@@ -393,8 +516,156 @@ export default function UniversalImportPage() {
           AI Data Importer
         </h1>
         <p className="text-sm text-[#5A6A7A] dark:text-white/50">
-          Paste any data — Excel, PDF, raw text — and AI will extract and import it accurately
+          Upload files or paste any data — AI detects the type and imports it accurately
         </p>
+      </div>
+
+      {/* ── FILE UPLOAD ──────────────────────────────────────────────────────── */}
+      <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#E8A020] text-[10px] font-bold text-white">
+            <span className="ti ti-upload" />
+          </div>
+          <h2 className="font-jakarta font-bold text-[#0D1B2A] dark:text-white">Upload Files</h2>
+        </div>
+
+        {/* Drop zone */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click() }}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files) }}
+          className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-all ${
+            dragOver
+              ? 'border-[#E8A020] bg-[#E8A020]/10'
+              : 'border-[#E8A020]/40 bg-[#E8A020]/[0.03] hover:border-[#E8A020] hover:bg-[#E8A020]/[0.06]'
+          }`}
+        >
+          <span className="ti ti-cloud-upload text-4xl text-[#E8A020]" />
+          <p className="text-sm font-bold text-[#0D1B2A] dark:text-white">Drag files here or click to browse</p>
+          <p className="text-xs text-[#5A6A7A] dark:text-white/50">CSV, Excel (.xlsx), JSON, PDF · up to 5 files, 10MB each</p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED}
+            multiple
+            className="hidden"
+            onChange={(e) => { addFiles(e.target.files); e.target.value = '' }}
+          />
+        </div>
+
+        {/* Selected file chips */}
+        {files.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {files.map((f) => (
+              <span key={f.name} className="flex items-center gap-2 rounded-xl border border-[#DDE3EC] dark:border-white/[0.1] bg-[#F5F7FB] dark:bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-[#0D1B2A] dark:text-white">
+                <span className="ti ti-file-text text-[#0B3D6B] dark:text-[#E8A020]" />
+                <span className="max-w-[180px] truncate">{f.name}</span>
+                <span className="text-[10px] text-[#5A6A7A] dark:text-white/40">{(f.size / 1024).toFixed(0)} KB</span>
+                <button type="button" onClick={() => removeFile(f.name)} className="text-[#5A6A7A] hover:text-red-500">
+                  <span className="ti ti-x text-xs" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Analyze button */}
+        {files.length > 0 && (
+          <button
+            type="button"
+            onClick={() => void analyzeFiles()}
+            disabled={detecting}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#E8A020] py-3.5 text-sm font-bold text-[#0B3D6B] disabled:opacity-40 hover:bg-[#F5B942] transition-all sm:w-auto sm:px-8"
+          >
+            {detecting ? (
+              <><span className="ti ti-loader animate-spin" /> AI is analysing your files…</>
+            ) : (
+              <><span className="ti ti-sparkles" /> Analyse {files.length} File{files.length > 1 ? 's' : ''}</>
+            )}
+          </button>
+        )}
+
+        {/* Detection results + per-file import */}
+        {detections && detections.length > 0 && (
+          <div className="space-y-3 pt-1">
+            {detections.map((det) => {
+              const result = fileResults[det.fileName]
+              const unknown = det.type === 'unknown' || !!det.error
+              return (
+                <div key={det.fileName} className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-[#F5F7FB]/60 dark:bg-white/[0.02] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 text-sm font-semibold text-[#0D1B2A] dark:text-white">
+                        <span className="ti ti-file-text text-[#0B3D6B] dark:text-[#E8A020]" />
+                        <span className="truncate">{det.fileName}</span>
+                        <span className="ti ti-arrow-right text-[#5A6A7A]" />
+                        <span className={unknown ? 'text-red-500' : 'text-[#0B3D6B] dark:text-[#E8A020]'}>
+                          {TYPE_LABELS[det.type] ?? det.type}
+                        </span>
+                      </p>
+                      {det.error ? (
+                        <p className="mt-1 text-xs text-red-500">{det.error}</p>
+                      ) : (
+                        <p className="mt-1 text-xs text-[#5A6A7A] dark:text-white/50">
+                          {det.suggestedCollection && <>→ <span className="font-mono">{det.suggestedCollection}</span> · </>}
+                          {det.recordCount > 0 && <>~{det.recordCount} records · </>}
+                          confidence {det.confidence}%
+                        </p>
+                      )}
+                    </div>
+                    {!unknown && !result && (
+                      <button
+                        type="button"
+                        onClick={() => void importFile(det)}
+                        disabled={importingName === det.fileName}
+                        className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-40 hover:bg-emerald-700"
+                      >
+                        {importingName === det.fileName
+                          ? <><span className="ti ti-loader animate-spin" /> Importing…</>
+                          : <><span className="ti ti-cloud-upload" /> Confirm &amp; Import</>}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Per-file result */}
+                  {result && (
+                    <div className={`mt-3 rounded-lg px-3 py-2 text-xs ${
+                      result.failed === 0
+                        ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
+                    }`}>
+                      <p className="font-bold">
+                        {result.imported} imported
+                        {result.skipped > 0 && ` · ${result.skipped} skipped (already exist)`}
+                        {result.failed > 0 && ` · ${result.failed} failed`}
+                        {` · into ${result.collection}`}
+                      </p>
+                      {result.errors.length > 0 && (
+                        <ul className="mt-1.5 space-y-0.5">
+                          {result.errors.slice(0, 8).map((e, i) => (
+                            <li key={i} className="font-mono text-[11px] text-red-600 dark:text-red-400">Row {e.row}: {e.reason}</li>
+                          ))}
+                          {result.errors.length > 8 && <li className="text-[11px]">…and {result.errors.length - 8} more</li>}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Divider between file upload and paste flow */}
+      <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-widest text-[#5A6A7A] dark:text-white/40">
+        <div className="h-px flex-1 bg-[#DDE3EC] dark:bg-white/[0.08]" />
+        or paste raw data
+        <div className="h-px flex-1 bg-[#DDE3EC] dark:bg-white/[0.08]" />
       </div>
 
       {/* Target selector */}

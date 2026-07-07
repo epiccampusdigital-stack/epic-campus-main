@@ -9,6 +9,7 @@ import {
   getDoc,
   getDocs,
   serverTimestamp,
+  setDoc,
   updateDoc,
   deleteDoc,
 } from 'firebase/firestore'
@@ -64,6 +65,42 @@ interface HouseInventoryItem {
   lastUpdated?: string
 }
 
+// Detailed monthly bill — stored per house at accommodations/{houseId}/bills/{YYYY-MM}.
+interface HouseBill {
+  id: string // doc id === month, e.g. "2026-07"
+  month: string
+  electricity: number
+  water: number
+  internet: number
+  gas: number
+  maintenance: number
+  other: number
+  otherDescription?: string
+  totalAmount: number
+  paid: boolean
+  paidDate?: unknown
+}
+
+/** Last `count` months (current first) as { value: "YYYY-MM", label: "July 2026" }. */
+function monthOptions(count: number): { value: string; label: string }[] {
+  const out: { value: string; label: string }[] = []
+  const base = new Date()
+  for (let i = 0; i < count; i++) {
+    const dt = new Date(base.getFullYear(), base.getMonth() - i, 1)
+    out.push({
+      value: `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`,
+      label: dt.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+    })
+  }
+  return out
+}
+
+const MONTH_OPTIONS = monthOptions(12)
+
+function emptyMbForm() {
+  return { electricity: '', water: '', internet: '', gas: '', maintenance: '', other: '', otherDescription: '', paid: false }
+}
+
 const COURSE_LABELS: Record<string, string> = {
   'japan-ssw': '🇯🇵 Japan SSW',
   'korea-d2d4': '🇰🇷 Korea',
@@ -97,7 +134,7 @@ function formatLKR(n: number) {
   return `LKR ${(n ?? 0).toLocaleString('en-LK')}`
 }
 
-type Tab = 'overview' | 'bills' | 'inventory'
+type Tab = 'overview' | 'monthly-bills' | 'bills' | 'inventory'
 
 export default function HouseDetailPage() {
   const { houseId } = useParams<{ houseId: string }>()
@@ -110,6 +147,12 @@ export default function HouseDetailPage() {
   const [bills, setBills] = useState<UtilityBill[]>([])
   const [inventory, setInventory] = useState<HouseInventoryItem[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Detailed monthly bills (new subcollection model)
+  const [monthlyBills, setMonthlyBills] = useState<HouseBill[]>([])
+  const [selectedMonth, setSelectedMonth] = useState<string>(MONTH_OPTIONS[0].value)
+  const [mbForm, setMbForm] = useState(emptyMbForm())
+  const [savingMB, setSavingMB] = useState(false)
 
   // Bill form
   const [billFormOpen, setBillFormOpen] = useState(false)
@@ -125,6 +168,8 @@ export default function HouseDetailPage() {
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
   const canEdit = (['admin', 'owner', 'accountant', 'reception'] as Role[]).some((r) => hasRole(r))
+  // Bills subcollection allows writes for admin/owner/accountant only (reception is read-only).
+  const canWriteBills = (['admin', 'owner', 'accountant'] as Role[]).some((r) => hasRole(r))
 
   const load = useCallback(async () => {
     if (!houseId) return
@@ -157,6 +202,14 @@ export default function HouseDetailPage() {
         const invSnap = await getDocs(collection(db, 'accommodations', houseId, 'inventory'))
           .catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] }))
         setInventory(invSnap.docs.map(d => ({ id: d.id, ...d.data() } as HouseInventoryItem)))
+
+        const mbSnap = await getDocs(collection(db, 'accommodations', houseId, 'bills'))
+          .catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] }))
+        setMonthlyBills(
+          mbSnap.docs
+            .map(d => ({ id: d.id, ...d.data() } as HouseBill))
+            .sort((a, b) => b.month.localeCompare(a.month))
+        )
       }
     } catch (err) {
       console.error('[HouseDetail]', err)
@@ -166,6 +219,86 @@ export default function HouseDetailPage() {
   }, [houseId])
 
   useEffect(() => { void load() }, [load])
+
+  // Load the selected month's saved bill into the form (or clear it for a fresh entry).
+  useEffect(() => {
+    const b = monthlyBills.find(x => x.id === selectedMonth)
+    if (b) {
+      setMbForm({
+        electricity: String(b.electricity ?? ''),
+        water: String(b.water ?? ''),
+        internet: String(b.internet ?? ''),
+        gas: String(b.gas ?? ''),
+        maintenance: String(b.maintenance ?? ''),
+        other: String(b.other ?? ''),
+        otherDescription: b.otherDescription ?? '',
+        paid: !!b.paid,
+      })
+    } else {
+      setMbForm(emptyMbForm())
+    }
+  }, [selectedMonth, monthlyBills])
+
+  const mbTotal =
+    (parseFloat(mbForm.electricity || '0') || 0) +
+    (parseFloat(mbForm.water || '0') || 0) +
+    (parseFloat(mbForm.internet || '0') || 0) +
+    (parseFloat(mbForm.gas || '0') || 0) +
+    (parseFloat(mbForm.maintenance || '0') || 0) +
+    (parseFloat(mbForm.other || '0') || 0)
+
+  async function saveMonthlyBill() {
+    if (!houseId || !canWriteBills) return
+    setSavingMB(true)
+    try {
+      const nums = {
+        electricity: parseFloat(mbForm.electricity || '0') || 0,
+        water: parseFloat(mbForm.water || '0') || 0,
+        internet: parseFloat(mbForm.internet || '0') || 0,
+        gas: parseFloat(mbForm.gas || '0') || 0,
+        maintenance: parseFloat(mbForm.maintenance || '0') || 0,
+        other: parseFloat(mbForm.other || '0') || 0,
+      }
+      const totalAmount = nums.electricity + nums.water + nums.internet + nums.gas + nums.maintenance + nums.other
+      const existing = monthlyBills.find(b => b.id === selectedMonth)
+      await setDoc(
+        doc(db, 'accommodations', houseId, 'bills', selectedMonth),
+        {
+          month: selectedMonth,
+          ...nums,
+          otherDescription: mbForm.otherDescription.trim(),
+          totalAmount,
+          paid: mbForm.paid,
+          paidDate: mbForm.paid ? serverTimestamp() : null,
+          updatedAt: serverTimestamp(),
+          ...(existing ? {} : { createdAt: serverTimestamp() }),
+        },
+        { merge: true },
+      )
+      showToast('Bill saved')
+      void load()
+    } catch (err) {
+      console.error('[SaveMonthlyBill]', err)
+      showToast('Failed to save bill')
+    } finally {
+      setSavingMB(false)
+    }
+  }
+
+  async function toggleMonthlyBillPaid(bill: HouseBill) {
+    if (!houseId || !canWriteBills) return
+    const nowPaid = !bill.paid
+    try {
+      await updateDoc(doc(db, 'accommodations', houseId, 'bills', bill.id), {
+        paid: nowPaid,
+        paidDate: nowPaid ? serverTimestamp() : null,
+        updatedAt: serverTimestamp(),
+      })
+      setMonthlyBills(prev => prev.map(b => b.id === bill.id ? { ...b, paid: nowPaid } : b))
+    } catch (err) {
+      console.error('[ToggleMonthlyBillPaid]', err)
+    }
+  }
 
   async function saveBill() {
     if (!house || !houseId) return
@@ -332,11 +465,11 @@ export default function HouseDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2">
-        {(['overview', 'bills', 'inventory'] as Tab[]).map(t => (
+      <div className="flex flex-wrap gap-2">
+        {(['overview', 'monthly-bills', 'bills', 'inventory'] as Tab[]).map(t => (
           <button key={t} type="button" onClick={() => setTab(t)}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold capitalize transition-all ${tab === t ? 'bg-[#E8A020] text-white' : 'border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/60'}`}>
-            {t === 'bills' ? '💡 Bills' : t === 'inventory' ? '📦 Inventory' : '👥 Overview'}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all ${tab === t ? 'bg-[#E8A020] text-white' : 'border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/60'}`}>
+            {t === 'monthly-bills' ? '🧾 Monthly Bills' : t === 'bills' ? '💡 Utility Bills' : t === 'inventory' ? '📦 Inventory' : '👥 Overview'}
           </button>
         ))}
       </div>
@@ -370,6 +503,143 @@ export default function HouseDetailPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── MONTHLY BILLS TAB (detailed, per-month subcollection) ── */}
+      {tab === 'monthly-bills' && (
+        <div className="space-y-4">
+          {/* Entry form */}
+          <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h2 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">Monthly Bills</h2>
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-[#5A6A7A] dark:text-white/50">Month</label>
+                <select
+                  value={selectedMonth}
+                  onChange={e => setSelectedMonth(e.target.value)}
+                  className="rounded-xl border border-[#DDE3EC] dark:border-white/20 bg-[#F5F7FB] dark:bg-white/[0.04] px-3 py-2 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020]"
+                >
+                  {MONTH_OPTIONS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {!canWriteBills ? (
+              <p className="text-sm text-[#5A6A7A] dark:text-white/50">You have read-only access to bills.</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {([
+                    { key: 'electricity', label: 'Electricity (CEB)' },
+                    { key: 'water', label: 'Water' },
+                    { key: 'internet', label: 'Internet' },
+                    { key: 'gas', label: 'Gas' },
+                    { key: 'maintenance', label: 'Maintenance' },
+                    { key: 'other', label: 'Other' },
+                  ] as const).map(f => (
+                    <div key={f.key}>
+                      <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">{f.label} (LKR)</label>
+                      <input
+                        type="number"
+                        value={mbForm[f.key]}
+                        onChange={e => setMbForm(p => ({ ...p, [f.key]: e.target.value }))}
+                        placeholder="0"
+                        className={inputClass}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-3">
+                  <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">Other — description (optional)</label>
+                  <input
+                    type="text"
+                    value={mbForm.otherDescription}
+                    onChange={e => setMbForm(p => ({ ...p, otherDescription: e.target.value }))}
+                    placeholder="e.g. Cleaning, repairs…"
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#F5F7FB] dark:bg-white/[0.04] px-4 py-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Total</p>
+                    <p className="font-jakarta text-2xl font-black text-[#E8A020]">{formatLKR(mbTotal)}</p>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm font-semibold text-[#0D1B2A] dark:text-white">
+                    <input type="checkbox" checked={mbForm.paid} onChange={e => setMbForm(p => ({ ...p, paid: e.target.checked }))} className="h-4 w-4 rounded accent-[#E8A020]" />
+                    Mark as paid
+                  </label>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={savingMB}
+                  onClick={() => void saveMonthlyBill()}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#E8A020] py-3 text-sm font-bold text-[#0B3D6B] disabled:opacity-50 sm:w-auto sm:px-8"
+                >
+                  <span className="ti ti-device-floppy" />
+                  {savingMB ? 'Saving…' : monthlyBills.some(b => b.id === selectedMonth) ? 'Update Bill' : 'Save Bill'}
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Bill history */}
+          <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#DDE3EC] dark:border-white/[0.08]">
+              <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">Bill History ({monthlyBills.length})</h3>
+            </div>
+            {monthlyBills.length === 0 ? (
+              <div className="py-10 text-center">
+                <span className="ti ti-receipt-off text-3xl text-[#DDE3EC] dark:text-white/20" />
+                <p className="mt-2 text-sm text-[#5A6A7A] dark:text-white/50">No monthly bills recorded yet</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#DDE3EC] dark:border-white/[0.08] bg-[#F5F7FB] dark:bg-white/[0.02]">
+                      <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-[#5A6A7A] dark:text-white/40">Month</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-[#5A6A7A] dark:text-white/40">Total</th>
+                      <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-[#5A6A7A] dark:text-white/40">Status</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider text-[#5A6A7A] dark:text-white/40">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monthlyBills.map(b => {
+                      const label = MONTH_OPTIONS.find(m => m.value === b.month)?.label ?? b.month
+                      return (
+                        <tr key={b.id} className="border-b border-[#DDE3EC]/50 dark:border-white/[0.04] last:border-0 hover:bg-[#F5F7FB]/50 dark:hover:bg-white/[0.02]">
+                          <td className="px-4 py-3 font-semibold text-[#0D1B2A] dark:text-white">{label}</td>
+                          <td className="px-4 py-3 text-right font-mono font-bold text-[#0B3D6B] dark:text-[#E8A020]">{formatLKR(b.totalAmount ?? 0)}</td>
+                          <td className="px-4 py-3 text-center">
+                            {canWriteBills ? (
+                              <button type="button" onClick={() => void toggleMonthlyBillPaid(b)}
+                                className={`rounded-full px-2.5 py-0.5 text-xs font-bold border ${b.paid ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' : 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'}`}>
+                                {b.paid ? '✓ Paid' : 'Unpaid'}
+                              </button>
+                            ) : (
+                              <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold border ${b.paid ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' : 'bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'}`}>
+                                {b.paid ? '✓ Paid' : 'Unpaid'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button type="button" onClick={() => { setSelectedMonth(b.month) }}
+                              className="text-xs font-semibold text-[#0B3D6B] dark:text-[#E8A020] hover:underline">
+                              View / edit →
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -278,7 +278,9 @@ export default function AdminExamsPage() {
   }
 
   async function handleToggleUnlock(paper: PaperDoc) {
-    const nextUnlocked = !paper.isUnlocked
+    // Papers display as unlocked unless explicitly false (legacy papers have no field),
+    // so toggle off the DISPLAYED state — otherwise a legacy paper's first click is a no-op.
+    const nextUnlocked = paper.isUnlocked === false
     setPapers(prev => prev.map(p => (p.id === paper.id ? { ...p, isUnlocked: nextUnlocked } : p)))
     setToast(nextUnlocked ? 'Paper unlocked for students' : 'Paper locked')
     try {
@@ -662,26 +664,26 @@ export default function AdminExamsPage() {
                       <p className="text-xs text-[#5A6A7A] dark:text-white/40 mt-0.5">
                         {paper.totalQuestions}Q · {Math.round((paper.timeLimitSeconds ?? 3600)/60)}min · Pass {paper.passMark}% · Order #{paper.order}
                       </p>
+                      {/* Prominent Student Access toggle — first action, right under the title */}
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={paper.isUnlocked !== false}
+                        onClick={() => void handleToggleUnlock(paper)}
+                        title={paper.isUnlocked !== false
+                          ? "Click to lock — students won't see this paper"
+                          : 'Click to unlock — students can access this paper'}
+                        className={`mt-2 inline-flex min-w-[160px] cursor-pointer items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-all duration-200 hover:brightness-110 ${
+                          paper.isUnlocked !== false
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-white/50'
+                        }`}
+                      >
+                        <span className={`ti ${paper.isUnlocked !== false ? 'ti-lock-open' : 'ti-lock'}`} />
+                        Student Access: {paper.isUnlocked !== false ? 'ON' : 'OFF'}
+                      </button>
                     </div>
                     <div className="flex shrink-0 gap-1 flex-wrap justify-end items-center">
-                      <div className="flex flex-col items-end gap-0.5 mr-1">
-                        <span className="text-[9px] font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">Student Access</span>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={paper.isUnlocked === true}
-                          onClick={() => void handleToggleUnlock(paper)}
-                          className={`relative h-5 w-9 rounded-full transition-colors ${
-                            paper.isUnlocked ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-white/15'
-                          }`}
-                        >
-                          <span
-                            className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                              paper.isUnlocked ? 'translate-x-4' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </div>
                       {paper.isLive && (
                         <button type="button" onClick={() => void startLiveExam(paper)}
                           className="rounded-lg bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700">

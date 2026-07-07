@@ -109,7 +109,7 @@ export default function NvqPage() {
       />
       <StatsBar stats={STATS} />
 
-      <section id="programs" className="bg-white py-24 dark:bg-[#04090f]">
+      <section id="programs" className="bg-white py-24 dark:bg-[#0D0B1E]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="NVQ Program Categories" />
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -159,49 +159,49 @@ export default function NvqPage() {
         </div>
       </section>
 
-      <section className="bg-[#F5F7FB] py-24">
+      <section className="bg-[#F5F7FB] py-24 dark:bg-[#130F2A]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="Why Choose NVQ?" />
           <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
             {WHY_NVQ.map((item) => (
               <div key={item.title} className={CARD}>
                 <div className="text-4xl">{item.emoji}</div>
-                <h3 className="mt-3 font-semibold text-[#0B3D6B]">{item.title}</h3>
-                <p className="mt-2 text-sm text-gray-500">{item.desc}</p>
+                <h3 className="mt-3 font-semibold text-[#0B3D6B] dark:text-white">{item.title}</h3>
+                <p className="mt-2 text-sm text-gray-500 dark:text-white/60">{item.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="bg-white py-24">
+      <section className="bg-white py-24 dark:bg-[#0D0B1E]">
         <div className="mx-auto max-w-6xl px-4">
           <SectionTitle title="TVEC Approved & Government Certified" />
-          <div className="mx-auto max-w-3xl rounded-2xl bg-[#F5F7FB] p-12 text-center">
+          <div className="mx-auto max-w-3xl rounded-2xl bg-[#F5F7FB] p-12 text-center dark:bg-white/[0.04] dark:border dark:border-white/[0.08]">
             <div className="mb-4 text-5xl">🏛️</div>
-            <h3 className="mb-2 text-2xl font-bold text-[#0B3D6B]">
+            <h3 className="mb-2 text-2xl font-bold text-[#0B3D6B] dark:text-white">
               Tertiary & Vocational Education Commission
             </h3>
-            <p className="mb-6 text-gray-600">
+            <p className="mb-6 text-gray-600 dark:text-white/60">
               EPIC Campus is a registered and accredited training institute authorized to deliver
               vocational training and award nationally recognized NVQ qualifications.
             </p>
             <div className="mt-8 grid grid-cols-3 gap-6">
               <div className="text-center">
-                <div className="text-2xl font-black text-[#0B3D6B]">A13430</div>
-                <div className="mt-1 text-xs uppercase tracking-wide text-gray-500">
+                <div className="text-2xl font-black text-[#0B3D6B] dark:text-[#E8A020]">A13430</div>
+                <div className="mt-1 text-xs uppercase tracking-wide text-gray-500 dark:text-white/50">
                   Registration Number
                 </div>
               </div>
-              <div className="border-x border-gray-200 text-center">
-                <div className="text-2xl font-black text-[#0B3D6B]">P04/0223</div>
-                <div className="mt-1 text-xs uppercase tracking-wide text-gray-500">
+              <div className="border-x border-gray-200 text-center dark:border-white/[0.08]">
+                <div className="text-2xl font-black text-[#0B3D6B] dark:text-[#E8A020]">P04/0223</div>
+                <div className="mt-1 text-xs uppercase tracking-wide text-gray-500 dark:text-white/50">
                   TVEC Reg. No.
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-black text-[#0B3D6B]">Jul 2027</div>
-                <div className="mt-1 text-xs uppercase tracking-wide text-gray-500">
+                <div className="text-2xl font-black text-[#0B3D6B] dark:text-[#E8A020]">Jul 2027</div>
+                <div className="mt-1 text-xs uppercase tracking-wide text-gray-500 dark:text-white/50">
                   Valid Until
                 </div>
               </div>

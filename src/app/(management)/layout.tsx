@@ -44,7 +44,8 @@ export default function ManagementLayout({
           : [role]
 
         if (!roles.some((r) => ALLOWED_ROLES.includes(r))) {
-          router.replace('/login')
+          // Kitchen staff have their own portal — send them there, not to login.
+          router.replace(roles.includes('kitchen' as Role) ? '/kitchen/dashboard' : '/login')
           return
         }
 

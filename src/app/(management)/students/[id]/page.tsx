@@ -21,6 +21,7 @@ import { parseAttendance } from '@/lib/attendance/helpers'
 import StudentAgentSection from '@/components/students/StudentAgentSection'
 import ParentAccessSection from '@/components/students/ParentAccessSection'
 import StudentForm from '@/components/students/StudentForm'
+import SendCredentialsModal from '@/components/students/SendCredentialsModal'
 import StudentIDCard from '@/components/students/StudentIDCard'
 import WhatsAppFollowUpModal from '@/components/students/WhatsAppFollowUpModal'
 import { useManagement } from '@/components/layout/ManagementContext'
@@ -247,6 +248,7 @@ export default function StudentProfilePage() {
   const [idCardOpen, setIdCardOpen] = useState(false)
   const [idDownloading, setIdDownloading] = useState(false)
   const [followUpOpen, setFollowUpOpen] = useState(false)
+  const [sendCredsOpen, setSendCredsOpen] = useState(false)
   const [regNumber, setRegNumber] = useState('')
   const [studentIdNum, setStudentIdNum] = useState('')
   const [savingIds, setSavingIds] = useState(false)
@@ -418,6 +420,12 @@ export default function StudentProfilePage() {
                   </span>
                 )}
               </div>
+              {(student.pendingAmount ?? 0) > 0 && (
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
+                  <span className="ti ti-alert-triangle" aria-hidden="true" />
+                  Payment Incomplete — {student.feeCurrency ?? 'LKR'} {student.pendingAmount!.toLocaleString()} pending
+                </div>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -437,6 +445,15 @@ export default function StudentProfilePage() {
             >
               <span className="ti ti-brand-whatsapp" aria-hidden="true" />
               Send Follow-up
+            </button>
+            <button
+              type="button"
+              onClick={() => setSendCredsOpen(true)}
+              disabled={!student.mobile}
+              className="inline-flex items-center gap-2 rounded-lg border border-[#25D366] px-4 py-2 font-jakarta text-sm font-semibold text-[#128C7E] hover:bg-[#25D366]/10 disabled:opacity-50"
+            >
+              <span className="ti ti-key" aria-hidden="true" />
+              Send Login
             </button>
             <button
               type="button"
@@ -687,13 +704,27 @@ export default function StudentProfilePage() {
                 <InfoRow label="Enrolled" value={formatDate(student.enrollmentDate)} />
                 <InfoRow label="Expected Completion" value={formatDate(student.expectedCompletionDate)} />
                 <InfoRow
-                  label="Fee"
+                  label="Total Fee"
                   value={
                     student.feeAmount != null
                       ? `${student.feeCurrency ?? 'LKR'} ${student.feeAmount.toLocaleString()}`
                       : undefined
                   }
                 />
+                {student.paymentStatus === 'partial' && (
+                  <InfoRow
+                    label="Amount Paid"
+                    value={`${student.feeCurrency ?? 'LKR'} ${(student.paidAmount ?? 0).toLocaleString()}`}
+                  />
+                )}
+                {(student.pendingAmount ?? 0) > 0 && (
+                  <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
+                    <dt className="font-inter text-sm text-[#5A6A7A]">Pending Amount</dt>
+                    <dd className="font-inter text-sm font-semibold text-red-600 dark:text-red-400 sm:text-right">
+                      {student.feeCurrency ?? 'LKR'} {student.pendingAmount!.toLocaleString()}
+                    </dd>
+                  </div>
+                )}
                 <InfoRow label="Branch" value={student.branchId} />
               </dl>
               {student.notes && (
@@ -896,6 +927,23 @@ export default function StudentProfilePage() {
         onClose={() => setFormOpen(false)}
         student={student}
         onSaved={loadData}
+      />
+
+      <SendCredentialsModal
+        open={sendCredsOpen}
+        student={
+          student
+            ? {
+                id: student.id,
+                name: student.name,
+                email: student.email,
+                mobile: student.mobile,
+                studentCode: student.studentCode,
+                uid: student.uid,
+              }
+            : null
+        }
+        onClose={() => setSendCredsOpen(false)}
       />
 
       <WhatsAppFollowUpModal

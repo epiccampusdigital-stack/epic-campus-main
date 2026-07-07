@@ -331,27 +331,27 @@ export default function AttendancePage() {
         <StatCard label="Attendance Rate" value={stats.rate} loading={loading} />
       </div>
 
-      <div className="rounded-xl border border-[#DDE3EC] bg-white p-4">
+      <div className="rounded-xl border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] p-4">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
           <div>
-            <label className="mb-1 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+            <label className="mb-1 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">
               Location
             </label>
-            <LocationFilterSelect value={locationFilter} onChange={setLocationFilter} className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]" />
+            <LocationFilterSelect value={locationFilter} onChange={setLocationFilter} className="w-full rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 font-inter text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]" />
           </div>
           <div>
-            <label className="mb-1 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+            <label className="mb-1 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">
               Date
             </label>
             <input
               type="date"
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
-              className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-base outline-none focus:border-[#E8A020] sm:text-sm"
+              className="w-full rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 font-inter text-base text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020] sm:text-sm"
             />
           </div>
           <div>
-            <label className="mb-1 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+            <label className="mb-1 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">
               Course
             </label>
             <select
@@ -360,7 +360,7 @@ export default function AttendancePage() {
                 setCourseFilter(e.target.value as CourseId | '')
                 setBatchFilter('')
               }}
-              className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
+              className="w-full rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 font-inter text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
             >
               <option value="">All courses</option>
               {COURSES.map((c) => (
@@ -371,13 +371,13 @@ export default function AttendancePage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+            <label className="mb-1 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">
               Batch
             </label>
             <select
               value={batchFilter}
               onChange={(e) => setBatchFilter(e.target.value)}
-              className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
+              className="w-full rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 font-inter text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
             >
               <option value="">All batches</option>
               {batches.map((b) => (
@@ -388,13 +388,13 @@ export default function AttendancePage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+            <label className="mb-1 block font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">
               Status
             </label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as AttendanceStatus | '')}
-              className="w-full rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
+              className="w-full rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 font-inter text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
             >
               <option value="">All statuses</option>
               <option value="present">Present</option>

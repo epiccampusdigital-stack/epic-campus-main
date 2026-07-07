@@ -147,6 +147,10 @@ export interface Student {
   feeCurrency?: 'LKR' | 'USD'
   registrationFee: number
   paymentStatus?: 'paid' | 'partial' | 'pending'
+  /** Amount paid so far — only tracked when paymentStatus is 'partial' */
+  paidAmount?: number
+  /** feeAmount - paidAmount when partial; feeAmount when pending; 0 when paid */
+  pendingAmount?: number
   status: 'active' | 'pending' | 'completed' | 'withdrawn'
   visaStatus?: 'not-started' | 'in-progress' | 'approved' | 'rejected'
   notes?: string

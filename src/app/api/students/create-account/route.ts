@@ -52,19 +52,38 @@ export async function POST(req: NextRequest) {
       registrationFeePaid,
       courseFeePaid,
       totalPaid,
+      // Real enrollment/fee data — takes priority over the legacy
+      // registrationFeePaid/courseFeePaid/totalPaid-derived defaults.
+      feeAmount,
+      paymentStatus,
+      paidAmount,
+      pendingAmount,
+      courseId,
+      batchId,
+      agentId,
+      notes,
     } = body
 
     let resolvedEmail = String(email ?? '')
     let resolvedName = String(displayName ?? '')
     let resolvedPhone = String(phone ?? '')
-    let resolvedProgram = program ? String(program) : 'japan-ssw'
-    let resolvedLocation = location ? String(location) : 'galle'
-    let resolvedBatchDuration = batchDuration ? String(batchDuration) : '45days'
+    // Left undefined (not defaulted) unless actually provided — createStudentAccount()
+    // needs to tell "no course/location sent" apart from "sent as the default value"
+    // so a bare login-creation request never overwrites a real record's real data.
+    let resolvedProgram: string | undefined = program ? String(program) : undefined
+    let resolvedLocation: string | undefined = location ? String(location) : undefined
+    let resolvedBatchDuration: string | undefined = batchDuration ? String(batchDuration) : undefined
     let resolvedAddress = String(address ?? '')
     let resolvedDob = String(dateOfBirth ?? '')
     let resolvedRegPaid = Boolean(registrationFeePaid)
     let resolvedCoursePaid = Boolean(courseFeePaid)
     let resolvedTotalPaid = Number(totalPaid ?? 0)
+    let resolvedFeeAmount: number | undefined = feeAmount != null ? Number(feeAmount) : undefined
+    let resolvedPaymentStatus: string | undefined = paymentStatus ?? undefined
+    let resolvedPaidAmount: number | undefined = paidAmount != null ? Number(paidAmount) : undefined
+    let resolvedCourseId: string | undefined = courseId ? String(courseId) : undefined
+    let resolvedBatchId: string | undefined = batchId ? String(batchId) : undefined
+    let resolvedAgentId: string | null | undefined = agentId ?? undefined
 
     if (enrollmentId) {
       const enrollSnap = await adminDb
@@ -86,14 +105,20 @@ export async function POST(req: NextRequest) {
         resolvedName ||
         `${String(e.firstName ?? '')} ${String(e.lastName ?? '')}`.trim()
       resolvedPhone = String(e.phone ?? resolvedPhone)
-      resolvedProgram = String(e.program ?? resolvedProgram)
-      resolvedLocation = String(location ?? e.location ?? 'galle')
-      resolvedBatchDuration = String(e.batchDuration ?? resolvedBatchDuration)
+      resolvedProgram = e.program ? String(e.program) : resolvedProgram
+      resolvedLocation = location ? String(location) : e.location ? String(e.location) : resolvedLocation
+      resolvedBatchDuration = e.batchDuration ? String(e.batchDuration) : resolvedBatchDuration
       resolvedAddress = String(e.address ?? resolvedAddress)
       resolvedDob = String(e.dateOfBirth ?? resolvedDob)
       resolvedRegPaid = Boolean(e.registrationFeePaid)
       resolvedCoursePaid = Boolean(e.courseFeePaid)
       resolvedTotalPaid = Number(e.totalPaid ?? resolvedTotalPaid)
+      resolvedFeeAmount = resolvedFeeAmount ?? (e.totalFee != null ? Number(e.totalFee) : e.feeAmount != null ? Number(e.feeAmount) : undefined)
+      resolvedPaymentStatus = resolvedPaymentStatus ?? (e.paymentStatus ? String(e.paymentStatus) : undefined)
+      resolvedPaidAmount = resolvedPaidAmount ?? (e.paidAmount != null ? Number(e.paidAmount) : undefined)
+      resolvedCourseId = resolvedCourseId ?? (e.courseId ? String(e.courseId) : undefined)
+      resolvedBatchId = resolvedBatchId ?? (e.batch ? String(e.batch) : e.batchId ? String(e.batchId) : undefined)
+      resolvedAgentId = resolvedAgentId ?? (e.agentId ? String(e.agentId) : undefined)
     }
 
     if (!resolvedEmail || !resolvedName) {
@@ -126,6 +151,14 @@ export async function POST(req: NextRequest) {
       courseFeePaid: resolvedCoursePaid,
       totalPaid: resolvedTotalPaid,
       createdBy: staff.uid,
+      feeAmount: resolvedFeeAmount,
+      paymentStatus: resolvedPaymentStatus,
+      paidAmount: resolvedPaidAmount,
+      pendingAmount: pendingAmount != null ? Number(pendingAmount) : undefined,
+      courseId: resolvedCourseId,
+      batchId: resolvedBatchId,
+      agentId: resolvedAgentId ?? null,
+      notes: notes ? String(notes) : undefined,
     })
 
     if (enrollmentId) {
@@ -133,7 +166,7 @@ export async function POST(req: NextRequest) {
         .collection('enrollmentApplications')
         .doc(String(enrollmentId))
         .update({
-          studentId: result.uid,
+          studentId: result.studentDocId,
           status: 'confirmed',
           studentCode: result.studentCode,
           approvedAt: FieldValue.serverTimestamp(),
@@ -141,7 +174,9 @@ export async function POST(req: NextRequest) {
         })
     }
 
-    if (resolvedPhone) {
+    // Only send login credentials when we actually created a new account —
+    // for a reused existing account the real password wasn't changed.
+    if (resolvedPhone && result.created) {
       const firstName = resolvedName.split(/\s+/)[0] || resolvedName
       await sendWhatsApp(
         resolvedPhone,

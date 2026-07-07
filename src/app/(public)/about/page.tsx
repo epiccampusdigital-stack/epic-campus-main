@@ -7,7 +7,7 @@ export default function AboutPage() {
   return (
     <div>
       {/* Hero */}
-      <section className="relative overflow-hidden bg-[#03080f] py-24">
+      <section className="relative overflow-hidden bg-[#0D0B1E] py-24">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(26,107,173,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(26,107,173,0.07)_1px,transparent_1px)] bg-[size:40px_40px]" />
         <div className="pointer-events-none absolute left-1/2 top-0 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(11,61,107,0.45)_0%,transparent_70%)]" />
         <div className="relative mx-auto max-w-4xl px-4 text-center sm:px-6">
@@ -24,7 +24,7 @@ export default function AboutPage() {
       </section>
 
       {/* Mission + Vision */}
-      <section className="bg-white py-24 dark:bg-[#04090f]">
+      <section className="bg-white py-24 dark:bg-[#0D0B1E]">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
             {[
@@ -57,7 +57,7 @@ export default function AboutPage() {
       </section>
 
       {/* Story */}
-      <section className="bg-[#F5F7FB] py-24 dark:bg-[#071428]">
+      <section className="bg-[#F5F7FB] py-24 dark:bg-[#130F2A]">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="grid grid-cols-1 gap-16 lg:grid-cols-2 lg:items-center">
             <div>
@@ -89,7 +89,7 @@ export default function AboutPage() {
       </section>
 
       {/* Milestones */}
-      <section className="bg-white py-24 dark:bg-[#04090f]">
+      <section className="bg-white py-24 dark:bg-[#0D0B1E]">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
           <div className="mb-16 text-center">
             <p className="mb-3 text-[11px] font-bold uppercase tracking-[4px] text-[#E8A020]">Our journey</p>
@@ -124,7 +124,7 @@ export default function AboutPage() {
       </section>
 
       {/* Accreditations */}
-      <section className="bg-[#F5F7FB] py-20 dark:bg-[#071428]">
+      <section className="bg-[#F5F7FB] py-20 dark:bg-[#130F2A]">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 text-center">
           <p className="mb-3 text-[11px] font-bold uppercase tracking-[4px] text-[#E8A020]">Recognised and approved</p>
           <h2 className="font-jakarta text-[32px] font-black text-[#0B3D6B] dark:text-white mb-12">Accreditations</h2>
@@ -147,7 +147,7 @@ export default function AboutPage() {
       </section>
 
       {/* CTA */}
-      <section className="bg-[#03080f] py-20">
+      <section className="bg-[#0D0B1E] py-20">
         <div className="mx-auto max-w-2xl px-4 text-center sm:px-6">
           <h2 className="font-jakarta text-[36px] font-black text-white mb-4">
             Ready to start your journey?
@@ -157,7 +157,7 @@ export default function AboutPage() {
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <a href="/enroll"
-              className="flex items-center justify-center gap-2 rounded-xl bg-[#E8A020] px-8 py-4 text-[14px] font-black text-[#03080f] hover:bg-[#f0b030] transition-colors">
+              className="btn-hover flex items-center justify-center gap-2 rounded-xl bg-[#E8A020] px-8 py-4 text-[14px] font-black text-[#0D0B1E] hover:bg-[#f0b030] transition-colors">
               Apply now
               <span className="ti ti-arrow-right" />
             </a>

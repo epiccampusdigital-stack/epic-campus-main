@@ -116,7 +116,7 @@ export default function PublicFooter() {
           </div>
         </div>
 
-        <div className="mt-10 border-t border-white/10 pt-6 text-center text-sm text-white/50">
+        <div className="mt-10 border-t border-white/10 pt-6 text-center text-sm text-white/40">
           © 2026 Epic Campus (Pvt) Ltd. All rights reserved.
         </div>
       </div>

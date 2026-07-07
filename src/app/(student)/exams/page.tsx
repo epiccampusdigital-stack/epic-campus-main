@@ -27,6 +27,7 @@ interface ExamPaperDoc {
   isPublished?: boolean
   order?: number
   isUnlocked?: boolean
+  type?: string
 }
 
 type ExamCategoryId = 'jft-basic' | 'general' | 'irodori'
@@ -43,14 +44,15 @@ const EXAM_CATEGORIES: {
   { id: 'irodori', label: 'Irodori', desc: 'Irodori Japanese language course papers', color: '#059669', icon: 'ti-book-2' },
 ]
 
-/** Bucket a paper into one of the three exam categories. Explicit categoryId wins;
- *  otherwise Irodori is inferred from the title and everything else is General. */
+/** Bucket a paper into one of the three exam categories. Explicit categoryId/type wins;
+ *  otherwise JFT/Irodori are inferred from the title and everything else is General. */
 function paperCategory(p: ExamPaperDoc): ExamCategoryId {
   const cat = (p.categoryId ?? '').toLowerCase().replace(/_/g, '-')
-  if (cat === 'jft-basic') return 'jft-basic'
-  if (cat === 'irodori') return 'irodori'
+  const type = (p.type ?? '').toLowerCase().replace(/_/g, '-')
+  const title = (p.title ?? '').trim().toLowerCase()
+  if (cat === 'jft-basic' || type === 'jft-basic' || title.includes('jft')) return 'jft-basic'
+  if (cat === 'irodori' || title.includes('irodori')) return 'irodori'
   if (cat === 'general') return 'general'
-  if ((p.title ?? '').trim().toLowerCase().startsWith('irodori')) return 'irodori'
   return 'general'
 }
 
@@ -113,7 +115,9 @@ export default function ExamsListPage() {
         setPapers(
           list.filter((p) => {
             if (p.isPublished === false) return false
-            if (p.isUnlocked !== true) return false
+            // Only hide papers explicitly locked. Legacy papers created before the
+            // isUnlocked field existed (undefined/null) are treated as unlocked.
+            if (p.isUnlocked === false) return false
             if (p.courseTag === 'japan-ssw-45day') return student?.courseId === 'japan-ssw'
             return true
           }),

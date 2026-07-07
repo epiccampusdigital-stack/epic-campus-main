@@ -18,9 +18,9 @@ import type { ExamAttempt, ExamResult, Student } from '@/types'
 
 function StatSkeleton() {
   return (
-    <div className="animate-pulse rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
-      <div className="mb-3 h-3 w-24 rounded bg-[#DDE3EC]" />
-      <div className="h-8 w-16 rounded bg-[#DDE3EC]" />
+    <div className="animate-pulse rounded-2xl border border-[#DDE3EC] bg-white p-6 dark:border-white/[0.08] dark:bg-white/[0.04]">
+      <div className="mb-3 h-3 w-24 rounded bg-[#DDE3EC] dark:bg-white/10" />
+      <div className="h-8 w-16 rounded bg-[#DDE3EC] dark:bg-white/10" />
     </div>
   )
 }
@@ -94,7 +94,7 @@ export default function TeacherDashboard() {
         <h2 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white">
           Teacher Dashboard
         </h2>
-        <p className="mt-1 font-inter text-sm text-[#5A6A7A]">
+        <p className="mt-1 font-inter text-sm text-[#5A6A7A] dark:text-white/50">
           Student progress and one-on-one sessions — no financial data shown here.
         </p>
       </div>
@@ -106,15 +106,15 @@ export default function TeacherDashboard() {
               <Link
                 key={key}
                 href={`/students?teacherStat=${key}`}
-                className="rounded-xl border border-[#DDE3EC] border-l-[3px] border-l-[#E8A020] bg-white p-5 transition-shadow hover:shadow-md dark:border-gray-600 dark:bg-gray-800"
+                className="stat-card-glass card-hover p-6"
               >
-                <p className="font-inter text-xs uppercase tracking-wide text-[#5A6A7A]">
+                <p className="font-inter text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-white/50">
                   {TEACHER_STAT_LABELS[key]}
                 </p>
-                <p className="font-jakarta mt-2 text-[28px] font-bold leading-tight text-[#0D1B2A] dark:text-white">
+                <p className="font-jakarta mt-2 text-[28px] font-black leading-tight text-[#0B3D6B] dark:text-[#E8A020]">
                   {counts[key]}
                 </p>
-                <p className="mt-1 font-inter text-xs text-[#0B3D6B]">View students →</p>
+                <p className="mt-1 font-inter text-xs font-medium text-[#0B3D6B] dark:text-white/40">View students →</p>
               </Link>
             ))}
       </section>
@@ -126,25 +126,25 @@ export default function TeacherDashboard() {
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Link
           href="/sessions"
-          className="group rounded-xl border border-[#DDE3EC] bg-white p-5 transition-all hover:border-[#E8A020] dark:bg-gray-800"
+          className="group card-hover rounded-2xl border border-[#DDE3EC] bg-white p-6 hover:border-[#E8A020] dark:border-white/[0.08] dark:bg-white/[0.04]"
         >
           <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#0B3D6B] text-white">
             <span className="ti ti-calendar-event text-lg" aria-hidden="true" />
           </div>
           <p className="font-jakarta font-semibold text-[#0D1B2A] dark:text-white">Sessions</p>
-          <p className="mt-1 font-inter text-xs text-[#5A6A7A]">
+          <p className="mt-1 font-inter text-xs text-[#5A6A7A] dark:text-white/50">
             Schedule and manage one-on-one student discussions
           </p>
         </Link>
         <Link
           href="/students"
-          className="group rounded-xl border border-[#DDE3EC] bg-white p-5 transition-all hover:border-[#E8A020] dark:bg-gray-800"
+          className="group card-hover rounded-2xl border border-[#DDE3EC] bg-white p-6 hover:border-[#E8A020] dark:border-white/[0.08] dark:bg-white/[0.04]"
         >
           <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#0B3D6B] text-white">
             <span className="ti ti-users text-lg" aria-hidden="true" />
           </div>
           <p className="font-jakarta font-semibold text-[#0D1B2A] dark:text-white">Students</p>
-          <p className="mt-1 font-inter text-xs text-[#5A6A7A]">
+          <p className="mt-1 font-inter text-xs text-[#5A6A7A] dark:text-white/50">
             View and search all student records
           </p>
         </Link>

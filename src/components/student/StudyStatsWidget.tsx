@@ -108,7 +108,7 @@ export default function StudyStatsWidget({ studentId }: { studentId: string }) {
   if (loading) return null
   if (sessions.length === 0) {
     return (
-      <div className="rounded-2xl border border-[#DDE3EC] bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div className="glass-card p-6 shadow-sm">
         <h2 className="mb-3 font-jakarta text-sm font-bold text-[#0B3D6B] dark:text-white">
           AI Study Assistant
         </h2>
@@ -128,7 +128,7 @@ export default function StudyStatsWidget({ studentId }: { studentId: string }) {
   }
 
   return (
-    <div className="rounded-2xl border border-[#DDE3EC] bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+    <div className="glass-card p-6 shadow-sm">
       <div className="flex items-center justify-between">
         <h2 className="font-jakarta text-sm font-bold text-[#0B3D6B] dark:text-white">
           Study Progress
@@ -142,8 +142,8 @@ export default function StudyStatsWidget({ studentId }: { studentId: string }) {
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-3">
-        <div className="rounded-xl bg-[#F5F7FB] px-3 py-3 text-center dark:bg-gray-700">
-          <p className="font-jakarta text-2xl font-bold text-[#0B3D6B] dark:text-white">
+        <div className="rounded-xl bg-[#F5F7FB] px-3 py-3 text-center dark:bg-white/[0.05]">
+          <p className="font-jakarta text-2xl font-black text-[#0B3D6B] dark:text-[#E8A020]">
             {streak > 0 ? `🔥 ${streak}` : '—'}
           </p>
           <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
@@ -151,14 +151,14 @@ export default function StudyStatsWidget({ studentId }: { studentId: string }) {
           </p>
         </div>
 
-        <div className="rounded-xl bg-[#F5F7FB] px-3 py-3 text-center dark:bg-gray-700">
-          <p className="font-jakarta text-2xl font-bold text-[#0B3D6B] dark:text-white">
+        <div className="rounded-xl bg-[#F5F7FB] px-3 py-3 text-center dark:bg-white/[0.05]">
+          <p className="font-jakarta text-2xl font-black text-[#0B3D6B] dark:text-[#E8A020]">
             {weekMins >= 60 ? `${Math.round(weekMins / 60)}h` : `${weekMins}m`}
           </p>
           <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">This week</p>
         </div>
 
-        <div className="rounded-xl bg-[#F5F7FB] px-3 py-3 text-center dark:bg-gray-700">
+        <div className="rounded-xl bg-[#F5F7FB] px-3 py-3 text-center dark:bg-white/[0.05]">
           <p className="text-lg">
             {best ? <span className={`ti ${best.icon} text-[#E8A020]`} /> : '—'}
           </p>

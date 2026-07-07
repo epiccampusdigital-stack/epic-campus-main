@@ -144,7 +144,7 @@ export default function PublicEpicWall() {
         return (
           <div
             key={post.id}
-            className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.08] shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
+            className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden"
           >
             {/* Post header */}
             <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3">

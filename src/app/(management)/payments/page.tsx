@@ -596,22 +596,22 @@ export default function PaymentsPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-[#DDE3EC] bg-white p-4 dark:bg-gray-800">
+      <div className="rounded-xl border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] p-4">
         <div className="grid gap-3 lg:grid-cols-4">
           <div className="relative lg:col-span-2">
-            <span className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A7A]" aria-hidden="true" />
+            <span className="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A7A] dark:text-white/40" aria-hidden="true" />
             <input
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by student or program"
-              className="w-full rounded-lg border border-[#DDE3EC] py-2.5 pl-10 pr-3 font-inter text-base outline-none focus:border-[#E8A020] sm:text-sm"
+              className="w-full rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] py-2.5 pl-10 pr-3 font-inter text-base text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020] sm:text-sm"
             />
           </div>
           <select
             value={programFilter}
             onChange={(e) => setProgramFilter(e.target.value as CourseId | '')}
-            className="rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
+            className="rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 font-inter text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
           >
             <option value="">All programs</option>
             {COURSES.map((course) => (
@@ -623,7 +623,7 @@ export default function PaymentsPage() {
           <select
             value={branchFilter}
             onChange={(e) => setBranchFilter(e.target.value)}
-            className="rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
+            className="rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 font-inter text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
           >
             <option value="">All branches</option>
             {branchOptions.map((branch) => (
@@ -635,7 +635,7 @@ export default function PaymentsPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as PaymentPlanStatus | '')}
-            className="rounded-lg border border-[#DDE3EC] px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
+            className="rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 font-inter text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
           >
             <option value="">All statuses</option>
             <option value="paid">Paid</option>
@@ -646,35 +646,35 @@ export default function PaymentsPage() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white dark:border-gray-700 dark:bg-gray-800">
+      <div className="overflow-hidden rounded-xl border border-[#DDE3EC] dark:border-white/[0.05] bg-white dark:bg-white/[0.04]">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[960px] text-left text-sm">
             <thead>
-              <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:border-gray-700 dark:bg-gray-900">
+              <tr className="border-b border-gray-100 bg-gray-50 dark:border-white/[0.05] dark:bg-white/[0.03]">
                 <th className="px-4 py-3 w-12" />
-                <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]">Student</th>
-                <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]">Program</th>
-                <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]">Branch</th>
-                <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]">Progress</th>
-                <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]">Paid / Fee</th>
-                <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]">Status</th>
-                <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]">Actions</th>
+                <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-white/40">Student</th>
+                <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-white/40">Program</th>
+                <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-white/40">Branch</th>
+                <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-white/40">Progress</th>
+                <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-white/40">Paid / Fee</th>
+                <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-white/40">Status</th>
+                <th className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-white/40">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#DDE3EC] dark:divide-gray-700">
+            <tbody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
               {loading ? (
                 Array.from({ length: 8 }).map((_, index) => (
                   <tr key={index} className="animate-pulse">
                     {Array.from({ length: 8 }).map((__, cellIndex) => (
                       <td key={cellIndex} className="h-12 px-4 py-3">
-                        <div className="h-3 w-full rounded bg-[#DDE3EC]" />
+                        <div className="h-3 w-full rounded bg-gray-100 dark:bg-white/[0.08]" />
                       </td>
                     ))}
                   </tr>
                 ))
               ) : filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-[#5A6A7A]">
+                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-[#5A6A7A] dark:text-white/40">
                     No students match the current filters.
                   </td>
                 </tr>
@@ -683,7 +683,7 @@ export default function PaymentsPage() {
                   const selectable = !!row.plan && row.status !== 'paid'
                   const checked = row.plan ? selectedPlanIds.includes(row.plan.id) : false
                   return (
-                    <tr key={row.student.id} className="group transition-colors hover:bg-[#F5F7FB]/70 dark:hover:bg-gray-700/40">
+                    <tr key={row.student.id} className="group bg-white dark:bg-transparent transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.03]">
                       <td className="px-4 py-3">
                         <input
                           type="checkbox"
@@ -698,20 +698,20 @@ export default function PaymentsPage() {
                               setSelectedPlanIds((current) => current.filter((id) => id !== planId))
                             }
                           }}
-                          className="h-4 w-4 rounded border-[#DDE3EC] text-[#E8A020] focus:ring-[#E8A020]"
+                          className="h-4 w-4 rounded border-[#DDE3EC] dark:border-white/20 text-[#E8A020] focus:ring-[#E8A020]"
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-[#0D1B2A] dark:text-white">{row.student.name}</div>
-                        <div className="text-xs text-[#5A6A7A] dark:text-gray-400">{row.student.studentCode}</div>
+                        <div className="font-medium text-gray-900 dark:text-white">{row.student.name}</div>
+                        <div className="text-xs text-gray-500 dark:text-white/40">{row.student.studentCode}</div>
                       </td>
-                      <td className="px-4 py-3 text-[#5A6A7A] dark:text-gray-300">
+                      <td className="px-4 py-3 text-gray-500 dark:text-white/40">
                         {COURSE_MAP[row.student.courseId]?.label ?? row.student.courseId}
                       </td>
-                      <td className="px-4 py-3 text-[#5A6A7A] dark:text-gray-300">{row.student.branchId || 'N/A'}</td>
+                      <td className="px-4 py-3 text-gray-500 dark:text-white/40">{row.student.branchId || 'N/A'}</td>
                       <td className="px-4 py-3">
-                        <div className="mb-1 text-xs text-[#5A6A7A]">{row.paidCount}/{row.installmentCount} paid</div>
-                        <div className="h-2 overflow-hidden rounded-full bg-[#E5E7EB] dark:bg-gray-700">
+                        <div className="mb-1 text-xs text-gray-500 dark:text-white/40">{row.paidCount}/{row.installmentCount} paid</div>
+                        <div className="h-2 overflow-hidden rounded-full bg-[#E5E7EB] dark:bg-white/10">
                           <div className="h-full rounded-full bg-[#E8A020]" style={{ width: `${row.progress}%` }} />
                         </div>
                       </td>
@@ -857,7 +857,7 @@ export default function PaymentsPage() {
                 <div className="mt-4 overflow-x-auto">
                   <table className="w-full min-w-[640px] text-left text-sm">
                     <thead>
-                      <tr className="border-b border-[#DDE3EC] text-xs uppercase tracking-wide text-[#5A6A7A]">
+                      <tr className="border-b border-gray-100 dark:border-white/[0.05] text-xs uppercase tracking-wide text-gray-500 dark:text-white/40">
                         <th className="px-4 py-3">Installment</th>
                         <th className="px-4 py-3">Amount</th>
                         <th className="px-4 py-3">Due date</th>
@@ -865,7 +865,7 @@ export default function PaymentsPage() {
                         <th className="px-4 py-3">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#DDE3EC] dark:divide-gray-700">
+                    <tbody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
                       {selectedRow.plan.installments.map((installment) => {
                         const paid = Boolean(installment.paidAt)
                         const dueDate = formatPaymentDate(installment.dueDate)
@@ -877,10 +877,10 @@ export default function PaymentsPage() {
                           : 'Unpaid'
 
                         return (
-                          <tr key={installment.id}>
-                            <td className="px-4 py-3 font-medium text-[#0D1B2A]">{installment.label}</td>
-                            <td className="px-4 py-3 text-[#0B3D6B]">{formatLKR(installment.amount)}</td>
-                            <td className="px-4 py-3 text-[#5A6A7A]">{dueDate}</td>
+                          <tr key={installment.id} className="bg-white dark:bg-transparent">
+                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{installment.label}</td>
+                            <td className="px-4 py-3 text-[#0B3D6B] dark:text-blue-300">{formatLKR(installment.amount)}</td>
+                            <td className="px-4 py-3 text-gray-500 dark:text-white/40">{dueDate}</td>
                             <td className="px-4 py-3">
                               <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${paid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : overdue ? 'bg-red-50 text-red-700 border-red-200' : 'bg-orange-50 text-orange-700 border-orange-200'}`}>
                                 {statusLabel}
@@ -897,7 +897,7 @@ export default function PaymentsPage() {
                                   Mark paid
                                 </button>
                               ) : (
-                                <span className="text-xs text-[#5A6A7A]">{paid ? 'Paid' : isViewOnly ? 'Read only' : 'N/A'}</span>
+                                <span className="text-xs text-gray-500 dark:text-white/40">{paid ? 'Paid' : isViewOnly ? 'Read only' : 'N/A'}</span>
                               )}
                             </td>
                           </tr>
@@ -909,35 +909,35 @@ export default function PaymentsPage() {
               )}
 
               {addingInstallment && selectedRow.plan && (
-                <div className="mt-6 rounded-2xl border border-[#DDE3EC] bg-[#F5F7FB] p-5">
-                  <h4 className="text-sm font-semibold text-[#0D1B2A]">New installment</h4>
+                <div className="mt-6 rounded-2xl border border-[#DDE3EC] dark:border-white/10 bg-[#F5F7FB] dark:bg-white/[0.04] p-5">
+                  <h4 className="text-sm font-semibold text-[#0D1B2A] dark:text-white">New installment</h4>
                   <div className="mt-4 grid gap-3 md:grid-cols-3">
-                    <label className="block text-sm text-[#5A6A7A]">
+                    <label className="block text-sm text-[#5A6A7A] dark:text-white/50">
                       Label
                       <input
                         value={installmentForm.label}
                         onChange={(e) => setInstallmentForm((current) => ({ ...current, label: e.target.value }))}
                         placeholder="Month 4"
-                        className="mt-2 w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm outline-none focus:border-[#E8A020]"
+                        className="mt-2 w-full rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
                       />
                     </label>
-                    <label className="block text-sm text-[#5A6A7A]">
+                    <label className="block text-sm text-[#5A6A7A] dark:text-white/50">
                       Amount
                       <input
                         type="number"
                         value={installmentForm.amount}
                         onChange={(e) => setInstallmentForm((current) => ({ ...current, amount: e.target.value }))}
                         placeholder="8000"
-                        className="mt-2 w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm outline-none focus:border-[#E8A020]"
+                        className="mt-2 w-full rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
                       />
                     </label>
-                    <label className="block text-sm text-[#5A6A7A]">
+                    <label className="block text-sm text-[#5A6A7A] dark:text-white/50">
                       Due date
                       <input
                         type="date"
                         value={installmentForm.dueDate}
                         onChange={(e) => setInstallmentForm((current) => ({ ...current, dueDate: e.target.value }))}
-                        className="mt-2 w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm outline-none focus:border-[#E8A020]"
+                        className="mt-2 w-full rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
                       />
                     </label>
                   </div>
@@ -975,35 +975,35 @@ export default function PaymentsPage() {
               </button>
             </div>
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              <label className="block text-sm text-[#5A6A7A]">
+              <label className="block text-sm text-[#5A6A7A] dark:text-white/50">
                 Total fee
                 <input
                   type="number"
                   value={setupForm.totalFee}
                   onChange={(e) => setSetupForm((current) => ({ ...current, totalFee: e.target.value }))}
                   placeholder="90000"
-                  className="mt-2 w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm outline-none focus:border-[#E8A020]"
+                  className="mt-2 w-full rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
                 />
               </label>
-              <label className="block text-sm text-[#5A6A7A]">
+              <label className="block text-sm text-[#5A6A7A] dark:text-white/50">
                 Installments
                 <select
                   value={setupForm.installments}
                   onChange={(e) => setSetupForm((current) => ({ ...current, installments: e.target.value }))}
-                  className="mt-2 w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm outline-none focus:border-[#E8A020]"
+                  className="mt-2 w-full rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
                 >
                   {INSTALLMENT_COUNTS.map((count) => (
                     <option key={count} value={String(count)}>{count}</option>
                   ))}
                 </select>
               </label>
-              <label className="block text-sm text-[#5A6A7A] sm:col-span-2">
+              <label className="block text-sm text-[#5A6A7A] dark:text-white/50 sm:col-span-2">
                 First due date
                 <input
                   type="date"
                   value={setupForm.firstDueDate}
                   onChange={(e) => setSetupForm((current) => ({ ...current, firstDueDate: e.target.value }))}
-                  className="mt-2 w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm outline-none focus:border-[#E8A020]"
+                  className="mt-2 w-full rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2 text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
                 />
               </label>
             </div>

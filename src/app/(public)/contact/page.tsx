@@ -18,7 +18,7 @@ export default function ContactPage() {
   return (
     <div>
       {/* Hero */}
-      <section className="relative overflow-hidden bg-[#03080f] py-20">
+      <section className="relative overflow-hidden bg-[#0D0B1E] py-20">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(26,107,173,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(26,107,173,0.07)_1px,transparent_1px)] bg-[size:40px_40px]" />
         <div className="pointer-events-none absolute left-1/2 top-0 h-[400px] w-[400px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(11,61,107,0.4)_0%,transparent_70%)]" />
         <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
@@ -31,7 +31,7 @@ export default function ContactPage() {
       </section>
 
       {/* Main content */}
-      <section className="bg-white py-20 dark:bg-[#04090f]">
+      <section className="bg-white py-20 dark:bg-[#130F2A]">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
 
           {/* Prominent WhatsApp CTA — above the form */}

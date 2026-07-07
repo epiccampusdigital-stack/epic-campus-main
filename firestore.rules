@@ -6,10 +6,10 @@ service cloud.firestore {
     match /users/{uid} {
       allow get: if request.auth != null && (
         request.auth.uid == uid ||
-        request.auth.token.role in ['admin', 'owner', 'reception', 'teacher', 'accountant', 'examCoordinator']
+        request.auth.token.role in ['admin', 'owner', 'reception', 'teacher', 'accountant', 'examCoordinator', 'agent', 'kitchen']
       );
       allow list: if request.auth != null &&
-        request.auth.token.role in ['admin', 'owner', 'reception', 'teacher', 'accountant', 'examCoordinator'];
+        request.auth.token.role in ['admin', 'owner', 'reception', 'teacher', 'accountant', 'examCoordinator', 'agent', 'kitchen'];
       allow create: if request.auth != null && (
         request.auth.uid == uid ||
         request.auth.token.role in ['admin', 'owner', 'reception']
@@ -20,19 +20,21 @@ service cloud.firestore {
       );
     }
 
-    // Students — read/write own record, admin can read all
+    // Students — read/write own record, staff read all, staff with edit access update
     match /students/{studentId} {
       allow read: if request.auth != null && (
         request.auth.uid == studentId ||
         resource.data.uid == request.auth.uid ||
-        request.auth.token.role in ['admin', 'owner', 'reception', 'accountant', 'teacher']
+        request.auth.token.role in ['admin', 'owner', 'reception', 'accountant', 'teacher', 'examCoordinator', 'agent']
       );
       allow create: if request.auth != null;
       allow update: if request.auth != null && (
         request.auth.uid == studentId ||
         resource.data.uid == request.auth.uid ||
-        request.auth.token.role in ['admin', 'owner', 'reception']
+        request.auth.token.role in ['admin', 'owner', 'reception', 'teacher', 'accountant']
       );
+      allow delete: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner'];
     }
 
     // Payments — single master collection for both flat transaction receipts and
@@ -97,7 +99,7 @@ service cloud.firestore {
 
     match /examAttempts/{attemptId} {
       allow read: if request.auth != null && (
-        request.auth.token.role in ['admin', 'owner', 'teacher', 'reception'] ||
+        request.auth.token.role in ['admin', 'owner', 'teacher', 'reception', 'examCoordinator'] ||
         resource.data.studentId == request.auth.uid
       );
       allow create: if request.auth != null;
@@ -193,7 +195,7 @@ service cloud.firestore {
     // Enrollment applications — public create (unauthenticated via API), staff read/update
     match /enrollmentApplications/{enrollmentId} {
       allow read: if request.auth != null && (
-        request.auth.token.role in ['admin', 'owner', 'reception'] ||
+        request.auth.token.role in ['admin', 'owner', 'reception', 'teacher', 'accountant'] ||
         request.auth.uid == resource.data.studentId
       );
       allow create: if true;
@@ -410,7 +412,7 @@ service cloud.firestore {
     match /consultationRequests/{docId} {
       allow read: if request.auth != null && (
         request.auth.uid == resource.data.studentId ||
-        request.auth.token.role in ['admin','owner','reception']
+        request.auth.token.role in ['admin','owner','reception','teacher']
       );
       allow create: if request.auth != null;
       allow update: if request.auth != null &&
@@ -443,6 +445,13 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin','owner','reception','accountant'];
+    }
+
+    match /accommodations/{houseId}/bills/{billId} {
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin','owner','accountant','reception'];
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin','owner','accountant'];
     }
 
     match /supplies/{docId} {

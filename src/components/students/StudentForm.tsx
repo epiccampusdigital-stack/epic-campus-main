@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   setDoc,
   updateDoc,
@@ -11,8 +12,8 @@ import {
   Timestamp,
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { db, storage } from '@/lib/firebase/client'
-import { COURSES } from '@/lib/constants/courses'
+import { auth, db, storage } from '@/lib/firebase/client'
+import { COURSES, COURSE_MAP } from '@/lib/constants/courses'
 import {
   generateStudentCode,
   generateTempPassword,
@@ -22,6 +23,7 @@ import {
 import { generateParentAccessCode } from '@/lib/parent/helpers'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { logAuditEvent } from '@/lib/audit/helpers'
+import { buildAutoInstallments, PLAN_SOURCE } from '@/lib/payments/autoInstallments'
 import {
   AGENT_ROLES,
   BATCH_DURATION_LABELS,
@@ -53,6 +55,7 @@ export interface StudentFormValues {
   feeAmount: string
   feeCurrency: 'LKR' | 'USD'
   paymentStatus: 'paid' | 'partial' | 'pending'
+  paidAmount: string
   status: Student['status']
   visaStatus: NonNullable<Student['visaStatus']>
   notes: string
@@ -87,6 +90,7 @@ function makeEmptyForm(): StudentFormValues {
     feeAmount: '',
     feeCurrency: 'LKR',
     paymentStatus: 'pending',
+    paidAmount: '',
     status: 'pending',
     visaStatus: 'not-started',
     notes: '',
@@ -128,6 +132,7 @@ function studentToForm(s: Student): StudentFormValues {
     feeAmount: s.feeAmount != null ? String(s.feeAmount) : '',
     feeCurrency: s.feeCurrency ?? 'LKR',
     paymentStatus: s.paymentStatus ?? 'pending',
+    paidAmount: s.paidAmount != null ? String(s.paidAmount) : '',
     status: s.status,
     visaStatus: s.visaStatus ?? 'not-started',
     notes: s.notes ?? '',
@@ -209,6 +214,47 @@ function SectionTitle({ icon, title }: { icon: string; title: string }) {
   )
 }
 
+/** Keeps the payments/{studentId} plan doc (read by the Payments and Payment
+ *  Tracker pages) in sync with the fee/payment-status fields on this form.
+ *  Skipped entirely when there's no fee, and left untouched if a plan already
+ *  exists that wasn't created by this same auto-sync (e.g. a manually configured
+ *  multi-installment schedule) — so we never clobber real payment history. */
+async function syncPaymentPlan(params: {
+  studentDocId: string
+  studentName: string
+  studentCode: string
+  courseId: CourseId | ''
+  location: string
+  branchId: string
+  feeAmount: number
+  feeCurrency: 'LKR' | 'USD'
+  paymentStatus: StudentFormValues['paymentStatus']
+  paidAmount: number
+}): Promise<void> {
+  if (params.feeAmount <= 0) return
+  const planRef = doc(db, 'payments', params.studentDocId)
+  const existing = await getDoc(planRef)
+  if (existing.exists() && existing.data().source !== PLAN_SOURCE.STUDENT_FORM) {
+    return
+  }
+
+  await setDoc(planRef, {
+    studentId: params.studentDocId,
+    studentName: params.studentName,
+    studentCode: params.studentCode,
+    courseId: params.courseId,
+    program: params.courseId ? (COURSE_MAP[params.courseId]?.label ?? params.courseId) : '',
+    location: params.location,
+    branch: params.branchId,
+    totalFee: params.feeAmount,
+    currency: params.feeCurrency,
+    installments: buildAutoInstallments(params.feeAmount, params.paymentStatus, params.paidAmount),
+    source: PLAN_SOURCE.STUDENT_FORM,
+    createdAt: existing.exists() ? (existing.data().createdAt ?? serverTimestamp()) : serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+}
+
 export default function StudentForm({
   open,
   onClose,
@@ -223,6 +269,17 @@ export default function StudentForm({
   const [error, setError] = useState('')
   const [agents, setAgents] = useState<{ uid: string; displayName: string; commissionRate?: number }[]>([])
   const [guardianSectionOpen, setGuardianSectionOpen] = useState(false)
+  // After a new student's login account is created, show their credentials so
+  // reception can send them — the generated password isn't stored anywhere else.
+  const [createdCreds, setCreatedCreds] = useState<{
+    name: string
+    studentCode: string
+    email: string
+    password: string
+    phone: string
+  } | null>(null)
+  const [whatsAppState, setWhatsAppState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [copied, setCopied] = useState(false)
 
   const isEdit = !!student
 
@@ -283,7 +340,7 @@ export default function StudentForm({
     studentDocId: string,
     email: string,
     name: string,
-  ): Promise<string | undefined> {
+  ): Promise<{ uid: string; password: string; created: boolean } | undefined> {
     const password = generateTempPassword()
     const res = await fetch('/api/students/create-account', {
       method: 'POST',
@@ -294,9 +351,12 @@ export default function StudentForm({
       const data = (await res.json()) as { error?: string }
       throw new Error(data.error ?? 'Failed to create login account')
     }
-    const data = (await res.json()) as { uid: string }
-    await sendCredentialsEmail(email, name, password)
-    return data.uid
+    // The API echoes back the password it actually set (and whether a brand-new
+    // account was created vs. an existing one reused).
+    const data = (await res.json()) as { uid: string; password?: string; created?: boolean }
+    const effectivePassword = data.password ?? password
+    await sendCredentialsEmail(email, name, effectivePassword)
+    return { uid: data.uid, password: effectivePassword, created: data.created ?? true }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -304,6 +364,14 @@ export default function StudentForm({
     if (!user) return
     setSaving(true)
     setError('')
+
+    let pendingCreds: {
+      name: string
+      studentCode: string
+      email: string
+      password: string
+      phone: string
+    } | null = null
 
     try {
       const studentDocId = student?.id ?? doc(collection(db, 'students')).id
@@ -337,6 +405,15 @@ export default function StudentForm({
             }
           : null
 
+      const feeAmountNum = form.feeAmount ? Number(form.feeAmount) : 0
+      const paidAmountNum = form.paymentStatus === 'partial' ? (Number(form.paidAmount) || 0) : 0
+      const pendingAmountNum =
+        form.paymentStatus === 'paid'
+          ? 0
+          : form.paymentStatus === 'partial'
+            ? Math.max(0, feeAmountNum - paidAmountNum)
+            : feeAmountNum
+
       const payload = {
         name: form.name.trim(),
         nic: form.nic.trim(),
@@ -366,6 +443,8 @@ export default function StudentForm({
         feeCurrency: form.feeCurrency,
         registrationFee: form.feeAmount ? Number(form.feeAmount) : 0,
         paymentStatus: form.paymentStatus,
+        paidAmount: paidAmountNum,
+        pendingAmount: pendingAmountNum,
         status: form.status,
         visaStatus: form.visaStatus,
         notes: form.notes.trim() || null,
@@ -375,6 +454,22 @@ export default function StudentForm({
 
       if (isEdit) {
         await updateDoc(doc(db, 'students', studentDocId), payload)
+        try {
+          await syncPaymentPlan({
+            studentDocId,
+            studentName: form.name.trim(),
+            studentCode: student?.studentCode ?? '',
+            courseId: form.courseId,
+            location: form.location || 'ahangama',
+            branchId: user.branchId ?? 'galle-main',
+            feeAmount: feeAmountNum,
+            feeCurrency: form.feeCurrency,
+            paymentStatus: form.paymentStatus,
+            paidAmount: paidAmountNum,
+          })
+        } catch (planErr) {
+          console.warn('[StudentForm] Payment plan sync skipped:', planErr)
+        }
         if (
           student &&
           student.visaStatus !== form.visaStatus &&
@@ -425,15 +520,43 @@ export default function StudentForm({
           createdBy: user.uid,
         })
 
+        try {
+          await syncPaymentPlan({
+            studentDocId,
+            studentName: form.name.trim(),
+            studentCode,
+            courseId: form.courseId,
+            location: form.location || 'ahangama',
+            branchId: user.branchId ?? 'galle-main',
+            feeAmount: feeAmountNum,
+            feeCurrency: form.feeCurrency,
+            paymentStatus: form.paymentStatus,
+            paidAmount: paidAmountNum,
+          })
+        } catch (planErr) {
+          console.warn('[StudentForm] Payment plan sync skipped:', planErr)
+        }
+
         if (form.email.trim()) {
           try {
-            const uid = await createAuthAccount(
+            const authResult = await createAuthAccount(
               studentDocId,
               form.email.trim(),
               form.name.trim(),
             )
-            if (uid) {
-              await updateDoc(doc(db, 'students', studentDocId), { uid })
+            if (authResult?.uid) {
+              await updateDoc(doc(db, 'students', studentDocId), { uid: authResult.uid })
+              // Only surface credentials for a genuinely new account — an existing
+              // account's real password wasn't changed, so showing one would mislead.
+              if (authResult.created) {
+                pendingCreds = {
+                  name: form.name.trim(),
+                  studentCode,
+                  email: form.email.trim(),
+                  password: authResult.password,
+                  phone: form.mobile.trim(),
+                }
+              }
             }
           } catch (authErr) {
             console.warn('[StudentForm] Auth account skipped:', authErr)
@@ -483,7 +606,14 @@ export default function StudentForm({
       }
 
       onSaved()
-      onClose()
+      if (pendingCreds) {
+        // Keep the credentials on screen until reception explicitly closes them.
+        setWhatsAppState('idle')
+        setCopied(false)
+        setCreatedCreds(pendingCreds)
+      } else {
+        onClose()
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save student')
     } finally {
@@ -491,10 +621,66 @@ export default function StudentForm({
     }
   }
 
-  if (!open) return null
+  async function sendCredsWhatsApp() {
+    if (!createdCreds) return
+    if (!createdCreds.phone) {
+      setWhatsAppState('error')
+      return
+    }
+    setWhatsAppState('sending')
+    try {
+      const token = await auth.currentUser?.getIdToken()
+      const res = await fetch('/api/students/send-credentials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          phone: createdCreds.phone,
+          studentName: createdCreds.name,
+          email: createdCreds.email,
+          password: createdCreds.password,
+          studentCode: createdCreds.studentCode,
+        }),
+      })
+      const data = (await res.json()) as { success?: boolean }
+      setWhatsAppState(data.success ? 'sent' : 'error')
+    } catch {
+      setWhatsAppState('error')
+    }
+  }
+
+  async function copyCreds() {
+    if (!createdCreds) return
+    const text =
+      `EPIC Campus login details\n` +
+      `Name: ${createdCreds.name}\n` +
+      `Student Code: ${createdCreds.studentCode}\n` +
+      `Portal: epiccampus.live\n` +
+      `Email: ${createdCreds.email}\n` +
+      `Password: ${createdCreds.password}`
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      /* clipboard blocked — ignore */
+    }
+  }
+
+  function closeCredsModal() {
+    setCreatedCreds(null)
+    onClose()
+  }
+
+  // Credentials modal survives even after the form aside is dismissed.
+  if (!open && !createdCreds) return null
 
   return (
     <>
+      {open && (
+      <>
       <div
         className="fixed inset-0 z-40 bg-[#0D1B2A]/40 backdrop-blur-sm"
         onClick={onClose}
@@ -933,6 +1119,31 @@ export default function StudentForm({
                   <option value="paid">Paid</option>
                 </SelectInput>
               </div>
+
+              {form.paymentStatus === 'partial' && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <FieldLabel>Amount Paid *</FieldLabel>
+                    <TextInput
+                      type="number"
+                      value={form.paidAmount}
+                      onChange={(v) => setField('paidAmount', v)}
+                      placeholder="0"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>Pending Amount</FieldLabel>
+                    <div className="w-full rounded-lg border border-[#DDE3EC] bg-[#F5F7FB] px-3 py-2.5 font-inter text-base font-bold text-[#E8A020] sm:text-sm">
+                      {form.feeCurrency}{' '}
+                      {Math.max(
+                        0,
+                        (Number(form.feeAmount) || 0) - (Number(form.paidAmount) || 0),
+                      ).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <SectionTitle icon="ti-file-description" title="Status & Documents" />
@@ -996,6 +1207,88 @@ export default function StudentForm({
           </div>
         </form>
       </aside>
+      </>
+      )}
+
+      {/* Success — show generated login credentials for a newly created student */}
+      {createdCreds && (
+        <>
+          <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm" aria-hidden="true" />
+          <div className="fixed left-1/2 top-1/2 z-[60] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white dark:bg-[#1A1535] p-6 shadow-2xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+                <span className="ti ti-circle-check text-2xl text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <h2 className="font-jakarta text-lg font-bold text-[#0D1B2A] dark:text-white">Student account created</h2>
+                <p className="text-xs text-[#5A6A7A] dark:text-white/50">Share these login details with the student.</p>
+              </div>
+            </div>
+
+            <div className="space-y-2 rounded-xl bg-[#F5F7FB] dark:bg-white/[0.04] px-4 py-3 text-sm">
+              <div className="flex justify-between gap-3">
+                <span className="text-[#5A6A7A] dark:text-white/50">Name</span>
+                <span className="font-semibold text-[#0D1B2A] dark:text-white">{createdCreds.name}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-[#5A6A7A] dark:text-white/50">Student Code</span>
+                <span className="font-mono font-semibold text-[#0D1B2A] dark:text-white">{createdCreds.studentCode}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-[#5A6A7A] dark:text-white/50">Email</span>
+                <span className="font-semibold text-[#0D1B2A] dark:text-white break-all">{createdCreds.email}</span>
+              </div>
+              <div className="flex justify-between gap-3 border-t border-[#DDE3EC] dark:border-white/[0.08] pt-2">
+                <span className="text-[#5A6A7A] dark:text-white/50">Password</span>
+                <span className="font-mono text-base font-bold text-[#0B3D6B] dark:text-[#E8A020]">{createdCreds.password}</span>
+              </div>
+            </div>
+
+            <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+              Note: Student must have WhatsApp active on this number.
+            </div>
+
+            {whatsAppState === 'sent' && (
+              <p className="mt-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">✓ Sent via WhatsApp</p>
+            )}
+            {whatsAppState === 'error' && (
+              <p className="mt-2 text-xs font-semibold text-red-600 dark:text-red-400">
+                Could not send WhatsApp{createdCreds.phone ? ' — number may not be on WhatsApp' : ' — no phone number on file'}. Copy the details instead.
+              </p>
+            )}
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => void copyCreds()}
+                className="flex-1 rounded-xl border border-gray-200 dark:border-white/10 py-2.5 text-sm font-semibold text-gray-700 dark:text-white/70 hover:bg-gray-50 dark:hover:bg-white/[0.06]"
+              >
+                <span className="ti ti-copy mr-1" /> {copied ? 'Copied!' : 'Copy credentials'}
+              </button>
+              <button
+                type="button"
+                disabled={whatsAppState === 'sending'}
+                onClick={() => void sendCredsWhatsApp()}
+                className="flex-[2] rounded-xl bg-green-600 py-2.5 text-sm font-bold text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                {whatsAppState === 'sending' ? (
+                  <><span className="ti ti-loader animate-spin mr-1" /> Sending…</>
+                ) : (
+                  <><span className="ti ti-brand-whatsapp mr-1" /> Send via WhatsApp</>
+                )}
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={closeCredsModal}
+              className="mt-3 w-full rounded-xl py-2 text-sm font-semibold text-[#5A6A7A] dark:text-white/60 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06]"
+            >
+              Close
+            </button>
+          </div>
+        </>
+      )}
     </>
   )
 }

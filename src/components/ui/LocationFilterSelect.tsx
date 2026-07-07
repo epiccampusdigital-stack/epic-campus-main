@@ -13,7 +13,7 @@ interface LocationFilterSelectProps {
 export default function LocationFilterSelect({
   value,
   onChange,
-  className = 'rounded-lg border border-[#DDE3EC] bg-white px-3 py-2.5 font-inter text-sm text-[#0D1B2A] outline-none focus:border-[#E8A020] dark:border-gray-600 dark:bg-gray-900 dark:text-white',
+  className = 'rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 font-inter text-sm text-gray-900 dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]',
   id,
 }: LocationFilterSelectProps) {
   return (
