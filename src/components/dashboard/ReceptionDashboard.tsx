@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { parseStudent } from '@/lib/students/helpers'
+import { parsePayment } from '@/lib/payments/helpers'
+import { formatLKR } from '@/lib/utils/formatCurrency'
 import { useManagement } from '@/components/layout/ManagementContext'
 
 function StatSkeleton() {
@@ -16,13 +18,20 @@ function StatSkeleton() {
   )
 }
 
-export default function ReceptionDashboard() {
+interface FinanceSummary {
+  monthIncome: number
+  todayCollection: number
+  pendingPayments: number
+}
+
+export default function ReceptionDashboard({ showFinances = false }: { showFinances?: boolean }) {
   const { user } = useManagement()
   const [loading, setLoading] = useState(true)
   const [pendingEnrollments, setPendingEnrollments] = useState<any[]>([])
   const [newStudentsCount, setNewStudentsCount] = useState(0)
   const [unreadMessages, setUnreadMessages] = useState(0)
   const [todayConsultations, setTodayConsultations] = useState(0)
+  const [finance, setFinance] = useState<FinanceSummary | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -81,6 +90,44 @@ export default function ReceptionDashboard() {
     void load()
   }, [])
 
+  // Finance summary only loads when the account has finance access enabled.
+  useEffect(() => {
+    if (!showFinances) {
+      setFinance(null)
+      return
+    }
+    let cancelled = false
+    async function loadFinance() {
+      try {
+        const snap = await getDocs(collection(db, 'payments'))
+        const monthKey = new Date().toISOString().slice(0, 7)
+        const today = new Date().toISOString().slice(0, 10)
+        let monthIncome = 0
+        let todayCollection = 0
+        let pendingPayments = 0
+        snap.docs.forEach((d) => {
+          const p = parsePayment(d.id, d.data() as Record<string, unknown>)
+          if (p.status === 'pending' || p.status === 'partial') pendingPayments++
+          if (p.status === 'paid' || p.status === 'partial') {
+            const lkr = p.currency === 'USD' ? p.amount * 320 : p.amount
+            if (p.paymentDate.slice(0, 7) === monthKey) {
+              monthIncome += lkr
+              if (p.paymentDate.slice(0, 10) === today) todayCollection += lkr
+            }
+          }
+        })
+        if (!cancelled) setFinance({ monthIncome, todayCollection, pendingPayments })
+      } catch (err) {
+        console.error('[ReceptionDashboard] finance', err)
+        if (!cancelled) setFinance(null)
+      }
+    }
+    void loadFinance()
+    return () => {
+      cancelled = true
+    }
+  }, [showFinances])
+
   const quickActions = [
     { label: 'New Enrollment', href: '/enrollments', icon: 'ti-clipboard-list' },
     { label: 'Students', href: '/students', icon: 'ti-users' },
@@ -138,6 +185,28 @@ export default function ReceptionDashboard() {
           </>
         )}
       </div>
+
+      {showFinances && finance && (
+        <section>
+          <p className="mb-3 font-inter text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-white/30">
+            Finance Summary
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="stat-card-glass card-hover p-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Month Income</p>
+              <p className="mt-2 text-2xl font-bold text-[#059669]">{formatLKR(finance.monthIncome)}</p>
+            </div>
+            <div className="stat-card-glass card-hover p-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Today&apos;s Collection</p>
+              <p className="mt-2 text-2xl font-bold text-[#0B3D6B] dark:text-[#E8A020]">{formatLKR(finance.todayCollection)}</p>
+            </div>
+            <div className="stat-card-glass card-hover p-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Pending Payments</p>
+              <p className="mt-2 text-2xl font-bold text-[#d97706]">{finance.pendingPayments}</p>
+            </div>
+          </div>
+        </section>
+      )}
 
       <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:border-white/[0.08] dark:bg-white/[0.04]">
         <h2 className="mb-4 font-jakarta text-lg font-bold text-[#0B3D6B] dark:text-white">Pending Enrollments</h2>

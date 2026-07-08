@@ -63,11 +63,11 @@ export default function StudentMessagesPage() {
   }, [messages, recipient])
 
   async function handleSend() {
-    if (!input.trim() || sending || !student || !user) return
+    const text = input.trim()
+    if (!text || sending || !student || !user) return
     setSending(true)
+    setInput('')
     try {
-      const text = input.trim()
-      setInput('')
       const threadName = recipient === 'admin' ? 'thread_admin' : 'thread_teacher'
 
       await addDoc(collection(db, 'messages', student.id, threadName), {
@@ -102,6 +102,9 @@ export default function StudentMessagesPage() {
       }
     } catch (err) {
       console.error('[StudentMessages] send error', err)
+      // Restore the typed message so it isn't lost on a failed send.
+      setInput(text)
+      alert('Failed to send message. Please try again.')
     } finally {
       setSending(false)
     }

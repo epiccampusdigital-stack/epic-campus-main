@@ -153,6 +153,7 @@ export default function MyVisaPage() {
 
   async function handleDelete(docKey: string, docLabel: string) {
     if (!student) return
+    if (!window.confirm('Are you sure you want to remove this document? This cannot be undone.')) return
     setDeleting((p) => ({ ...p, [docKey]: true }))
     try {
       const existing = uploadedDocs[docKey]

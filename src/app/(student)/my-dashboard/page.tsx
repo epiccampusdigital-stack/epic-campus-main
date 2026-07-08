@@ -62,7 +62,7 @@ export default function MyDashboardPage() {
           ).catch(() => ({ docs: [] })),
           getDocs(
             query(
-              collection(db, 'examResults'),
+              collection(db, 'examAttempts'),
               where('studentId', '==', studentId),
             ),
           ).catch(() => ({ docs: [] })),

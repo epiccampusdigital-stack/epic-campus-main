@@ -27,7 +27,8 @@ service cloud.firestore {
         resource.data.uid == request.auth.uid ||
         request.auth.token.role in ['admin', 'owner', 'reception', 'accountant', 'teacher', 'examCoordinator', 'agent']
       );
-      allow create: if request.auth != null;
+      allow create: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'reception'];
       allow update: if request.auth != null && (
         request.auth.uid == studentId ||
         resource.data.uid == request.auth.uid ||
@@ -91,6 +92,9 @@ service cloud.firestore {
         request.auth.token.role in ['admin', 'owner', 'teacher', 'examCoordinator'];
     }
 
+    // KNOWN LIMITATION: Firestore rules cannot hide a single field (correctIndex) from
+    // students, and the exam-taking UI must read this collection, so read stays open to
+    // any authenticated user. Do not tighten without moving answer-checking server-side.
     match /examQuestions/{questionId} {
       allow read: if request.auth != null;
       allow create, update, delete: if request.auth != null &&
@@ -112,10 +116,12 @@ service cloud.firestore {
     }
 
     match /examAttemptAnswers/{answerId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        (resource.data.studentId == request.auth.uid ||
+         request.auth.token.role in ['admin', 'owner', 'teacher', 'examCoordinator']);
       allow create: if request.auth != null;
       allow update, delete: if request.auth != null &&
-        request.auth.token.role in ['admin', 'owner', 'teacher'];
+        request.auth.token.role in ['admin', 'owner', 'teacher', 'examCoordinator'];
     }
 
     // Leads — staff only
@@ -133,7 +139,10 @@ service cloud.firestore {
     }
 
     match /notifications/{docId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null &&
+        (resource.data.userId == request.auth.uid ||
+         request.auth.token.role in ['admin', 'owner']);
+      allow create: if request.auth != null;
     }
 
     match /parentAccounts/{accountId} {
@@ -228,6 +237,15 @@ service cloud.firestore {
         request.auth.token.role in ['kitchen', 'admin', 'owner'];
     }
 
+    // Unified stock-change log (kitchen inventory + supplies). Immutable audit trail.
+    match /inventoryLogs/{logId} {
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['kitchen', 'admin', 'owner', 'accountant', 'reception'];
+      allow create: if request.auth != null &&
+        request.auth.token.role in ['kitchen', 'admin', 'owner', 'accountant', 'reception'];
+      allow update, delete: if false;
+    }
+
     match /kitchen_intake/{docId} {
       allow read: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'accountant', 'kitchen'];
@@ -248,7 +266,7 @@ service cloud.firestore {
 
     match /wasteLog/{doc} {
       allow read, write: if request.auth != null &&
-        request.auth.token.role in ['admin', 'owner', 'kitchen', 'kitchenStaff', 'kitchen_staff', 'accountant'];
+        request.auth.token.role in ['admin', 'owner', 'kitchen', 'accountant'];
     }
 
     match /kitchenOrders/{doc} {
@@ -425,11 +443,37 @@ service cloud.firestore {
         request.auth.token.role in ['admin','owner'];
     }
 
-    match /messages/{docId} {
-      allow read, write: if request.auth != null;
+    match /messages/{studentId} {
+      allow read, write: if request.auth != null &&
+        (request.auth.uid == studentId ||
+         request.auth.token.role in ['admin', 'owner', 'teacher', 'reception']);
     }
 
-    match /messages/{docId}/{subCol}/{subDocId} {
+    match /messages/{studentId}/{subCol}/{docId} {
+      allow read, write: if request.auth != null &&
+        (request.auth.uid == studentId ||
+         request.auth.token.role in ['admin', 'owner', 'teacher', 'reception']);
+    }
+
+    match /visaApplications/{docId} {
+      allow read: if request.auth != null &&
+        (resource.data.studentId == request.auth.uid ||
+         request.auth.token.role in ['admin', 'owner', 'reception']);
+      allow write: if request.auth != null &&
+        (request.auth.token.role in ['admin', 'owner', 'reception'] ||
+         resource.data.studentId == request.auth.uid);
+    }
+
+    match /conversations/{docId} {
+      allow read, write: if request.auth != null &&
+        (resource.data.studentId == request.auth.uid ||
+         request.auth.token.role in ['admin', 'owner', 'teacher', 'reception']);
+    }
+
+    match /messageThreads/{threadId} {
+      allow read, write: if request.auth != null;
+    }
+    match /messageThreads/{threadId}/messages/{msgId} {
       allow read, write: if request.auth != null;
     }
 

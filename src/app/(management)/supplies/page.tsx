@@ -15,6 +15,7 @@ import {
 import { db } from '@/lib/firebase/client'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { formatLKR } from '@/lib/utils/formatCurrency'
+import { writeStockLog } from '@/lib/kitchen/stockLog'
 import type {
   SupplyItem,
   SuppliesCategory,
@@ -181,10 +182,35 @@ export default function SuppliesPage() {
         updatedByName: user?.displayName ?? '',
         lastUpdated: serverTimestamp(),
       }
+      const newStockNum = Number(form.currentStock)
       if (editItem) {
         await updateDoc(doc(db, 'supplies', editItem.id), data)
+        if (newStockNum !== editItem.currentStock) {
+          await writeStockLog({
+            itemId: editItem.id,
+            itemName: data.itemName,
+            changeType: 'adjust',
+            previousQty: editItem.currentStock,
+            newQty: newStockNum,
+            unit: data.unit,
+            changedBy: user?.uid ?? '',
+            changedByName: user?.displayName ?? 'Staff',
+            source: 'supplies',
+          })
+        }
       } else {
-        await addDoc(collection(db, 'supplies'), data)
+        const ref = await addDoc(collection(db, 'supplies'), data)
+        await writeStockLog({
+          itemId: ref.id,
+          itemName: data.itemName,
+          changeType: 'add',
+          previousQty: 0,
+          newQty: newStockNum,
+          unit: data.unit,
+          changedBy: user?.uid ?? '',
+          changedByName: user?.displayName ?? 'Staff',
+          source: 'supplies',
+        })
       }
       setModalOpen(false)
       setEditItem(null)
@@ -219,6 +245,17 @@ export default function SuppliesPage() {
         byName: user?.displayName ?? '',
         createdAt: serverTimestamp(),
       })
+      await writeStockLog({
+        itemId: restockItem.id,
+        itemName: restockItem.itemName,
+        changeType: 'add',
+        previousQty: restockItem.currentStock,
+        newQty: newStock,
+        unit: restockItem.unit,
+        changedBy: user?.uid ?? '',
+        changedByName: user?.displayName ?? 'Staff',
+        source: 'supplies',
+      })
       setItems((prev) => prev.map((i) => (i.id === restockItem.id ? { ...i, currentStock: newStock } : i)))
       setRestockItem(null)
       setRestockQty('')
@@ -250,6 +287,17 @@ export default function SuppliesPage() {
         by: user?.uid ?? '',
         byName: user?.displayName ?? '',
         createdAt: serverTimestamp(),
+      })
+      await writeStockLog({
+        itemId: removeItem.id,
+        itemName: removeItem.itemName,
+        changeType: 'remove',
+        previousQty: removeItem.currentStock,
+        newQty: newStock,
+        unit: removeItem.unit,
+        changedBy: user?.uid ?? '',
+        changedByName: user?.displayName ?? 'Staff',
+        source: 'supplies',
       })
       setItems((prev) => prev.map((i) => (i.id === removeItem.id ? { ...i, currentStock: newStock } : i)))
       setRemoveItem(null)

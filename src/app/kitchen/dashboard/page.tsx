@@ -74,9 +74,18 @@ export default function KitchenDashboardPage() {
   const [budgetModalOpen, setBudgetModalOpen] = useState(false)
   const [budgetInput, setBudgetInput] = useState('')
   const [budgetSaving, setBudgetSaving] = useState(false)
+  const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' } | null>(null)
+  const [studentCount, setStudentCount] = useState(0)
+  const [kitchenStaffCount, setKitchenStaffCount] = useState(0)
 
   const isAdmin = user?.role === 'admin' || user?.role === 'owner'
   const monthKey = thisMonthPrefix()
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(t)
+  }, [toast])
 
   useEffect(() => {
     async function load() {
@@ -86,12 +95,26 @@ export default function KitchenDashboardPage() {
         const monthStr = thisMonthPrefix()
         const weekAgoStr = weekAgo()
 
-        const [mealSnap, wasteSnap, invSnap, budgetSnap] = await Promise.all([
+        const [mealSnap, wasteSnap, invSnap, budgetSnap, studentsSnap, kitchenUsersSnap] = await Promise.all([
           getDocs(collection(db, 'mealLogs')),
           getDocs(query(collection(db, 'wasteLog'), where('date', '>=', weekAgoStr))),
           getDocs(query(collection(db, 'inventory'), where('isActive', '==', true))),
           getDoc(doc(db, 'kitchenBudget', monthStr)),
+          // Active students + kitchen staff for the head-count cards. Wrapped in
+          // .catch so a Firestore-rules denial (kitchen role) degrades to 0 rather
+          // than breaking the whole dashboard load.
+          getDocs(query(collection(db, 'students'), where('status', '==', 'active'))).catch(() => null),
+          getDocs(query(collection(db, 'users'), where('role', '==', 'kitchen'))).catch(() => null),
         ])
+
+        // Active students = status === 'active' (matches the Students list filter).
+        setStudentCount(studentsSnap ? studentsSnap.docs.length : 0)
+        // Kitchen staff = role 'kitchen' AND active (treat a missing status as active).
+        setKitchenStaffCount(
+          kitchenUsersSnap
+            ? kitchenUsersSnap.docs.filter((d) => String(d.data().status ?? 'active') === 'active').length
+            : 0,
+        )
 
         const allMeals = mealSnap.docs.map((d) => {
           const data = d.data()
@@ -143,6 +166,8 @@ export default function KitchenDashboardPage() {
   const remaining = monthlyBudget - monthCost
   const dailyAvg = dayOfMonth() > 0 ? monthCost / dayOfMonth() : 0
   const projectedMonthEnd = dailyAvg * daysInCurrentMonth()
+  // Rough per-student daily food cost — helps kitchen judge cost efficiency.
+  const perStudentDaily = studentCount > 0 && monthCost > 0 ? monthCost / studentCount / 30 : 0
 
   let barColor = 'bg-emerald-500'
   if (budgetPct >= 100) barColor = 'bg-red-600'
@@ -164,15 +189,30 @@ export default function KitchenDashboardPage() {
         { merge: true },
       )
       setMonthlyBudget(amount)
+      setToast({ msg: 'Budget saved', kind: 'success' })
       setBudgetModalOpen(false)
     } catch (err) {
-      console.error('[KitchenBudget]', err)
+      console.error('Failed to save budget:', err)
+      setToast({ msg: 'Failed to save budget. Please try again.', kind: 'error' })
+      // keep the modal open so they can retry
     } finally {
       setBudgetSaving(false)
     }
   }
 
   const statCards = [
+    {
+      label: 'Active Students',
+      value: loading ? '…' : String(studentCount),
+      icon: 'ti-school',
+      color: 'text-[#0B3D6B] dark:text-[#1A6BAD]',
+    },
+    {
+      label: 'Kitchen Staff',
+      value: loading ? '…' : String(kitchenStaffCount),
+      icon: 'ti-chef-hat',
+      color: 'text-[#E8A020]',
+    },
     {
       label: 'Meals Today',
       value: loading ? '…' : String(todayServings),
@@ -211,6 +251,11 @@ export default function KitchenDashboardPage() {
 
   return (
     <div className="space-y-5 md:space-y-6">
+      {toast && (
+        <div className={`fixed bottom-6 right-4 z-[70] rounded-xl px-5 py-3 text-sm font-medium text-white shadow-lg ${toast.kind === 'error' ? 'bg-red-600' : 'bg-emerald-600'}`}>
+          {toast.msg}
+        </div>
+      )}
       {!loading && lowStockCount > 0 && (
         <div className="w-full rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-700/40 dark:bg-amber-900/20">
           <div className="flex items-center gap-2">
@@ -342,6 +387,12 @@ export default function KitchenDashboardPage() {
           <p className="text-sm text-gray-500 dark:text-white/50">
             No budget set for this month.
             {isAdmin && ' Click Edit Budget to set one.'}
+          </p>
+        )}
+
+        {perStudentDaily > 0 && (
+          <p className="mt-3 border-t border-[#DDE3EC] pt-2 text-xs font-medium text-[#0B3D6B] dark:border-white/[0.06] dark:text-white/60">
+            ~{formatLKR(perStudentDaily)} per student per day
           </p>
         )}
       </div>

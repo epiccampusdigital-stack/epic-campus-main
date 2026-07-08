@@ -113,6 +113,13 @@ export function parseAttempt(id: string, data: Record<string, unknown>): ExamAtt
           ? Number(data.speakingScore)
           : undefined,
     totalScore: data.totalScore != null ? Number(data.totalScore) : undefined,
+    // JFT MCQ engine writes `percentage` (0–100); fall back to legacy `marks250` scale.
+    percentage:
+      data.percentage != null
+        ? Number(data.percentage)
+        : data.marks250 != null
+          ? Math.round((Number(data.marks250) / 250) * 100)
+          : undefined,
     grade: data.grade ? String(data.grade) : undefined,
     markingStatus: (data.markingStatus as ExamAttempt['markingStatus']) ?? 'pending',
     createdAt: created?.toISOString() ?? new Date().toISOString(),

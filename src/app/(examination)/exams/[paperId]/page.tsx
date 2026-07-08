@@ -27,6 +27,7 @@ interface ExamPaper {
   hasAudioCheck?: boolean
   isPublished?: boolean
   isUnlocked?: boolean
+  maxAttempts?: number
 }
 
 interface ExamSection {
@@ -139,6 +140,8 @@ export default function ExamPage() {
   const [audioChecked, setAudioChecked] = useState(false)
   const [score, setScore] = useState<{ correct: number; total: number; pct: number } | null>(null)
   const [error, setError] = useState('')
+  const [toast, setToast] = useState('')
+  const [attemptCount, setAttemptCount] = useState(0)
 
   const load = useCallback(async () => {
     if (!paperId) return
@@ -179,6 +182,27 @@ export default function ExamPage() {
 
   useEffect(() => { void load() }, [load])
 
+  // Count this student's previous completed attempts for this paper — used to
+  // enforce paper.maxAttempts on the "Try Again" button.
+  useEffect(() => {
+    const uid = user?.uid
+    if (!paperId || !uid) return
+    let cancelled = false
+    async function loadAttempts() {
+      try {
+        const snap = await getDocs(
+          query(collection(db, 'examAttempts'), where('studentId', '==', uid)),
+        )
+        if (cancelled) return
+        setAttemptCount(snap.docs.filter(d => d.data().paperId === paperId).length)
+      } catch (err) {
+        console.error('[ExamPage attempts]', err)
+      }
+    }
+    void loadAttempts()
+    return () => { cancelled = true }
+  }, [paperId, user])
+
   useEffect(() => {
     if (phase !== 'exam') return
     if (timeLeft <= 0) { void handleSubmit(); return }
@@ -188,6 +212,7 @@ export default function ExamPage() {
 
   async function handleSubmit() {
     if (!paper) return
+    setToast('')
     setPhase('submitting')
     try {
       const correct = questions.filter(q => Number(answers[q.id]) === Number(q.correctIndex)).length
@@ -209,10 +234,14 @@ export default function ExamPage() {
         completedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
       })
+      // Only advance to results after the attempt was actually saved.
+      setAttemptCount(c => c + 1)
+      setPhase('results')
     } catch (err) {
       console.error('[ExamPage submit]', err)
-    } finally {
-      setPhase('results')
+      // Keep the exam state so the student can retry submitting.
+      setToast('Failed to save your results. Please check your connection and try again.')
+      setPhase('exam')
     }
   }
 
@@ -229,6 +258,7 @@ export default function ExamPage() {
   const answered = Object.keys(answers).length
   const timerWarn = timeLeft < 300
   const passed = score && paper && score.pct >= (paper.passMark ?? 80)
+  const maxReached = paper?.maxAttempts != null && attemptCount >= paper.maxAttempts
 
   // ── LOADING ──
   if (phase === 'loading') return (
@@ -419,13 +449,19 @@ export default function ExamPage() {
 
         <div className="flex gap-3">
           <button type="button" onClick={() => router.push('/exams')} className="flex-1 rounded-xl border border-[#DDE3EC] bg-white py-3 text-sm font-semibold text-[#5A6A7A]">All Exams</button>
-          <button
-            type="button"
-            onClick={() => { setAnswers({}); setFlagged(new Set()); setCurrentQ(0); setTimeLeft(paper?.timeLimitSeconds ?? 3600); setScore(null); setPhase('start') }}
-            className="flex-1 rounded-xl bg-[#E8A020] py-3 text-sm font-bold text-[#0B3D6B]"
-          >
-            Try Again
-          </button>
+          {maxReached ? (
+            <div className="flex-1 rounded-xl border border-[#DDE3EC] bg-[#F5F7FB] py-3 text-center text-sm font-semibold text-[#5A6A7A]">
+              Maximum attempts reached
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setAnswers({}); setFlagged(new Set()); setCurrentQ(0); setTimeLeft(paper?.timeLimitSeconds ?? 3600); setScore(null); setPhase('start') }}
+              className="flex-1 rounded-xl bg-[#E8A020] py-3 text-sm font-bold text-[#0B3D6B]"
+            >
+              Try Again
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -434,6 +470,11 @@ export default function ExamPage() {
   // ── EXAM ──
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#F5F7FB] dark:bg-[#04090f]">
+      {toast && (
+        <div className="fixed left-1/2 top-4 z-[60] -translate-x-1/2 rounded-xl bg-red-600 px-5 py-3 text-center text-sm font-semibold text-white shadow-lg">
+          {toast}
+        </div>
+      )}
       {/* Top bar */}
       <div className={`flex shrink-0 items-center justify-between px-4 py-3 ${timerWarn ? 'bg-red-600' : 'bg-[#0B3D6B]'}`}>
         <div className="flex items-center gap-3">

@@ -60,6 +60,7 @@ export default function ManagementLayout({
             ? (String(data.locationAssigned) as EpicUser['locationAssigned'])
             : undefined,
           studentId: data.studentId,
+          showFinances: data.showFinances === true,
           createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? new Date().toISOString(),
         })
       } catch {

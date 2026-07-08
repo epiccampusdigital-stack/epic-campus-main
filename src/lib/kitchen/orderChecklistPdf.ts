@@ -11,7 +11,7 @@ import type { OrderItem } from '@/types/kitchen'
  */
 export async function downloadOrderChecklistPdf(
   items: OrderItem[],
-  opts?: { campus?: string },
+  opts?: { campus?: string; dateRange?: string },
 ): Promise<void> {
   const { default: jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
@@ -33,6 +33,11 @@ export async function downloadOrderChecklistPdf(
   doc.setFontSize(9)
   doc.setTextColor(90, 106, 122)
   doc.text(`Date: ${dateStr}`, pageWidth - margin, margin + 2, { align: 'right' })
+  if (opts?.dateRange) {
+    doc.setFontSize(9)
+    doc.setTextColor(90, 106, 122)
+    doc.text(`Usage period: ${opts.dateRange}`, margin, margin + 7)
+  }
   doc.setTextColor(0, 0, 0)
 
   // ── Column layout (mm) ─────────────────────────────────────────────────

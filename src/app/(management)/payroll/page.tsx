@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { collection, doc, getDocs, orderBy, query, updateDoc } from 'firebase/firestore'
 import dynamic from 'next/dynamic'
+import { redirect } from 'next/navigation'
 import { db } from '@/lib/firebase/client'
+import { useManagement } from '@/components/layout/ManagementContext'
 import { formatLKR } from '@/lib/payments/helpers'
 import { parseStaff } from '@/lib/staff/helpers'
 import {
@@ -49,6 +51,7 @@ function StatCard({
 }
 
 export default function PayrollPage() {
+  const { user } = useManagement()
   const [records, setRecords] = useState<PayrollRecord[]>([])
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [loading, setLoading] = useState(true)
@@ -57,8 +60,16 @@ export default function PayrollPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [editRecord, setEditRecord] = useState<PayrollRecord | null>(null)
   const [slipRecord, setSlipRecord] = useState<PayrollRecord | null>(null)
+  const [processing, setProcessing] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' } | null>(null)
 
   const periodOptions = useMemo(() => getPeriodOptions(12), [])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(t)
+  }, [toast])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -107,8 +118,21 @@ export default function PayrollPage() {
   }, [period])
 
   async function markAsPaid(record: PayrollRecord) {
-    await updateDoc(doc(db, 'payroll', record.id), { status: 'paid' })
-    loadData()
+    if (!window.confirm(`Mark salary as paid for ${record.staffName}?`)) return
+    try {
+      setProcessing(record.id)
+      await updateDoc(doc(db, 'payroll', record.id), {
+        status: 'paid',
+        paidAt: new Date().toISOString(),
+      })
+      setToast({ msg: 'Salary marked as paid', kind: 'success' })
+      await loadData()
+    } catch (err) {
+      console.error('Failed to mark paid:', err)
+      setToast({ msg: 'Failed to update payroll. Please try again.', kind: 'error' })
+    } finally {
+      setProcessing(null)
+    }
   }
 
   function openEdit(record: PayrollRecord) {
@@ -116,8 +140,19 @@ export default function PayrollPage() {
     setFormOpen(true)
   }
 
+  // Payroll is sensitive — only admin/owner/accountant may view this page.
+  const allowedRoles = ['admin', 'owner', 'accountant']
+  if (user && !allowedRoles.includes(user.role)) {
+    redirect('/dashboard')
+  }
+
   return (
     <div className="space-y-6">
+      {toast && (
+        <div className={`fixed bottom-6 right-4 z-[70] rounded-xl px-5 py-3 text-sm font-medium text-white shadow-lg ${toast.kind === 'error' ? 'bg-red-600' : 'bg-emerald-600'}`}>
+          {toast.msg}
+        </div>
+      )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="font-jakarta text-2xl font-bold text-[#0B3D6B] dark:text-white">Payroll</h1>
@@ -273,10 +308,11 @@ export default function PayrollPage() {
                         {r.status !== 'paid' && (
                           <button
                             type="button"
+                            disabled={processing === r.id}
                             onClick={() => markAsPaid(r)}
-                            className="rounded-lg px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                            className="rounded-lg px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
                           >
-                            Mark Paid
+                            {processing === r.id ? 'Marking…' : 'Mark Paid'}
                           </button>
                         )}
                       </div>

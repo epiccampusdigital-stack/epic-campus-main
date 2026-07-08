@@ -70,6 +70,7 @@ function AccommodationPageContent() {
   const { user, hasRole } = useManagement()
   const [houses, setHouses] = useState<AccommodationHouse[]>([])
   const [billInfo, setBillInfo] = useState<Record<string, CurrentBillInfo>>({})
+  const [studentCounts, setStudentCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)
   const [toast, setToast] = useState('')
@@ -118,6 +119,17 @@ function AccommodationPageContent() {
         }),
       )
       setBillInfo(info)
+
+      // Count students assigned to each house (houseId on the student doc).
+      const studentsSnap = await getDocs(collection(db, 'students')).catch(() => null)
+      if (studentsSnap) {
+        const counts: Record<string, number> = {}
+        studentsSnap.docs.forEach((d) => {
+          const hid = String(d.data().houseId ?? '')
+          if (hid) counts[hid] = (counts[hid] ?? 0) + 1
+        })
+        setStudentCounts(counts)
+      }
     } catch (err) {
       console.error('[AccommodationPage]', err)
       setHouses([])
@@ -256,6 +268,9 @@ function AccommodationPageContent() {
                   <p>Capacity: {house.capacity} students</p>
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${pill.cls}`}>{pill.text}</span>
+                    <span className="inline-flex rounded-full bg-[#0B3D6B]/10 px-2.5 py-0.5 text-xs font-semibold text-[#0B3D6B] dark:bg-white/10 dark:text-white/70">
+                      {studentCounts[house.id] ?? 0} / {house.capacity} students
+                    </span>
                     <span className="text-xs text-[#5A6A7A] dark:text-white/40">
                       Utilities: {info?.hasBill ? formatLKR(info.utilities) : '—'}
                     </span>

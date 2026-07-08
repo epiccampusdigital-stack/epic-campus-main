@@ -26,6 +26,7 @@ import FoodEmoji from '@/components/kitchen/FoodEmoji'
 import { CATEGORY_PILLS, getFoodEmoji } from '@/lib/kitchen/foodImages'
 import { formatLKR } from '@/lib/utils/formatCurrency'
 import { formatQty } from '@/lib/kitchen-utils'
+import { writeStockLog } from '@/lib/kitchen/stockLog'
 import type { InventoryCategory, InventoryItem } from '@/types/kitchen'
 
 const CATEGORY_LABELS: Record<InventoryCategory, string> = {
@@ -357,6 +358,36 @@ export default function InventoryPage() {
         }
       }
 
+      // Log stock quantity changes: new item (add) or a manual edit that changed the count (adjust).
+      if (savedItemId) {
+        const newStockNum = parseFloat(values.currentStock)
+        if (slideMode === 'add') {
+          await writeStockLog({
+            itemId: savedItemId,
+            itemName: values.itemName,
+            changeType: 'add',
+            previousQty: 0,
+            newQty: newStockNum,
+            unit: values.unit,
+            changedBy: user?.uid ?? '',
+            changedByName: user?.displayName ?? 'Kitchen Staff',
+            source: 'kitchen',
+          })
+        } else if (editItem && newStockNum !== editItem.currentStock) {
+          await writeStockLog({
+            itemId: savedItemId,
+            itemName: values.itemName,
+            changeType: 'adjust',
+            previousQty: editItem.currentStock,
+            newQty: newStockNum,
+            unit: values.unit,
+            changedBy: user?.uid ?? '',
+            changedByName: user?.displayName ?? 'Kitchen Staff',
+            source: 'kitchen',
+          })
+        }
+      }
+
       setSlideMode(null)
       await loadItems()
     } catch (err) {
@@ -393,6 +424,17 @@ export default function InventoryPage() {
         byName: user?.displayName ?? '',
         createdAt: serverTimestamp(),
       })
+      await writeStockLog({
+        itemId: restockItem.id,
+        itemName: restockItem.itemName,
+        changeType: 'add',
+        previousQty: restockItem.currentStock,
+        newQty: newStock,
+        unit: restockItem.unit,
+        changedBy: user?.uid ?? '',
+        changedByName: user?.displayName ?? 'Kitchen Staff',
+        source: 'kitchen',
+      })
       setRestockItem(null)
       setRestockQty('')
       setRestockBrand('')
@@ -426,6 +468,17 @@ export default function InventoryPage() {
         by: user?.uid ?? '',
         byName: user?.displayName ?? '',
         createdAt: serverTimestamp(),
+      })
+      await writeStockLog({
+        itemId: removeItem.id,
+        itemName: removeItem.itemName,
+        changeType: 'remove',
+        previousQty: removeItem.currentStock,
+        newQty: newStock,
+        unit: removeItem.unit,
+        changedBy: user?.uid ?? '',
+        changedByName: user?.displayName ?? 'Kitchen Staff',
+        source: 'kitchen',
       })
       setItems((prev) =>
         prev.map((i) => (i.id === removeItem.id ? { ...i, currentStock: newStock } : i)),

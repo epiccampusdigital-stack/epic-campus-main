@@ -29,6 +29,8 @@ export interface EpicUser {
   studentId?: string
   /** Partner company document id when role is company */
   companyId?: string
+  /** Whether this staff member may view financial data on their dashboard */
+  showFinances?: boolean
   createdAt: string
 }
 
@@ -56,6 +58,8 @@ export interface StaffMember {
   salaryType: SalaryType
   baseSalary: number
   commissionRate?: number
+  /** Whether this staff member may view financial data on their dashboard */
+  showFinances?: boolean
   createdAt: string
   approvedBy?: string
   approvedAt?: string
@@ -540,6 +544,8 @@ export interface ExamAttempt {
   writingScore?: number
   speakingScore?: number | null
   totalScore?: number
+  /** 0–100 percentage score, written by the JFT MCQ exam engine (examAttempts.percentage). */
+  percentage?: number
   grade?: string
   markingStatus: ExamMarkingStatus
   createdAt: string

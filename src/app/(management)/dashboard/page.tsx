@@ -522,11 +522,11 @@ export default function DashboardPage() {
   const monthOptions = useMemo(() => getMonthPickerOptions(12), [])
 
   if (isPureTeacher) {
-    return <TeacherDashboard />
+    return <TeacherDashboard showFinances={user?.showFinances ?? false} />
   }
 
   if (isPureReception) {
-    return <ReceptionDashboard />
+    return <ReceptionDashboard showFinances={user?.showFinances ?? false} />
   }
 
   const statCards: { label: string; value: string; sub: string; amber?: boolean }[] = [

@@ -5,7 +5,9 @@ import Link from 'next/link'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { parseAttempt } from '@/lib/exam/helpers'
+import { parsePayment } from '@/lib/payments/helpers'
 import { parseStudent } from '@/lib/students/helpers'
+import { formatLKR } from '@/lib/utils/formatCurrency'
 import {
   computeTeacherStatCounts,
   TEACHER_STAT_LABELS,
@@ -14,7 +16,7 @@ import {
 import TeacherSessionsWidget from '@/components/sessions/TeacherSessionsWidget'
 import TeacherRiskWatchWidget from '@/components/risk/TeacherRiskWatchWidget'
 import { useManagement } from '@/components/layout/ManagementContext'
-import type { ExamAttempt, ExamResult, Student } from '@/types'
+import type { ExamAttempt, Student } from '@/types'
 
 function StatSkeleton() {
   return (
@@ -25,46 +27,31 @@ function StatSkeleton() {
   )
 }
 
-function parseExamResult(id: string, data: Record<string, unknown>): ExamResult {
-  return {
-    id,
-    examId: String(data.examId ?? ''),
-    studentId: String(data.studentId ?? ''),
-    score: data.score != null ? Number(data.score) : undefined,
-    band: data.band ? String(data.band) : undefined,
-    level: data.level ? String(data.level) : undefined,
-    status: (data.status as ExamResult['status']) ?? 'pending',
-    notes: data.notes ? String(data.notes) : undefined,
-    createdAt: String(data.createdAt ?? new Date().toISOString()),
-    createdBy: String(data.createdBy ?? ''),
-  }
-}
-
 const STAT_KEYS: TeacherStatFilter[] = ['active', 'passed', 'failed', 'dropped', 'repeats']
 
-export default function TeacherDashboard() {
+interface FinanceSummary {
+  monthIncome: number
+  todayCollection: number
+  pendingPayments: number
+}
+
+export default function TeacherDashboard({ showFinances = false }: { showFinances?: boolean }) {
   const { user } = useManagement()
   const [loading, setLoading] = useState(true)
   const [students, setStudents] = useState<Student[]>([])
-  const [examResults, setExamResults] = useState<ExamResult[]>([])
   const [examAttempts, setExamAttempts] = useState<ExamAttempt[]>([])
+  const [finance, setFinance] = useState<FinanceSummary | null>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [studentsSnap, resultsSnap, attemptsSnap] = await Promise.all([
+      const [studentsSnap, attemptsSnap] = await Promise.all([
         getDocs(collection(db, 'students')),
-        getDocs(collection(db, 'examResults')).catch(() => ({ docs: [] })),
         getDocs(collection(db, 'examAttempts')).catch(() => ({ docs: [] })),
       ])
       setStudents(
         studentsSnap.docs.map((d) =>
           parseStudent(d.id, d.data() as Record<string, unknown>),
-        ),
-      )
-      setExamResults(
-        resultsSnap.docs.map((d) =>
-          parseExamResult(d.id, d.data() as Record<string, unknown>),
         ),
       )
       setExamAttempts(
@@ -83,9 +70,47 @@ export default function TeacherDashboard() {
     void loadData()
   }, [loadData])
 
+  // Finance summary only loads when the account has finance access enabled.
+  useEffect(() => {
+    if (!showFinances) {
+      setFinance(null)
+      return
+    }
+    let cancelled = false
+    async function loadFinance() {
+      try {
+        const snap = await getDocs(collection(db, 'payments'))
+        const monthKey = new Date().toISOString().slice(0, 7)
+        const today = new Date().toISOString().slice(0, 10)
+        let monthIncome = 0
+        let todayCollection = 0
+        let pendingPayments = 0
+        snap.docs.forEach((d) => {
+          const p = parsePayment(d.id, d.data() as Record<string, unknown>)
+          if (p.status === 'pending' || p.status === 'partial') pendingPayments++
+          if (p.status === 'paid' || p.status === 'partial') {
+            const lkr = p.currency === 'USD' ? p.amount * 320 : p.amount
+            if (p.paymentDate.slice(0, 7) === monthKey) {
+              monthIncome += lkr
+              if (p.paymentDate.slice(0, 10) === today) todayCollection += lkr
+            }
+          }
+        })
+        if (!cancelled) setFinance({ monthIncome, todayCollection, pendingPayments })
+      } catch (err) {
+        console.error('[TeacherDashboard] finance', err)
+        if (!cancelled) setFinance(null)
+      }
+    }
+    void loadFinance()
+    return () => {
+      cancelled = true
+    }
+  }, [showFinances])
+
   const counts = useMemo(
-    () => computeTeacherStatCounts(students, examResults, examAttempts),
-    [students, examResults, examAttempts],
+    () => computeTeacherStatCounts(students, [], examAttempts),
+    [students, examAttempts],
   )
 
   return (
@@ -95,9 +120,45 @@ export default function TeacherDashboard() {
           Teacher Dashboard
         </h2>
         <p className="mt-1 font-inter text-sm text-[#5A6A7A] dark:text-white/50">
-          Student progress and one-on-one sessions — no financial data shown here.
+          {showFinances
+            ? 'Student progress, one-on-one sessions, and finance summary.'
+            : 'Student progress and one-on-one sessions — no financial data shown here.'}
         </p>
       </div>
+
+      {showFinances && finance && (
+        <section>
+          <p className="mb-3 font-inter text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-white/30">
+            Finance Summary
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="stat-card-glass p-6">
+              <p className="font-inter text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-white/50">
+                Month Income
+              </p>
+              <p className="font-jakarta mt-2 text-2xl font-black text-[#059669]">
+                {formatLKR(finance.monthIncome)}
+              </p>
+            </div>
+            <div className="stat-card-glass p-6">
+              <p className="font-inter text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-white/50">
+                Today&apos;s Collection
+              </p>
+              <p className="font-jakarta mt-2 text-2xl font-black text-[#0B3D6B] dark:text-[#E8A020]">
+                {formatLKR(finance.todayCollection)}
+              </p>
+            </div>
+            <div className="stat-card-glass p-6">
+              <p className="font-inter text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-white/50">
+                Pending Payments
+              </p>
+              <p className="font-jakarta mt-2 text-2xl font-black text-[#d97706]">
+                {finance.pendingPayments}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {loading

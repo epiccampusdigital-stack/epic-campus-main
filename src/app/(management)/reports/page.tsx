@@ -7,6 +7,7 @@ import {
   orderBy,
   query,
 } from 'firebase/firestore'
+import { redirect } from 'next/navigation'
 import { db } from '@/lib/firebase/client'
 import { useManagement } from '@/components/layout/ManagementContext'
 import {
@@ -35,10 +36,11 @@ interface Student {
 
 interface Payment {
   id: string
-  amount: number
+  amount?: number
   paymentDate?: string
   createdAt?: unknown
   status?: string
+  installments?: Array<{ status: string; paidAt: unknown; amount: number }>
 }
 
 interface Attempt {
@@ -90,23 +92,20 @@ export default function ReportsPage() {
   const [attempts, setAttempts] = useState<Attempt[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'overview' | 'enrollment' | 'finance' | 'exams'>('overview')
-  const [paymentPlans, setPaymentPlans] = useState<Array<{ installments?: Array<{ status: string; paidAt: unknown; amount: number }> }>>([])
 
   useEffect(() => {
     if (!user) return
     async function load() {
       setLoading(true)
       try {
-        const [studentsSnap, paymentsSnap, attemptsSnap, plansSnap] = await Promise.all([
+        const [studentsSnap, paymentsSnap, attemptsSnap] = await Promise.all([
           getDocs(collection(db, 'students')),
           getDocs(collection(db, 'payments')).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] })),
           getDocs(query(collection(db, 'examAttempts'), orderBy('finishedAt', 'desc'))).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] })),
-          getDocs(collection(db, 'payments')).catch(() => ({ docs: [] as { id: string; data: () => Record<string, unknown> }[] })),
         ])
         setStudents(studentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Student)))
         setPayments(paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Payment)))
         setAttempts(attemptsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Attempt)))
-        setPaymentPlans(plansSnap.docs.map(d => d.data() as { installments?: Array<{ status: string; paidAt: unknown; amount: number }> }))
       } catch (err) {
         console.error('[Reports]', err)
       } finally {
@@ -118,7 +117,7 @@ export default function ReportsPage() {
 
   const monthlyRevenue = useMemo(() => {
     const map: Record<string, number> = {}
-    paymentPlans.forEach(plan => {
+    payments.forEach(plan => {
       plan.installments?.forEach(inst => {
         if (inst.paidAt) {
           try {
@@ -134,11 +133,18 @@ export default function ReportsPage() {
     return Object.entries(map)
       .map(([month, revenue]) => ({ month, revenue }))
       .slice(-6)
-  }, [paymentPlans])
+  }, [payments])
 
   // ── Derived stats ────────────────────────────────────────────────────────
   const activeStudents = students.filter(s => s.status === 'active')
-  const totalRevenue = payments.reduce((sum, p) => sum + (p.amount ?? 0), 0)
+  // Payment docs hold { totalFee, installments[] } (not a flat `amount`); sum paid
+  // installments, falling back to a flat `amount` for legacy receipt docs.
+  const totalRevenue = payments.reduce((sum, p) => {
+    const installmentTotal = (p.installments ?? [])
+      .filter((i) => i.paidAt)
+      .reduce((is, i) => is + (Number(i.amount) || 0), 0)
+    return sum + (installmentTotal || Number(p.amount) || 0)
+  }, 0)
   const passedAttempts = attempts.filter(a => a.marks250 >= (a.passMark ?? 200))
   const passRate = attempts.length > 0 ? Math.round((passedAttempts.length / attempts.length) * 100) : 0
 
@@ -180,6 +186,12 @@ export default function ReportsPage() {
     { range: '150-199', count: attempts.filter(a => a.marks250 >= 150 && a.marks250 < 200).length },
     { range: '200-250', count: attempts.filter(a => a.marks250 >= 200).length },
   ]
+
+  // Reports expose finance totals — only admin/owner/accountant may view this page.
+  const allowedRoles = ['admin', 'owner', 'accountant']
+  if (user && !allowedRoles.includes(user.role)) {
+    redirect('/dashboard')
+  }
 
   if (loading) return (
     <div className="animate-pulse space-y-4">
@@ -345,15 +357,21 @@ export default function ReportsPage() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
-            <h3 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white mb-2">Revenue Summary</h3>
-            <p className="text-xs text-[#5A6A7A] dark:text-white/50 mb-4">Connect payment data for detailed breakdown</p>
-            <div className="rounded-xl bg-[#F5F7FB] dark:bg-white/[0.04] p-8 text-center">
-              <span className="ti ti-chart-line text-4xl text-[#DDE3EC] dark:text-white/20" />
-              <p className="mt-3 text-sm text-[#5A6A7A] dark:text-white/50">
-                Revenue charts will appear once payment records are imported via the AI Importer
-              </p>
-            </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <StatCard
+              label="Total Revenue (Collected)"
+              value={`LKR ${totalRevenue.toLocaleString('en-LK')}`}
+              icon="ti-coin"
+              color="text-emerald-600"
+              sub={`${payments.length} payment records`}
+            />
+            <StatCard
+              label="Avg per Student"
+              value={`LKR ${(students.length > 0 ? Math.round(totalRevenue / students.length) : 0).toLocaleString('en-LK')}`}
+              icon="ti-user-dollar"
+              color="text-[#0B3D6B]"
+              sub={`${students.length} students`}
+            />
           </div>
         </div>
       )}

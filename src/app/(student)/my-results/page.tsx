@@ -42,29 +42,36 @@ export default function MyResultsPage() {
       setLoading(true)
       try {
         const snap = await getDocs(
-          query(collection(db, 'examResults'), where('studentId', '==', student!.id)),
+          query(collection(db, 'examAttempts'), where('studentId', '==', student!.id)),
         )
 
         const parsed = await Promise.all(
           snap.docs.map(async (d) => {
             const data = d.data() as Record<string, unknown>
-            let examTitle = String(data.examTitle ?? '')
-            if (data.examId) {
+            // examAttempts stores paperId/paperTitle (not examId/examTitle), a 0–100
+            // `percentage`, and Timestamp completedAt/createdAt.
+            let examTitle = String(data.paperTitle ?? '')
+            if (data.paperId) {
               const examSnap = await getDoc(
-                doc(db, 'examPapers', String(data.examId)),
+                doc(db, 'examPapers', String(data.paperId)),
               ).catch(() => null)
               if (examSnap?.exists()) {
                 examTitle = String(examSnap.data()?.title ?? examTitle)
-              } else {
-                const legacySnap = await getDoc(doc(db, 'exams', String(data.examId))).catch(
-                  () => null,
-                )
-                if (legacySnap?.exists()) {
-                  examTitle = String(legacySnap.data()?.title ?? examTitle)
-                }
               }
             }
-            return parseExamAttempt(d.id, data, examTitle || undefined)
+            const completed = (data.completedAt ?? data.createdAt) as
+              | { toDate?: () => Date }
+              | undefined
+            const dateIso = completed?.toDate
+              ? completed.toDate().toISOString()
+              : String(data.completedAt ?? data.createdAt ?? '')
+            const normalized: Record<string, unknown> = {
+              ...data,
+              total: data.percentage ?? data.score,
+              examTitle: examTitle || data.paperTitle,
+              examDate: dateIso,
+            }
+            return parseExamAttempt(d.id, normalized, examTitle || undefined)
           }),
         )
 

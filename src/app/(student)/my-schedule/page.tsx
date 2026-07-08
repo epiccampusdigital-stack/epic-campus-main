@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { collection, getDocs, orderBy, query, where } from 'firebase/firestore'
+import { collection, getDocs, orderBy, query } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { useStudentPortal } from '@/components/student/StudentContext'
 
@@ -10,6 +10,9 @@ type StoredStatus = 'scheduled' | 'completed' | 'cancelled'
 type DisplayStatus = 'upcoming' | 'today' | 'completed' | 'cancelled'
 type ScheduleView = 'month' | 'week' | 'list'
 
+// Display shape used across the calendar/agenda UI. Sessions are stored in the
+// `schedule` collection (written by the management SessionForm), whose fields are
+// courseName / staffName / type / batchName — mapped into this shape below.
 interface Session {
   id: string
   title: string
@@ -24,6 +27,43 @@ interface Session {
   joinLink?: string
   /** Optional — not all session docs carry an explicit status; derived from date when absent. */
   status?: StoredStatus
+}
+
+/** Map a `schedule` collection doc into the Session display shape.
+ *  schedule docs use: type, courseId, courseName, staffName, batchName, date,
+ *  startTime, endTime, location, notes, status. There is no `title` — it's built
+ *  from courseName (+ batch); `teacherName` comes from staffName. */
+function mapScheduleDoc(id: string, data: Record<string, unknown>): Session {
+  const courseName = String(data.courseName ?? '')
+  const batchName = String(data.batchName ?? '')
+  const rawType = String(data.type ?? 'class')
+  const type: SessionType =
+    rawType === 'exam' ? 'exam' : rawType === 'workshop' ? 'workshop' : rawType === 'class' ? 'class' : 'other'
+  const title = courseName
+    ? batchName
+      ? `${courseName} · Batch ${batchName}`
+      : courseName
+    : data.title
+      ? String(data.title)
+      : 'Session'
+  const rawStatus = String(data.status ?? '')
+  return {
+    id,
+    title,
+    date: String(data.date ?? ''),
+    startTime: String(data.startTime ?? ''),
+    endTime: String(data.endTime ?? ''),
+    type,
+    location: String(data.location ?? ''),
+    teacherName: String(data.staffName ?? ''),
+    courseId: String(data.courseId ?? ''),
+    notes: data.notes ? String(data.notes) : undefined,
+    joinLink: data.joinLink ? String(data.joinLink) : undefined,
+    status:
+      rawStatus === 'cancelled' || rawStatus === 'completed' || rawStatus === 'scheduled'
+        ? (rawStatus as StoredStatus)
+        : undefined,
+  }
 }
 
 const TYPE_ICONS: Record<SessionType, string> = {
@@ -467,14 +507,25 @@ export default function MySchedulePage() {
     async function load() {
       setLoading(true)
       try {
-        const base = collection(db, 'sessions')
-        const q = filterByCourse
-          ? query(base, where('courseId', '==', courseId), orderBy('date', 'asc'))
-          : query(base, orderBy('date', 'asc'))
-        const snap = await getDocs(q)
-        if (!cancelled) {
-          setSessions(snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Session, 'id'>) })))
-        }
+        // Read the `schedule` collection (single-field date order — no composite
+        // index needed). Course filtering + consultation privacy are applied
+        // client-side.
+        const snap = await getDocs(query(collection(db, 'schedule'), orderBy('date', 'asc')))
+        const studentId = student?.id ?? ''
+        const mapped = snap.docs
+          .map(d => ({ id: d.id, raw: d.data() as Record<string, unknown> }))
+          .filter(({ raw }) => {
+            if (filterByCourse && String(raw.courseId ?? '') !== courseId) return false
+            // Hide other students' one-to-one consultations; show classes, exams,
+            // and this student's own consultations / open slots.
+            if (String(raw.type ?? '') === 'consultation') {
+              const sid = String(raw.studentId ?? '')
+              if (sid !== '' && sid !== studentId) return false
+            }
+            return true
+          })
+          .map(({ id, raw }) => mapScheduleDoc(id, raw))
+        if (!cancelled) setSessions(mapped)
       } catch (err) {
         console.error('[MySchedule]', err)
         if (!cancelled) setSessions([])

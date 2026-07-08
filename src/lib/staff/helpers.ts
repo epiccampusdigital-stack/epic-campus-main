@@ -68,6 +68,7 @@ export function parseStaff(id: string, data: Record<string, unknown>): StaffMemb
     salaryType: (data.salaryType as SalaryType) ?? 'fixed',
     baseSalary: Number(data.baseSalary ?? 0),
     commissionRate: data.commissionRate != null ? Number(data.commissionRate) : undefined,
+    showFinances: data.showFinances === true,
     createdAt: created?.toISOString() ?? new Date().toISOString(),
     approvedBy: data.approvedBy ? String(data.approvedBy) : undefined,
     approvedAt: approved?.toISOString(),
@@ -76,13 +77,13 @@ export function parseStaff(id: string, data: Record<string, unknown>): StaffMemb
 
 export function getRoleLabel(role: StaffRole): string {
   const labels: Record<StaffRole, string> = {
-    admin: 'Admin',
+    admin: 'Administrator',
     owner: 'Owner',
     reception: 'Reception',
     accountant: 'Accountant',
     teacher: 'Teacher',
     examCoordinator: 'Exam Coordinator',
-    agent: 'Enrollment Agent',
+    agent: 'Agent',
     kitchen: 'Kitchen Staff',
   }
   return labels[role] ?? role

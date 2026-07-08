@@ -120,8 +120,18 @@ function Toast({ msg, onDone }: { msg: string; onDone: () => void }) {
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
+const CATEGORY_LABELS: Record<string, string> = {
+  'japan-ssw': 'Japan SSW',
+  'jft-basic': 'JFT Basic',
+  korea: 'Korea TOPIK',
+  china: 'China',
+  ielts: 'IELTS',
+  nvq: 'NVQ',
+  general: 'General',
+}
+
 export default function AdminExamsPage() {
-  const { user } = useManagement()
+  const { user, hasRole } = useManagement()
   const [papers, setPapers] = useState<PaperDoc[]>([])
   const [sections, setSections] = useState<SectionDoc[]>([])
   const [questions, setQuestions] = useState<QuestionDoc[]>([])
@@ -129,6 +139,34 @@ export default function AdminExamsPage() {
   const [toast, setToast] = useState('')
   const [activeTab, setActiveTab] = useState<'papers' | 'questions'>('papers')
   const [selectedPaper, setSelectedPaper] = useState<PaperDoc | null>(null)
+
+  // Read-only "View Questions" slide-over (separate state from the editor above).
+  const [viewPaper, setViewPaper] = useState<PaperDoc | null>(null)
+  const [viewSections, setViewSections] = useState<SectionDoc[]>([])
+  const [viewQuestions, setViewQuestions] = useState<QuestionDoc[]>([])
+  const [viewLoading, setViewLoading] = useState(false)
+
+  const isExamAdmin = hasRole('admin') || hasRole('owner')
+  const canViewPaper = (paper: PaperDoc) => isExamAdmin || paper.createdBy === user?.uid
+
+  async function openViewQuestions(paper: PaperDoc) {
+    setViewPaper(paper)
+    setViewLoading(true)
+    try {
+      const [secSnap, qSnap] = await Promise.all([
+        getDocs(query(collection(db, 'examSections'), where('paperId', '==', paper.id), orderBy('order', 'asc'))),
+        getDocs(query(collection(db, 'examQuestions'), where('paperId', '==', paper.id), orderBy('order', 'asc'))),
+      ])
+      setViewSections(secSnap.docs.map((d) => ({ id: d.id, ...d.data() } as SectionDoc)))
+      setViewQuestions(qSnap.docs.map((d) => ({ id: d.id, ...d.data() } as QuestionDoc)))
+    } catch (err) {
+      console.error('[AdminExams] view questions load failed:', err)
+      setViewSections([])
+      setViewQuestions([])
+    } finally {
+      setViewLoading(false)
+    }
+  }
 
   // Paper form
   const [paperForm, setPaperForm] = useState({
@@ -200,8 +238,11 @@ export default function AdminExamsPage() {
     if (!user || !paperForm.title.trim()) return
     setSavingPaper(true)
     try {
+      // totalQuestions is auto-maintained as questions are added/removed — never
+      // write it from this form (set to 0 on create; left untouched on edit).
+      const { totalQuestions: _ignoredTotalQuestions, ...paperFormRest } = paperForm
       const payload = {
-        ...paperForm,
+        ...paperFormRest,
         isPublished: editingPaper?.isPublished ?? false,
         createdBy: user.uid,
         updatedAt: serverTimestamp(),
@@ -242,6 +283,7 @@ export default function AdminExamsPage() {
       } else {
         const paperRef = await addDoc(collection(db, 'examPapers'), {
           ...payload,
+          totalQuestions: 0,
           isPublished: false,
           isUnlocked: false,
           createdAt: serverTimestamp(),
@@ -272,6 +314,8 @@ export default function AdminExamsPage() {
   }
 
   async function handleTogglePublish(paper: PaperDoc) {
+    const action = paper.isPublished ? 'unpublish' : 'publish'
+    if (!window.confirm(`${action} this exam paper? Students will ${paper.isPublished ? 'no longer' : 'now'} be able to see it.`)) return
     await updateDoc(doc(db, 'examPapers', paper.id), { isPublished: !paper.isPublished })
     setToast(paper.isPublished ? 'Paper unpublished' : 'Paper published — students can now see it')
     await loadPapers()
@@ -410,6 +454,7 @@ export default function AdminExamsPage() {
   async function handleDeleteQuestion(q: QuestionDoc) {
     const paper = selectedPaper
     if (!paper) return
+    if (!window.confirm('Delete this question? This cannot be undone.')) return
     await deleteDoc(doc(db, 'examQuestions', q.id))
     await updateDoc(doc(db, 'examPapers', paper.id), { totalQuestions: Math.max(0, questions.length - 1) })
     const secQs = questions.filter(x => x.sectionId === q.sectionId && x.id !== q.id)
@@ -517,7 +562,9 @@ export default function AdminExamsPage() {
                   <option value="japan-ssw">Japan SSW</option>
                   <option value="jft-basic">JFT Basic</option>
                   <option value="korea">Korea TOPIK</option>
+                  <option value="china">China</option>
                   <option value="ielts">IELTS</option>
+                  <option value="nvq">NVQ</option>
                   <option value="general">General</option>
                 </select>
               </div>
@@ -527,12 +574,7 @@ export default function AdminExamsPage() {
                   onChange={e => setPaperForm(f => ({ ...f, order: Number(e.target.value) }))} className={inputClass} />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Questions</label>
-                <input type="number" min={1} value={paperForm.totalQuestions}
-                  onChange={e => setPaperForm(f => ({ ...f, totalQuestions: Number(e.target.value) }))} className={inputClass} />
-              </div>
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Time (min)</label>
                 <input type="number" min={10} value={Math.round(paperForm.timeLimitSeconds / 60)}
@@ -660,6 +702,9 @@ export default function AdminExamsPage() {
                         }`}>
                           {paper.isPublished ? 'Published' : 'Draft'}
                         </span>
+                        <span className="rounded-full bg-[#0B3D6B]/10 dark:bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-[#0B3D6B] dark:text-white/60">
+                          {paper.totalQuestions} question{paper.totalQuestions === 1 ? '' : 's'}
+                        </span>
                       </div>
                       <p className="text-xs text-[#5A6A7A] dark:text-white/40 mt-0.5">
                         {paper.totalQuestions}Q · {Math.round((paper.timeLimitSeconds ?? 3600)/60)}min · Pass {paper.passMark}% · Order #{paper.order}
@@ -709,6 +754,12 @@ export default function AdminExamsPage() {
                           className="flex items-center gap-1.5 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 text-xs font-bold text-amber-700 dark:text-amber-400"
                         >
                           <span className="ti ti-bell-ringing" /> Send Reminder
+                        </button>
+                      )}
+                      {canViewPaper(paper) && (
+                        <button type="button" onClick={() => void openViewQuestions(paper)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-[#0B3D6B]/30 dark:border-white/20 bg-[#0B3D6B]/[0.04] dark:bg-white/[0.04] px-2 py-1 text-xs font-semibold text-[#0B3D6B] dark:text-white/70">
+                          <span className="ti ti-eye" /> View Questions
                         </button>
                       )}
                       <button type="button" onClick={() => { setSelectedPaper(paper); setActiveTab('questions'); void ensureDefaultSections(paper.id) }}
@@ -1105,6 +1156,144 @@ export default function AdminExamsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── VIEW QUESTIONS SLIDE-OVER (read-only) ───────────────────────────── */}
+      {viewPaper && (
+        <>
+          <div
+            className="fixed inset-0 z-50 bg-[#0D1B2A]/40 backdrop-blur-sm"
+            onClick={() => setViewPaper(null)}
+            aria-hidden="true"
+          />
+          <aside
+            className="fixed inset-y-0 right-0 z-[55] flex w-full max-w-[700px] flex-col border-l border-white/80 bg-white/95 shadow-2xl backdrop-blur-2xl dark:border-white/[0.08] dark:bg-[#0d1a2e]/95"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-[#DDE3EC] px-6 py-4 dark:border-white/[0.08]">
+              <div className="min-w-0">
+                <h2 className="font-jakarta text-lg font-bold text-[#0D1B2A] dark:text-white truncate">
+                  {viewPaper.title}
+                </h2>
+                <p className="mt-0.5 text-xs text-[#5A6A7A] dark:text-white/50">
+                  {CATEGORY_LABELS[viewPaper.categoryId] ?? viewPaper.categoryId} ·{' '}
+                  {viewLoading ? 'Loading…' : `${viewQuestions.length} question${viewQuestions.length === 1 ? '' : 's'}`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewPaper(null)}
+                className="rounded-lg p-2 text-[#5A6A7A] hover:bg-[#F5F7FB] dark:text-white/60 dark:hover:bg-white/[0.06]"
+                aria-label="Close"
+              >
+                <span className="ti ti-x text-xl" aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto px-6 py-5" style={{ maxHeight: 'calc(100vh - 120px)' }}>
+              {viewLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-24 animate-pulse rounded-xl bg-[#DDE3EC] dark:bg-white/10" />
+                  ))}
+                </div>
+              ) : viewQuestions.length === 0 ? (
+                <div className="py-16 text-center text-sm text-[#5A6A7A] dark:text-white/40">
+                  This paper has no questions yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {viewQuestions.map((q, idx) => {
+                    const section = viewSections.find((s) => s.id === q.sectionId)
+                    const isListening =
+                      !!q.questionAudioUrl || !!section?.name?.toLowerCase().includes('listen')
+                    const type = isListening ? 'Listening' : q.options.length === 0 ? 'Fill-in' : 'MCQ'
+                    const totalQ = viewQuestions.length || viewPaper.totalQuestions || 1
+                    const points = viewPaper.scoringScale
+                      ? Math.round((viewPaper.scoringScale / totalQ) * 10) / 10
+                      : 1
+                    return (
+                      <div
+                        key={q.id}
+                        className="rounded-xl border border-[#DDE3EC] bg-white p-4 dark:border-white/[0.08] dark:bg-white/[0.04]"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0B3D6B] text-xs font-bold text-white">
+                            {idx + 1}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className="whitespace-pre-wrap break-words text-sm text-[#0D1B2A] dark:text-white"
+                              style={{ fontFamily: "'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" }}
+                            >
+                              {q.questionText}
+                            </p>
+
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <span className="rounded-full bg-[#F5F7FB] px-2 py-0.5 text-[10px] font-semibold text-[#5A6A7A] dark:bg-white/[0.06] dark:text-white/50">
+                                Type: {type}
+                              </span>
+                              <span className="rounded-full bg-[#F5F7FB] px-2 py-0.5 text-[10px] font-semibold text-[#5A6A7A] dark:bg-white/[0.06] dark:text-white/50">
+                                Points: {points}
+                              </span>
+                              {section && (
+                                <span className="rounded-full bg-[#F5F7FB] px-2 py-0.5 text-[10px] text-[#5A6A7A] dark:bg-white/[0.06] dark:text-white/40">
+                                  {section.name}
+                                </span>
+                              )}
+                            </div>
+
+                            {q.questionImageUrl && (
+                              <img
+                                src={q.questionImageUrl}
+                                alt=""
+                                className="mt-2 h-20 w-20 rounded-lg border border-[#DDE3EC] object-cover dark:border-white/[0.08]"
+                              />
+                            )}
+
+                            {q.questionAudioUrl && (
+                              <audio src={q.questionAudioUrl} controls className="mt-2 w-full" />
+                            )}
+
+                            {q.options.length > 0 && (
+                              <div className="mt-3 space-y-1.5">
+                                {q.options.map((o) => {
+                                  const correct = o.index === q.correctIndex
+                                  return (
+                                    <div
+                                      key={o.index}
+                                      className={`flex items-start gap-2 rounded-lg border px-2.5 py-1.5 text-sm ${
+                                        correct
+                                          ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/25 dark:text-emerald-300'
+                                          : 'border-[#DDE3EC] text-[#0D1B2A] dark:border-white/[0.08] dark:text-white/80'
+                                      }`}
+                                    >
+                                      <span className="font-bold">{['A', 'B', 'C', 'D', 'E', 'F'][o.index - 1] ?? o.index}.</span>
+                                      <span
+                                        className="min-w-0 flex-1 break-words"
+                                        style={{ fontFamily: "'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif" }}
+                                      >
+                                        {o.text}
+                                      </span>
+                                      {correct && (
+                                        <span className="ti ti-circle-check shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </aside>
+        </>
       )}
     </div>
   )

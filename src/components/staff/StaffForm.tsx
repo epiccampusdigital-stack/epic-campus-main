@@ -38,6 +38,7 @@ export interface StaffFormValues {
   baseSalary: string
   commissionRate: string
   locationAssigned: StudentLocation | ''
+  showFinances: boolean
 }
 
 const EMPTY: StaffFormValues = {
@@ -54,6 +55,7 @@ const EMPTY: StaffFormValues = {
   baseSalary: '',
   commissionRate: '',
   locationAssigned: '',
+  showFinances: false,
 }
 
 interface StaffFormProps {
@@ -79,6 +81,7 @@ function staffToForm(s: StaffMember): StaffFormValues {
     baseSalary: s.baseSalary ? String(s.baseSalary) : '',
     commissionRate: s.commissionRate != null ? String(s.commissionRate) : '',
     locationAssigned: s.locationAssigned ?? '',
+    showFinances: s.showFinances ?? false,
   }
 }
 
@@ -184,6 +187,7 @@ export default function StaffForm({
             : null,
         status: 'active',
         locationAssigned: form.locationAssigned || null,
+        showFinances: form.showFinances,
         pendingDocId: staffDocId,
       }),
     })
@@ -237,6 +241,7 @@ export default function StaffForm({
             ? Number(form.commissionRate)
             : null,
         locationAssigned: form.locationAssigned || null,
+        showFinances: form.showFinances,
         updatedAt: serverTimestamp(),
       }
 
@@ -513,6 +518,35 @@ export default function StaffForm({
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="rounded-lg border border-[#DDE3EC] dark:border-gray-600 p-3.5">
+                <label className="flex cursor-pointer items-start justify-between gap-4">
+                  <div>
+                    <p className="font-jakarta text-sm font-semibold text-[#0D1B2A] dark:text-white">
+                      Finance Access
+                    </p>
+                    <p className="mt-0.5 font-inter text-xs text-[#5A6A7A] dark:text-white/50">
+                      Allow this staff member to view financial data on their dashboard
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={form.showFinances}
+                    disabled={isView}
+                    onClick={() => setField('showFinances', !form.showFinances)}
+                    className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-60 ${
+                      form.showFinances ? 'bg-[#E8A020]' : 'bg-[#DDE3EC] dark:bg-white/20'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                        form.showFinances ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </label>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

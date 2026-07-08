@@ -19,7 +19,8 @@ interface BookingRequest {
   timeSlot: string
   purpose: string
   notes?: string
-  status: 'pending' | 'confirmed' | 'cancelled'
+  status: 'pending' | 'confirmed' | 'cancelled' | 'rejected'
+  rejectedReason?: string
 }
 
 const TIME_SLOTS = [
@@ -109,6 +110,7 @@ export default function StudentConsultationBooking() {
     pending: { label: 'Pending', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' },
     confirmed: { label: 'Confirmed', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' },
     cancelled: { label: 'Cancelled', color: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' },
+    rejected: { label: 'Booking Rejected', color: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' },
   }
 
   return (
@@ -223,19 +225,26 @@ export default function StudentConsultationBooking() {
             {bookings.map(b => {
               const cfg = statusConfig[b.status] ?? statusConfig.pending
               return (
-                <div key={b.id} className="flex items-center gap-3 rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] px-4 py-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0B3D6B]/10 dark:bg-[#0B3D6B]/30">
-                    <span className="ti ti-calendar text-[#0B3D6B] dark:text-blue-300 text-sm" />
+                <div key={b.id} className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0B3D6B]/10 dark:bg-[#0B3D6B]/30">
+                      <span className="ti ti-calendar text-[#0B3D6B] dark:text-blue-300 text-sm" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#0D1B2A] dark:text-white">
+                        {b.date} at {b.timeSlot}
+                      </p>
+                      <p className="text-xs text-[#5A6A7A] dark:text-white/40">{b.purpose}</p>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${cfg.color}`}>
+                      {cfg.label}
+                    </span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#0D1B2A] dark:text-white">
-                      {b.date} at {b.timeSlot}
+                  {b.rejectedReason && (
+                    <p className="text-sm text-red-500 mt-1">
+                      Reason: {b.rejectedReason}
                     </p>
-                    <p className="text-xs text-[#5A6A7A] dark:text-white/40">{b.purpose}</p>
-                  </div>
-                  <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${cfg.color}`}>
-                    {cfg.label}
-                  </span>
+                  )}
                 </div>
               )
             })}

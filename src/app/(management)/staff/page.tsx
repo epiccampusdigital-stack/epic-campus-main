@@ -9,6 +9,7 @@ import {
   getRoleLabel,
   parseStaff,
   staffHasRole,
+  STAFF_ROLES,
 } from '@/lib/staff/helpers'
 import { sendCredentialsEmail } from '@/lib/students/helpers'
 import { logAuditEvent } from '@/lib/audit/helpers'
@@ -71,7 +72,6 @@ export default function StaffPage() {
         getDocs(collection(db, 'users')),
         getDocs(collection(db, 'staff')).catch(() => null),
       ])
-      console.log('[StaffPage] users docs:', usersSnap.docs.length, usersSnap.docs.map(d => ({ id: d.id, role: d.data().role, status: d.data().status, email: d.data().email })))
       const allDocs = [...usersSnap.docs, ...(staffSnap?.docs ?? [])]
       const members = allDocs
         .map((d) => parseStaff(d.id, d.data() as Record<string, unknown>))
@@ -79,7 +79,6 @@ export default function StaffPage() {
         .filter((s, i, arr) => arr.findIndex(x => x.email === s.email) === i)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       setStaff(members)
-      console.log('[StaffPage] parsed members:', members.length, members.map(m => ({ id: m.id, email: m.email, role: m.role, status: m.status })))
     } catch (err) {
       console.error('[StaffPage]', err)
       setStaff([])
@@ -149,6 +148,8 @@ export default function StaffPage() {
 
   async function handleApprove(member: StaffMember) {
     if (!user) return
+    if (!['admin', 'owner'].includes(user.role)) return
+    if (!window.confirm(`Approve ${member.displayName} as ${member.role}? This will create their login account.`)) return
     setApprovingId(member.id)
     try {
       const token = await auth.currentUser?.getIdToken()
@@ -160,8 +161,16 @@ export default function StaffPage() {
       const data = (await res.json()) as { error?: string; password?: string; uid?: string }
       if (!res.ok) throw new Error(data.error ?? 'Approval failed')
 
+      // The account is already created at this point — send credentials in a
+      // separate try so an email failure doesn't read as the approval failing.
+      let emailFailed = false
       if (data.password && member.email) {
-        await sendCredentialsEmail(member.email, member.displayName, data.password)
+        try {
+          await sendCredentialsEmail(member.email, member.displayName, data.password)
+        } catch (emailErr) {
+          console.error('[StaffPage] credentials email failed:', emailErr)
+          emailFailed = true
+        }
       }
 
       await logAuditEvent({
@@ -175,9 +184,17 @@ export default function StaffPage() {
       })
 
       await loadStaff()
+
+      if (emailFailed) {
+        toast.success('Account approved')
+        // react-hot-toast has no .warning — use a warning icon to convey it.
+        toast('Credentials email may not have sent — check manually', { icon: '⚠️' })
+      } else {
+        toast.success('Staff account approved and credentials sent')
+      }
     } catch (err) {
       console.error('[StaffPage] approve failed:', err)
-      alert(err instanceof Error ? err.message : 'Failed to approve staff')
+      toast.error(err instanceof Error ? err.message : 'Failed to approve staff')
     } finally {
       setApprovingId(null)
     }
@@ -263,14 +280,11 @@ export default function StaffPage() {
             className="rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-[#1A1535] px-3 py-2.5 font-inter text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020] dark:focus:border-[#E8A020]"
           >
             <option value="">All roles</option>
-            <option value="admin">Admin</option>
-            <option value="owner">Owner</option>
-            <option value="reception">Reception</option>
-            <option value="accountant">Accountant</option>
-            <option value="teacher">Teacher</option>
-            <option value="examCoordinator">Exam Coordinator</option>
-            <option value="kitchen">Kitchen</option>
-            <option value="agent">Agent</option>
+            {STAFF_ROLES.map((r) => (
+              <option key={r} value={r}>
+                {getRoleLabel(r)}
+              </option>
+            ))}
           </select>
           <select
             value={statusFilter}

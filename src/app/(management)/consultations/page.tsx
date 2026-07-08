@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import toast from 'react-hot-toast'
 import ConsultationSlotForm from '@/components/consultations/ConsultationSlotForm'
+import ConsultationRequestsPanel from '@/components/consultations/ConsultationRequestsPanel'
 import EmptyState from '@/components/ui/EmptyState'
 import {
   BOOKING_STATUS_BADGE,
@@ -18,7 +20,7 @@ import {
 } from '@/lib/consultations/helpers'
 import type { StaffMember } from '@/types'
 
-type Tab = 'slots' | 'bookings'
+type Tab = 'slots' | 'bookings' | 'requests'
 
 export default function ConsultationsPage() {
   const [tab, setTab] = useState<Tab>('slots')
@@ -63,17 +65,18 @@ export default function ConsultationsPage() {
 
   async function handleDeleteSlot(slot: ConsultationSlot) {
     if (slot.isBooked) {
-      alert('Cannot delete a booked slot.')
+      toast.error('Cannot delete a booked slot.')
       return
     }
-    if (!confirm('Delete this consultation slot?')) return
+    if (!window.confirm('Delete this consultation slot?')) return
     setActionId(slot.id)
     try {
       await deleteConsultationSlot(slot.id)
+      toast.success('Slot deleted')
       await loadData()
     } catch (err) {
       console.error('[ConsultationsPage]', err)
-      alert('Failed to delete slot.')
+      toast.error('Failed to delete slot.')
     } finally {
       setActionId(null)
     }
@@ -88,24 +91,26 @@ export default function ConsultationsPage() {
         body: JSON.stringify({ bookingId: booking.id }),
       })
       if (!res.ok) throw new Error('Approve failed')
+      toast.success('Booking approved')
       await loadData()
     } catch (err) {
       console.error('[ConsultationsPage]', err)
-      alert('Failed to approve booking.')
+      toast.error('Failed to approve booking.')
     } finally {
       setActionId(null)
     }
   }
 
   async function handleReject(booking: ConsultationBooking) {
-    if (!confirm(`Reject booking for ${booking.studentName}?`)) return
+    if (!window.confirm(`Reject booking for ${booking.studentName}?`)) return
     setActionId(booking.id)
     try {
       await rejectConsultationBooking(booking)
+      toast.success('Booking rejected')
       await loadData()
     } catch (err) {
       console.error('[ConsultationsPage]', err)
-      alert('Failed to reject booking.')
+      toast.error('Failed to reject booking.')
     } finally {
       setActionId(null)
     }
@@ -137,6 +142,7 @@ export default function ConsultationsPage() {
           [
             ['slots', 'Slots'],
             ['bookings', 'Bookings'],
+            ['requests', 'Student Requests'],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -168,20 +174,20 @@ export default function ConsultationsPage() {
             />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left text-sm">
+              <table className="w-full min-w-[720px] text-left text-sm dark:text-white/80">
                 <thead>
                   <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:border-gray-700 dark:bg-gray-900">
                     {['Date', 'Time', 'Staff', 'Status', 'Actions'].map((h) => (
                       <th
                         key={h}
-                        className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]"
+                        className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50"
                       >
                         {h}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#DDE3EC]">
+                <tbody className="divide-y divide-[#DDE3EC] dark:divide-white/10">
                   {slots.map((slot) => (
                     <tr key={slot.id}>
                       <td className="px-4 py-3">{formatConsultationDate(slot.date)}</td>
@@ -231,7 +237,7 @@ export default function ConsultationsPage() {
               onChange={(e) =>
                 setStatusFilter(e.target.value as ConsultationBookingStatus | '')
               }
-              className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm"
+              className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-800 dark:text-white"
             >
               <option value="">All statuses</option>
               <option value="pending">Pending</option>
@@ -243,7 +249,7 @@ export default function ConsultationsPage() {
               type="date"
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
-              className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm"
+              className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-800 dark:text-white"
             />
             {(statusFilter || dateFilter) && (
               <button
@@ -270,9 +276,9 @@ export default function ConsultationsPage() {
               />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[960px] text-left text-sm">
+                <table className="w-full min-w-[960px] text-left text-sm dark:text-white/80">
                   <thead>
-                    <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB]">
+                    <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] dark:border-white/10 dark:bg-gray-900">
                       {[
                         'Student',
                         'Date',
@@ -284,17 +290,17 @@ export default function ConsultationsPage() {
                       ].map((h) => (
                         <th
                           key={h}
-                          className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]"
+                          className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50"
                         >
                           {h}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#DDE3EC]">
+                  <tbody className="divide-y divide-[#DDE3EC] dark:divide-white/10">
                     {filteredBookings.map((b) => (
                       <tr key={b.id}>
-                        <td className="px-4 py-3 font-medium text-[#0D1B2A]">
+                        <td className="px-4 py-3 font-medium text-[#0D1B2A] dark:text-white">
                           {b.studentName}
                         </td>
                         <td className="px-4 py-3">{formatConsultationDate(b.date)}</td>
@@ -345,6 +351,8 @@ export default function ConsultationsPage() {
           </div>
         </>
       )}
+
+      {tab === 'requests' && <ConsultationRequestsPanel />}
 
       <ConsultationSlotForm
         open={formOpen}

@@ -416,7 +416,7 @@ export default function PaymentsPage() {
           installment.id === installmentId
             ? {
                 ...installment,
-                paidAt: serverTimestamp(),
+                paidAt: new Date().toISOString(),
                 paidBy: user.uid,
               }
             : installment,
@@ -458,7 +458,7 @@ export default function PaymentsPage() {
           installment.id === row.nextUnpaid?.id
             ? {
                 ...installment,
-                paidAt: serverTimestamp(),
+                paidAt: new Date().toISOString(),
                 paidBy: user.uid,
               }
             : installment,

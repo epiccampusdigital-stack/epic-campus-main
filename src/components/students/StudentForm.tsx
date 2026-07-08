@@ -6,13 +6,15 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
+  where,
   setDoc,
   updateDoc,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { db, storage } from '@/lib/firebase/client'
+import { auth, db, storage } from '@/lib/firebase/client'
 import { COURSES, COURSE_MAP } from '@/lib/constants/courses'
 import {
   generateStudentCode,
@@ -51,6 +53,7 @@ export interface StudentFormValues {
   location: StudentLocation | ''
   agentId: string
   referredByStaffId: string
+  houseId: string
   enrollmentDate: string
   expectedCompletionDate: string
   feeAmount: string
@@ -87,6 +90,7 @@ function makeEmptyForm(): StudentFormValues {
     location: 'ahangama',
     agentId: '',
     referredByStaffId: '',
+    houseId: '',
     enrollmentDate: new Date().toISOString().slice(0, 10),
     expectedCompletionDate: '',
     feeAmount: '',
@@ -130,6 +134,9 @@ function studentToForm(s: Student): StudentFormValues {
     location: s.location ?? 'ahangama',
     agentId: s.agentId ?? '',
     referredByStaffId: s.referredByStaffId ?? '',
+    houseId: (s as unknown as Record<string, unknown>).houseId
+      ? String((s as unknown as Record<string, unknown>).houseId)
+      : '',
     enrollmentDate: s.enrollmentDate?.slice(0, 10) ?? '',
     expectedCompletionDate: s.expectedCompletionDate?.slice(0, 10) ?? '',
     feeAmount: s.feeAmount != null ? String(s.feeAmount) : '',
@@ -271,6 +278,7 @@ export default function StudentForm({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [agents, setAgents] = useState<{ uid: string; displayName: string; commissionRate?: number }[]>([])
+  const [houses, setHouses] = useState<{ id: string; name: string; capacity: number }[]>([])
   const [guardianSectionOpen, setGuardianSectionOpen] = useState(false)
   // After a new student's login account is created, show their credentials so
   // reception can send them — the generated password isn't stored anywhere else.
@@ -315,6 +323,20 @@ export default function StudentForm({
           .sort((a, b) => a.displayName.localeCompare(b.displayName))
         setAgents(list)
       })
+      // Load active houses for the accommodation assignment dropdown.
+      void getDocs(query(collection(db, 'accommodations'), where('status', '==', 'active')))
+        .then((snap) => {
+          setHouses(
+            snap.docs
+              .map((d) => ({
+                id: d.id,
+                name: String(d.data().name ?? ''),
+                capacity: Number(d.data().capacity ?? 0),
+              }))
+              .sort((a, b) => a.name.localeCompare(b.name)),
+          )
+        })
+        .catch(() => setHouses([]))
     }
   }, [open, student])
 
@@ -345,9 +367,13 @@ export default function StudentForm({
     name: string,
     password: string,
   ): Promise<{ uid: string; password: string; created: boolean } | undefined> {
+    const token = await auth.currentUser?.getIdToken()
     const res = await fetch('/api/students/create-account', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({ email, password, displayName: name, studentId: studentDocId }),
     })
     if (!res.ok) {
@@ -443,6 +469,7 @@ export default function StudentForm({
         agentName: selectedAgent?.displayName ?? null,
         referredByStaffId: form.referredByStaffId || null,
         referredByStaffName: selectedReferralStaff?.displayName ?? null,
+        houseId: form.houseId || null,
         branchId: user.branchId ?? 'galle-main',
         enrollmentDate: form.enrollmentDate || null,
         expectedCompletionDate: form.expectedCompletionDate || null,
@@ -567,7 +594,11 @@ export default function StudentForm({
               }
             }
           } catch (authErr) {
-            console.warn('[StudentForm] Auth account skipped:', authErr)
+            // Surface the failure instead of silently swallowing it — otherwise
+            // reception thinks the login was created when it wasn't.
+            console.error('[StudentForm] Account creation failed:', authErr)
+            setError('Failed to create login account. Please try again.')
+            return
           }
         }
 
@@ -1186,6 +1217,25 @@ export default function StudentForm({
                   </div>
                 </div>
               )}
+            </div>
+
+            <SectionTitle icon="ti-home" title="Accommodation" />
+            <div className="mb-6">
+              <FieldLabel>Assigned House</FieldLabel>
+              <SelectInput
+                value={form.houseId}
+                onChange={(v) => setField('houseId', v)}
+              >
+                <option value="">Not assigned</option>
+                {houses.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.name} (capacity {h.capacity})
+                  </option>
+                ))}
+              </SelectInput>
+              <p className="mt-1 text-xs text-[#5A6A7A]">
+                Assign the student to a boarding house — appears on their dashboard.
+              </p>
             </div>
 
             <SectionTitle icon="ti-file-description" title="Status & Documents" />
