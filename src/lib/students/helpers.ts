@@ -220,6 +220,20 @@ export function generateTempPassword(): string {
   return pwd
 }
 
+/**
+ * Generate a friendly, easy-to-read-aloud password in the format
+ * [Animal][2-digit number][Thing] — e.g. "Tiger42Chair", "Eagle91Mango".
+ * Meant for reception to share with a student verbally or over WhatsApp.
+ */
+export function generateFriendlyPassword(): string {
+  const animals = ['Tiger', 'Eagle', 'Lion', 'Panda', 'Whale', 'Hawk', 'Bear', 'Wolf', 'Shark', 'Deer']
+  const things = ['Mango', 'Chair', 'River', 'Cloud', 'Stone', 'Bridge', 'Garden', 'Ocean', 'Flame', 'Tower']
+  const animal = animals[Math.floor(Math.random() * animals.length)]
+  const thing = things[Math.floor(Math.random() * things.length)]
+  const number = Math.floor(10 + Math.random() * 90) // 10–99
+  return `${animal}${number}${thing}`
+}
+
 /** Placeholder — wire to Twilio/WhatsApp Business API later */
 export async function sendWhatsAppNotification(
   mobile: string,

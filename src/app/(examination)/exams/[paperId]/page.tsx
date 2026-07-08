@@ -473,9 +473,17 @@ export default function ExamPage() {
           {q ? (
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                {/* Question image — above question text */}
+                {/* Question text — always first (top) */}
+                {q.questionText && (
+                  <p className="text-base leading-relaxed font-semibold text-[#0D1B2A] dark:text-white">{q.questionText}</p>
+                )}
+                {q.questionTextJP && (
+                  <p className="mt-2 text-sm text-blue-600 dark:text-blue-300">{q.questionTextJP}</p>
+                )}
+
+                {/* Question image — below the question text */}
                 {(q.questionImageUrl || q.imageUrl) && (
-                  <div className="mb-4 overflow-hidden rounded-xl border border-[#DDE3EC] dark:border-white/20">
+                  <div className="mt-4 overflow-hidden rounded-xl border border-[#DDE3EC] dark:border-white/20">
                     <img
                       src={q.questionImageUrl ?? q.imageUrl}
                       alt="Question"
@@ -483,14 +491,6 @@ export default function ExamPage() {
                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                     />
                   </div>
-                )}
-
-                {/* Question text */}
-                {q.questionText && (
-                  <p className="text-base leading-relaxed font-semibold text-[#0D1B2A] dark:text-white">{q.questionText}</p>
-                )}
-                {q.questionTextJP && (
-                  <p className="mt-2 text-sm text-blue-600 dark:text-blue-300">{q.questionTextJP}</p>
                 )}
 
                 {/* Audio player */}

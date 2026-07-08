@@ -4,13 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   collection,
   addDoc,
-  doc,
-  getDoc,
   getDocs,
-  query,
-  orderBy,
-  updateDoc,
-  where,
   serverTimestamp,
 } from 'firebase/firestore'
 import {
@@ -23,22 +17,21 @@ import {
 } from 'recharts'
 import { db } from '@/lib/firebase/client'
 import { useKitchen } from '@/app/kitchen/context'
-import CountStepper from '@/components/kitchen/CountStepper'
-import IngredientPicker from '@/components/kitchen/IngredientPicker'
 import KitchenBottomSheet from '@/components/kitchen/KitchenBottomSheet'
-import { fetchActiveInventory } from '@/lib/kitchen/fetchActiveInventory'
-import { getFoodEmoji, WASTE_REASON_VISUAL } from '@/lib/kitchen/foodImages'
-import { formatLKR } from '@/lib/utils/formatCurrency'
 import type {
   WasteEntry,
+  WasteType,
   WasteReason,
-  InventoryItem,
-  MealLog,
   KitchenAISuggestion,
 } from '@/types/kitchen'
 
-const WASTE_REASONS: WasteReason[] = [
-  'overcooked', 'expired', 'leftover', 'spoiled', 'dropped', 'other',
+// New reason-based waste log (Leftover / Expired / Overcooked / Dropped / Other).
+const REASON_OPTIONS: { id: WasteReason; label: string }[] = [
+  { id: 'leftover', label: 'Leftover' },
+  { id: 'expired', label: 'Expired' },
+  { id: 'overcooked', label: 'Overcooked' },
+  { id: 'dropped', label: 'Dropped' },
+  { id: 'other', label: 'Other' },
 ]
 
 const REASON_LABELS: Record<WasteReason, string> = {
@@ -48,6 +41,23 @@ const REASON_LABELS: Record<WasteReason, string> = {
   spoiled: 'Spoiled',
   dropped: 'Dropped',
   other: 'Other',
+}
+
+const MEAL_OPTIONS = ['breakfast', 'lunch', 'dinner', 'other'] as const
+
+// Legacy first-gen simplified docs stored a `wasteType` instead of `reason`.
+const WASTE_TYPE_LABELS: Record<WasteType, string> = {
+  food_waste: 'Food Waste',
+  spoiled: 'Spoiled Items',
+  other: 'Other',
+}
+
+function cap(s: string): string {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
+}
+
+function fmtKg(n: number): string {
+  return `${Number((Number(n) || 0).toFixed(2))} kg`
 }
 
 function today(): string {
@@ -64,19 +74,71 @@ function thisMonthPrefix(): string {
   return new Date().toISOString().slice(0, 7)
 }
 
-function lastMonthPrefix(): string {
-  const d = new Date()
-  d.setMonth(d.getMonth() - 1)
-  return d.toISOString().slice(0, 7)
+type WasteRow = {
+  id: string
+  date: string
+  typeLabel: string
+  weightKg: number
+  details: string
+  loggedByName: string
+}
+
+// Normalise the three doc shapes we may find in `wasteLog` into one display row:
+// (1) new reason-based weight docs, (2) old wasteType-based weight docs, and
+// (3) legacy item-based docs.
+function normalize(id: string, e: WasteEntry): WasteRow {
+  // (2) Old wasteType-based docs
+  if (e.wasteType) {
+    let details = '—'
+    if (e.wasteType === 'spoiled') details = e.spoiledItems?.trim() || '—'
+    else if (e.wasteType === 'food_waste') details = e.mealType ? cap(e.mealType) : '—'
+    else if (e.notes?.trim()) details = e.notes.trim()
+    return {
+      id,
+      date: e.date,
+      typeLabel: WASTE_TYPE_LABELS[e.wasteType],
+      weightKg: Number(e.weightKg ?? 0),
+      details,
+      loggedByName: e.loggedByName ?? '',
+    }
+  }
+  // (1) New reason-based weight docs
+  if (e.weightKg != null) {
+    let details = '—'
+    if (e.reason === 'expired') details = e.expiredItems?.trim() || '—'
+    else if (e.reason === 'leftover' || e.reason === 'overcooked') details = e.mealType ? cap(e.mealType) : '—'
+    else if (e.notes?.trim()) details = e.notes.trim()
+    return {
+      id,
+      date: e.date,
+      typeLabel: e.reason ? REASON_LABELS[e.reason] : 'Other',
+      weightKg: Number(e.weightKg ?? 0),
+      details,
+      loggedByName: e.loggedByName ?? '',
+    }
+  }
+  // (3) Legacy item-based docs — derive a weight from the old quantity/unit.
+  let weightKg = 0
+  if (e.unit === 'kg') weightKg = Number(e.quantity ?? 0)
+  else if (e.unit === 'grams') weightKg = Number(e.quantity ?? 0) / 1000
+  const details = e.itemName
+    ? `${e.itemName}${e.quantity ? ` · ${e.quantity} ${e.unit ?? ''}` : ''}`
+    : '—'
+  return {
+    id,
+    date: e.date,
+    typeLabel: e.reason ? REASON_LABELS[e.reason] : 'Other',
+    weightKg,
+    details,
+    loggedByName: e.loggedByName ?? '',
+  }
 }
 
 export default function WastePage() {
   const { user } = useKitchen()
-  const [entries, setEntries] = useState<WasteEntry[]>([])
+  const [rows, setRows] = useState<WasteRow[]>([])
   const [loading, setLoading] = useState(true)
   const [showSlide, setShowSlide] = useState(false)
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
-  const [todayLogs, setTodayLogs] = useState<MealLog[]>([])
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
   const [aiSuggestions, setAiSuggestions] = useState<KitchenAISuggestion[]>([])
@@ -84,25 +146,30 @@ export default function WastePage() {
 
   // Form
   const [fDate, setFDate] = useState(today())
-  const [fItemId, setFItemId] = useState('')
-  const [fQty, setFQty] = useState('')
   const [fReason, setFReason] = useState<WasteReason>('leftover')
-  const [fMealLogId, setFMealLogId] = useState('')
+  const [fWeight, setFWeight] = useState('')
+  const [fExpiredItems, setFExpiredItems] = useState('')
+  const [fMealType, setFMealType] = useState<(typeof MEAL_OPTIONS)[number]>('lunch')
   const [fNotes, setFNotes] = useState('')
+
+  const showMealType = fReason === 'leftover' || fReason === 'overcooked'
+  const showExpired = fReason === 'expired'
 
   async function loadData() {
     setLoading(true)
     try {
-      const [wasteSnap, invItems, mealSnap] = await Promise.all([
-        getDocs(query(collection(db, 'wasteLog'), orderBy('date', 'desc'), orderBy('createdAt', 'desc'))),
-        fetchActiveInventory(),
-        getDocs(query(collection(db, 'mealLogs'), where('date', '==', today()))),
-      ])
-      setEntries(wasteSnap.docs.map((d) => ({ id: d.id, ...d.data() } as WasteEntry)))
-      setInventoryItems(invItems)
-      setTodayLogs(mealSnap.docs.map((d) => ({ id: d.id, ...d.data() } as MealLog)))
+      // Fetch without a compound orderBy. Ordering by two different fields
+      // (date + createdAt) requires a composite index that isn't defined, which
+      // made the read throw and the log appear empty. Sort newest-first client-side
+      // instead — this also keeps docs that are missing one of the fields.
+      const wasteSnap = await getDocs(collection(db, 'wasteLog'))
+      const list = wasteSnap.docs.map((d) => normalize(d.id, d.data() as WasteEntry))
+      list.sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+      setRows(list)
     } catch (err) {
-      console.error('[Waste]', err)
+      console.error('[Waste load]', err)
+      setRows([])
+      showToast('Failed to load waste log. Please refresh.')
     } finally {
       setLoading(false)
     }
@@ -115,79 +182,62 @@ export default function WastePage() {
     setTimeout(() => setToast(''), 3000)
   }
 
-  const selectedItem = inventoryItems.find((i) => i.id === fItemId)
-  const estimatedLoss = Number(fQty) * (selectedItem?.unitCost ?? 0)
+  function resetForm() {
+    setFDate(today())
+    setFReason('leftover')
+    setFWeight('')
+    setFExpiredItems('')
+    setFMealType('lunch')
+    setFNotes('')
+  }
 
   async function handleSave() {
-    if (!fItemId || !fQty) return
+    const weight = Number(fWeight)
+    if (!weight || weight <= 0) return
     setSaving(true)
     try {
-      await addDoc(collection(db, 'wasteLog'), {
+      const payload: Record<string, unknown> = {
         date: fDate,
-        itemId: fItemId,
-        itemName: selectedItem?.itemName ?? '',
-        quantity: Number(fQty),
-        unit: selectedItem?.unit ?? '',
         reason: fReason,
-        estimatedLoss,
-        mealLogId: fMealLogId || null,
-        notes: fNotes,
+        weightKg: parseFloat(weight.toFixed(2)),
+        notes: fNotes.trim(),
         loggedBy: user?.uid ?? '',
         loggedByName: user?.displayName ?? '',
         createdAt: serverTimestamp(),
-      })
-
-      try {
-        const invRef = doc(db, 'inventory', fItemId)
-        const invSnap = await getDoc(invRef)
-        if (invSnap.exists()) {
-          const current = parseFloat(String(invSnap.data().currentStock ?? 0))
-          const newStock = parseFloat(Math.max(0, current - Number(fQty)).toFixed(4))
-          await updateDoc(invRef, {
-            currentStock: newStock,
-            lastUpdated: serverTimestamp(),
-            updatedBy: user?.uid ?? '',
-            updatedByName: user?.displayName ?? '',
-          })
-        }
-      } catch (err) {
-        console.error('[WasteDeduct]', err)
       }
-
+      if (fReason === 'expired') payload.expiredItems = fExpiredItems.trim()
+      if (fReason === 'leftover' || fReason === 'overcooked') payload.mealType = fMealType
+      await addDoc(collection(db, 'wasteLog'), payload)
       setShowSlide(false)
-      setFDate(today()); setFItemId(''); setFQty(''); setFReason('leftover'); setFMealLogId(''); setFNotes('')
+      resetForm()
       showToast('Waste entry logged')
       await loadData()
     } catch (err) {
       console.error('[Waste save]', err)
+      showToast('Failed to log waste. Please try again.')
     } finally {
       setSaving(false)
     }
   }
 
   const fetchAiSuggestions = useCallback(async () => {
-    if (entries.length === 0) return
+    if (rows.length === 0) return
     setAiLoading(true)
     try {
-      const last30 = entries.filter((e) => e.date >= daysAgo(30))
+      const last30 = rows.filter((r) => r.date >= daysAgo(30))
       const res = await fetch('/api/kitchen-ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          wasteData: last30.map((e) => ({
-            item: e.itemName,
-            qty: e.quantity,
-            unit: e.unit,
-            reason: e.reason,
-            loss: e.estimatedLoss,
-            date: e.date,
+          wasteData: last30.map((r) => ({
+            item: r.details || r.typeLabel,
+            qty: r.weightKg,
+            unit: 'kg',
+            reason: r.typeLabel,
+            loss: 0,
+            date: r.date,
           })),
-          inventoryData: inventoryItems.map((i) => ({
-            item: i.itemName,
-            category: i.category,
-            currentStock: i.currentStock,
-            minLevel: i.minStockLevel,
-          })),
+          inventoryData: [],
         }),
       })
       const data = await res.json() as { suggestions: KitchenAISuggestion[] }
@@ -197,31 +247,25 @@ export default function WastePage() {
     } finally {
       setAiLoading(false)
     }
-  }, [entries, inventoryItems])
+  }, [rows])
 
   useEffect(() => {
-    if (!loading && entries.length > 0) fetchAiSuggestions()
+    if (!loading && rows.length > 0) fetchAiSuggestions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading])
 
-  // Stats
+  // Stats — weight based (kg)
   const weekAgoStr = daysAgo(7)
-  const weekWaste = entries.filter((e) => e.date >= weekAgoStr).reduce((s, e) => s + e.estimatedLoss, 0)
   const monthStr = thisMonthPrefix()
-  const monthWaste = entries.filter((e) => e.date.startsWith(monthStr)).reduce((s, e) => s + e.estimatedLoss, 0)
+  const weekKg = rows.filter((r) => r.date >= weekAgoStr).reduce((s, r) => s + r.weightKg, 0)
+  const monthKg = rows.filter((r) => r.date.startsWith(monthStr)).reduce((s, r) => s + r.weightKg, 0)
+  const monthCount = rows.filter((r) => r.date.startsWith(monthStr)).length
 
-  // Most wasted
-  const itemWaste: Record<string, { name: string; loss: number }> = {}
-  entries.filter((e) => e.date.startsWith(monthStr)).forEach((e) => {
-    if (!itemWaste[e.itemId]) itemWaste[e.itemId] = { name: e.itemName, loss: 0 }
-    itemWaste[e.itemId].loss += e.estimatedLoss
-  })
-  const mostWasted = Object.values(itemWaste).sort((a, b) => b.loss - a.loss)[0]
-
-  // Chart data: last 14 days
+  // Chart data: last 14 days (kg)
   const chartData = Array.from({ length: 14 }, (_, i) => {
     const date = daysAgo(13 - i)
-    const val = entries.filter((e) => e.date === date).reduce((s, e) => s + e.estimatedLoss, 0)
-    return { date: date.slice(5), value: val }
+    const val = rows.filter((r) => r.date === date).reduce((s, r) => s + r.weightKg, 0)
+    return { date: date.slice(5), value: Number(val.toFixed(2)) }
   })
 
   const PRIORITY_STYLES: Record<'high' | 'medium' | 'low', string> = {
@@ -239,7 +283,12 @@ export default function WastePage() {
       )}
 
       <div className="space-y-3">
-        <h1 className="text-xl font-bold text-[#0D1B2A] dark:text-white">Waste Tracker</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-bold text-[#0D1B2A] dark:text-white">Waste Tracker</h1>
+          <span className="rounded-full bg-[#0B3D6B]/10 px-3 py-1 text-sm font-bold text-[#0B3D6B] dark:bg-white/[0.06] dark:text-[#E8A020]">
+            This month: {fmtKg(monthKg)} waste logged
+          </span>
+        </div>
         <button
           type="button"
           onClick={() => setShowSlide(true)}
@@ -249,16 +298,11 @@ export default function WastePage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 md:grid-cols-2 md:gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 md:gap-4">
         {[
-          { label: 'Week', value: formatLKR(weekWaste), color: 'text-red-600' },
-          { label: 'Month', value: formatLKR(monthWaste), color: 'text-amber-600' },
-          {
-            label: 'Top Item',
-            value: mostWasted ? mostWasted.name : 'None',
-            sub: mostWasted ? formatLKR(mostWasted.loss) : '',
-            color: 'text-[#0B3D6B] dark:text-[#E8A020]',
-          },
+          { label: 'This Week', value: fmtKg(weekKg), color: 'text-red-600' },
+          { label: 'This Month', value: fmtKg(monthKg), color: 'text-amber-600' },
+          { label: 'Entries (month)', value: String(monthCount), color: 'text-[#0B3D6B] dark:text-[#E8A020]' },
         ].map((s) => (
           <div
             key={s.label}
@@ -270,107 +314,102 @@ export default function WastePage() {
             <p className={`mt-1 truncate text-sm font-bold md:mt-2 md:text-base ${s.color}`}>
               {s.value}
             </p>
-            {'sub' in s && s.sub && (
-              <p className="text-xs font-medium text-red-600">{s.sub}</p>
-            )}
           </div>
         ))}
       </div>
 
       {/* Bar Chart */}
       <div className="rounded-xl border border-white/90 bg-white/65 p-5 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05]">
-        <h2 className="mb-4 text-sm font-bold text-[#0D1B2A] dark:text-white">Daily Waste Value — Last 14 Days (LKR)</h2>
+        <h2 className="mb-4 text-sm font-bold text-[#0D1B2A] dark:text-white">Daily Waste — Last 14 Days (kg)</h2>
         <ResponsiveContainer width="100%" height={180}>
           <BarChart data={chartData}>
             <XAxis dataKey="date" tick={{ fontSize: 10 }} />
             <YAxis tick={{ fontSize: 10 }} />
-            <Tooltip formatter={(v) => [formatLKR(Number(v) || 0), 'Waste']} />
+            <Tooltip formatter={(v) => [fmtKg(Number(v) || 0), 'Waste']} />
             <Bar dataKey="value" fill="#0B3D6B" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
+      {/* Mobile history */}
       <div className="space-y-3 md:hidden">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-20 animate-pulse rounded-xl bg-[#DDE3EC] dark:bg-white/10" />
           ))
-        ) : entries.length === 0 ? (
+        ) : rows.length === 0 ? (
           <p className="py-8 text-center text-sm text-[#5A6A7A] dark:text-white/40">
             No waste entries yet
           </p>
         ) : (
-          entries.slice(0, 50).map((e) => {
-            const reasonVisual = WASTE_REASON_VISUAL.find((r) => r.id === e.reason)
-            return (
-              <div
-                key={e.id}
-                className="flex items-center gap-3 rounded-xl border border-white/90 bg-white/65 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]"
-              >
-                <span className="text-3xl">{getFoodEmoji(e.itemName)}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-bold text-[#0D1B2A] dark:text-white">{e.itemName}</p>
-                  <p className="text-sm text-gray-500">
-                    {e.quantity} {e.unit} · {e.date}
-                  </p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium dark:bg-white/10">
-                    {reasonVisual?.emoji} {REASON_LABELS[e.reason]}
-                  </span>
-                  <p className="mt-1 text-sm font-bold text-red-600">{formatLKR(e.estimatedLoss)}</p>
-                </div>
+          rows.slice(0, 50).map((r) => (
+            <div
+              key={r.id}
+              className="rounded-xl border border-white/90 bg-white/65 p-4 dark:border-white/[0.08] dark:bg-white/[0.05]"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-bold text-[#0D1B2A] dark:text-white">{r.typeLabel}</p>
+                <p className="shrink-0 text-sm font-bold text-red-600">{fmtKg(r.weightKg)}</p>
               </div>
-            )
-          })
+              <p className="mt-1 text-sm text-gray-500">{r.details}</p>
+              <p className="mt-0.5 text-xs text-gray-400">{r.date} · {r.loggedByName || '—'}</p>
+            </div>
+          ))
         )}
       </div>
 
+      {/* Desktop history */}
       <div className="hidden overflow-hidden rounded-xl border border-white/90 bg-white/65 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05] md:block">
-        <div>
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] text-xs font-medium uppercase text-[#5A6A7A] dark:border-white/[0.06] dark:bg-white/[0.03] dark:text-white/40">
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Item</th>
-                <th className="px-4 py-3">Qty</th>
-                <th className="px-4 py-3">Reason</th>
-                <th className="px-4 py-3">LKR Loss</th>
-                <th className="px-4 py-3">Notes</th>
-                <th className="px-4 py-3">By</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="border-b border-[#DDE3EC] dark:border-white/[0.06]">
-                    {Array.from({ length: 7 }).map((__, j) => (
-                      <td key={j} className="px-4 py-3"><div className="h-4 animate-pulse rounded bg-[#DDE3EC] dark:bg-white/10" /></td>
-                    ))}
-                  </tr>
-                ))
-              ) : entries.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-sm text-[#5A6A7A] dark:text-white/40">
-                    No waste entries yet
-                  </td>
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB] text-xs font-medium uppercase text-[#5A6A7A] dark:border-white/[0.06] dark:bg-white/[0.03] dark:text-white/40">
+              <th className="px-4 py-3">Date</th>
+              <th className="px-4 py-3">Reason</th>
+              <th className="px-4 py-3">Weight (kg)</th>
+              <th className="px-4 py-3">Details</th>
+              <th className="px-4 py-3">Logged By</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} className="border-b border-[#DDE3EC] dark:border-white/[0.06]">
+                  {Array.from({ length: 5 }).map((__, j) => (
+                    <td key={j} className="px-4 py-3"><div className="h-4 animate-pulse rounded bg-[#DDE3EC] dark:bg-white/10" /></td>
+                  ))}
                 </tr>
-              ) : (
-                entries.slice(0, 50).map((e) => (
-                  <tr key={e.id} className="border-b border-[#DDE3EC] last:border-0 dark:border-white/[0.06]">
-                    <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">{e.date}</td>
-                    <td className="px-4 py-3 font-medium text-[#0D1B2A] dark:text-white">{e.itemName}</td>
-                    <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">{e.quantity} {e.unit}</td>
-                    <td className="px-4 py-3 capitalize text-[#5A6A7A] dark:text-white/60">{REASON_LABELS[e.reason]}</td>
-                    <td className="px-4 py-3 font-medium text-red-600 dark:text-red-400">{formatLKR(e.estimatedLoss)}</td>
-                    <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">{e.notes || '—'}</td>
-                    <td className="px-4 py-3 text-xs text-[#5A6A7A] dark:text-white/40">{e.loggedByName}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+              ))
+            ) : rows.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-12 text-center text-sm text-[#5A6A7A] dark:text-white/40">
+                  No waste entries yet
+                </td>
+              </tr>
+            ) : (
+              rows.slice(0, 50).map((r) => (
+                <tr key={r.id} className="border-b border-[#DDE3EC] last:border-0 dark:border-white/[0.06]">
+                  <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">{r.date}</td>
+                  <td className="px-4 py-3 font-medium text-[#0D1B2A] dark:text-white">{r.typeLabel}</td>
+                  <td className="px-4 py-3 font-medium text-red-600 dark:text-red-400">{Number(r.weightKg.toFixed(2))}</td>
+                  <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">{r.details}</td>
+                  <td className="px-4 py-3 text-xs text-[#5A6A7A] dark:text-white/40">{r.loggedByName || '—'}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+          {!loading && rows.length > 0 && (
+            <tfoot>
+              <tr className="border-t border-[#DDE3EC] bg-[#F5F7FB] dark:border-white/[0.06] dark:bg-white/[0.03]">
+                <td className="px-4 py-3 text-sm font-bold text-[#0D1B2A] dark:text-white" colSpan={2}>
+                  Total this month:
+                </td>
+                <td className="px-4 py-3 text-sm font-bold text-red-600 dark:text-red-400" colSpan={3}>
+                  {fmtKg(monthKg)}
+                </td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
       </div>
 
       {/* AI Suggestions */}
@@ -389,7 +428,7 @@ export default function WastePage() {
             {aiLoading ? 'Loading…' : 'Refresh Suggestions'}
           </button>
         </div>
-        {entries.length === 0 ? (
+        {rows.length === 0 ? (
           <p className="text-sm text-[#5A6A7A] dark:text-white/40">Log waste entries to get AI-powered reduction suggestions</p>
         ) : aiLoading ? (
           <div className="space-y-3">
@@ -411,7 +450,7 @@ export default function WastePage() {
                 </div>
                 {s.potentialSaving && (
                   <p className="mt-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                    💡 {s.potentialSaving}
+                    {s.potentialSaving}
                   </p>
                 )}
               </div>
@@ -436,7 +475,7 @@ export default function WastePage() {
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving || !fItemId || !fQty}
+              disabled={saving || !fWeight || Number(fWeight) <= 0}
               className="flex min-h-[48px] flex-1 items-center justify-center rounded-xl bg-[#E8A020] text-base font-bold text-white disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Log Waste'}
@@ -454,83 +493,80 @@ export default function WastePage() {
               className="w-full min-h-[48px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-2 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
             />
           </div>
-          <div>
-            <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">Item *</label>
-            <IngredientPicker
-              inventoryItems={inventoryItems}
-              selectedItemId={fItemId}
-              onSelect={(item) => setFItemId(item.id)}
-              placeholder="Search item…"
-            />
-          </div>
-          {selectedItem && (
-            <div className="flex items-center gap-2 rounded-xl bg-[#F5F7FB] p-3 dark:bg-white/[0.04]">
-              <span className="text-3xl">{getFoodEmoji(selectedItem.itemName)}</span>
-              <div>
-                <p className="font-semibold text-[#0B3D6B] dark:text-white">{selectedItem.itemName}</p>
-                <p className="text-sm text-gray-500">
-                  Available: {selectedItem.currentStock} {selectedItem.unit}
-                </p>
-              </div>
-            </div>
-          )}
-          <div>
-            <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
-              Quantity * {selectedItem && `(${selectedItem.unit})`}
-            </label>
-            <CountStepper value={fQty} onChange={setFQty} step={0.5} />
-            {estimatedLoss > 0 && (
-              <p className="mt-2 text-center text-lg font-bold text-[#E8A020]">
-                Estimated Loss: {formatLKR(estimatedLoss)}
-              </p>
-            )}
-          </div>
+
           <div>
             <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">Reason</label>
             <div className="grid grid-cols-3 gap-2">
-              {WASTE_REASON_VISUAL.map((r) => (
+              {REASON_OPTIONS.map((r) => (
                 <button
                   key={r.id}
                   type="button"
                   onClick={() => setFReason(r.id)}
-                  className={`flex min-h-[52px] min-w-[90px] flex-col items-center justify-center rounded-xl border-2 px-2 py-2 text-center text-xs font-semibold ${
+                  className={`min-h-[48px] rounded-xl border-2 px-2 py-2 text-center text-sm font-semibold ${
                     fReason === r.id
                       ? 'border-[#E8A020] bg-[#E8A020] text-white'
                       : 'border-[#DDE3EC] bg-white text-[#0D1B2A] dark:border-gray-600 dark:bg-gray-900 dark:text-white'
                   }`}
                 >
-                  <span className="text-2xl leading-none">{r.emoji}</span>
                   {r.label}
                 </button>
               ))}
             </div>
           </div>
-          {todayLogs.length > 0 && (
+
+          <div>
+            <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
+              Total weight wasted (kg) *
+            </label>
+            <input
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="0.1"
+              value={fWeight}
+              onChange={(e) => setFWeight(e.target.value)}
+              placeholder="0.0"
+              className="w-full min-h-[48px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-2 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            />
+          </div>
+
+          {showExpired && (
             <div>
               <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">
-                Link to Meal (optional)
+                What items expired? (optional)
               </label>
+              <textarea
+                value={fExpiredItems}
+                onChange={(e) => setFExpiredItems(e.target.value)}
+                rows={2}
+                placeholder="e.g. Tomatoes 2kg, Green chilli 0.5kg"
+                className="w-full min-h-[56px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-2 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+              />
+            </div>
+          )}
+
+          {showMealType && (
+            <div>
+              <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">Meal type</label>
               <select
-                value={fMealLogId}
-                onChange={(e) => setFMealLogId(e.target.value)}
+                value={fMealType}
+                onChange={(e) => setFMealType(e.target.value as (typeof MEAL_OPTIONS)[number])}
                 className="w-full min-h-[48px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-2 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
               >
-                <option value="">None</option>
-                {todayLogs.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.mealType} — {l.totalServings} servings
-                  </option>
+                {MEAL_OPTIONS.map((m) => (
+                  <option key={m} value={m}>{cap(m)}</option>
                 ))}
               </select>
             </div>
           )}
+
           <div>
-            <label className="mb-2 block text-base font-bold text-[#0D1B2A] dark:text-white">Notes</label>
+            <label className="mb-2 block text-sm font-bold text-[#0D1B2A] dark:text-white">Notes (optional)</label>
             <textarea
               value={fNotes}
               onChange={(e) => setFNotes(e.target.value)}
-              rows={3}
-              className="w-full min-h-[80px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-3 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+              rows={2}
+              className="w-full min-h-[56px] rounded-xl border border-[#DDE3EC] bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
             />
           </div>
         </div>

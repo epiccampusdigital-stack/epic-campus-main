@@ -10,6 +10,7 @@ import { daysUntilExpiry } from '@/lib/kitchen/expiryHelpers'
 import { getFoodEmoji, MEAL_SESSION_VISUAL } from '@/lib/kitchen/foodImages'
 import { useKitchenSinhala } from '@/lib/kitchen/useKitchenSinhala'
 import { formatLKR } from '@/lib/utils/formatCurrency'
+import { formatQty } from '@/lib/kitchen-utils'
 import type { InventoryItem, MealLog, MealType } from '@/types/kitchen'
 
 const MEAL_SESSIONS: { type: MealType; label: string }[] = [
@@ -211,23 +212,28 @@ export default function KitchenDashboardPage() {
   return (
     <div className="space-y-5 md:space-y-6">
       {!loading && lowStockCount > 0 && (
-        <div
-          onClick={() => setLowStockModalOpen(true)}
-          className="w-full cursor-pointer rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-700/40 dark:bg-amber-900/20"
-        >
+        <div className="w-full rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-700/40 dark:bg-amber-900/20">
           <div className="flex items-center gap-2">
             <span className="ti ti-alert-triangle text-xl text-amber-600 dark:text-amber-400" />
             <p className="text-base font-semibold text-amber-800 dark:text-amber-300">
               {lowStockCount} item{lowStockCount !== 1 ? 's are' : ' is'} running low
             </p>
           </div>
-          <Link
-            href="/kitchen/orders"
-            onClick={(e) => e.stopPropagation()}
-            className="mt-3 flex min-h-[48px] w-full items-center justify-center rounded-xl bg-amber-600 text-sm font-bold text-white hover:bg-amber-700 md:mt-0 md:ml-auto md:w-auto md:px-4"
-          >
-            Generate Order List
-          </Link>
+          <div className="mt-3 flex gap-3">
+            <button
+              type="button"
+              onClick={() => setLowStockModalOpen(true)}
+              className="flex min-h-[48px] flex-1 items-center justify-center rounded-xl border border-[#E8A020] bg-transparent text-sm font-bold text-[#E8A020] hover:bg-[#E8A020]/10 md:flex-none md:px-4"
+            >
+              View Low Stock Items
+            </button>
+            <Link
+              href="/kitchen/orders"
+              className="flex min-h-[48px] flex-1 items-center justify-center rounded-xl bg-[#E8A020] text-sm font-bold text-[#0B3D6B] hover:bg-[#d4911c] md:flex-none md:px-4"
+            >
+              Generate Order List
+            </Link>
+          </div>
         </div>
       )}
 
@@ -488,7 +494,7 @@ export default function KitchenDashboardPage() {
                   <div>
                     <p className="font-semibold text-sm text-[#0D1B2A] dark:text-white">{item.itemName}</p>
                     <p className="text-xs text-red-600 dark:text-red-400">
-                      Stock: {item.currentStock} {item.unit} — Min: {item.minStockLevel} {item.unit}
+                      Stock: {formatQty(item.currentStock, item.unit)} — Min: {formatQty(item.minStockLevel, item.unit)}
                     </p>
                   </div>
                   <span className="text-xl">{item.emoji ?? '📦'}</span>

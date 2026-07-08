@@ -483,7 +483,7 @@ export default function LoginPage() {
               </GoldSubmitButton>
 
               <p className="mt-6 text-sm">
-                <span className="text-gray-600">Already a student? </span>
+                <span className="text-gray-600 dark:text-white/60">Already a student? </span>
                 <Link href="/signup" className="font-semibold text-[#E8A020] hover:underline">
                   Create your account →
                 </Link>
@@ -501,12 +501,12 @@ export default function LoginPage() {
       {showReset && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowReset(false)} />
-          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-            <h2 className="font-jakarta font-bold text-[#0B3D6B] mb-2">Reset Password</h2>
+          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white dark:bg-slate-800 p-6 shadow-2xl">
+            <h2 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white mb-2">Reset Password</h2>
             {resetSent ? (
               <div className="text-center py-4">
                 <span className="ti ti-mail-check text-4xl text-emerald-500" />
-                <p className="mt-2 text-sm text-[#5A6A7A]">Reset link sent to {resetEmail}</p>
+                <p className="mt-2 text-sm text-[#5A6A7A] dark:text-white/60">Reset link sent to {resetEmail}</p>
                 <button
                   type="button"
                   onClick={() => {
@@ -520,19 +520,19 @@ export default function LoginPage() {
               </div>
             ) : (
               <>
-                <p className="text-sm text-[#5A6A7A] mb-4">Enter your email and we&apos;ll send you a reset link.</p>
+                <p className="text-sm text-[#5A6A7A] dark:text-white/60 mb-4">Enter your email and we&apos;ll send you a reset link.</p>
                 <input
                   type="email"
                   value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
                   placeholder="your@email.com"
-                  className="w-full rounded-xl border border-[#DDE3EC] px-4 py-3 text-sm outline-none focus:border-[#E8A020]"
+                  className="w-full rounded-xl border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-slate-900 px-4 py-3 text-sm text-[#0D1B2A] dark:text-white outline-none placeholder-gray-400 focus:border-[#E8A020]"
                 />
                 <div className="mt-4 flex gap-3">
                   <button
                     type="button"
                     onClick={() => setShowReset(false)}
-                    className="flex-1 rounded-xl border border-[#DDE3EC] py-2.5 text-sm font-semibold text-[#5A6A7A]"
+                    className="flex-1 rounded-xl border border-[#DDE3EC] dark:border-white/10 py-2.5 text-sm font-semibold text-[#5A6A7A] dark:text-white/70"
                   >
                     Cancel
                   </button>
@@ -561,12 +561,12 @@ export default function LoginPage() {
       {showRoleSelect && googleUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" />
-          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#0B3D6B]/10">
-              <span className="ti ti-user-question text-3xl text-[#0B3D6B]" />
+          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white dark:bg-slate-800 p-6 shadow-2xl text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#0B3D6B]/10 dark:bg-white/10">
+              <span className="ti ti-user-question text-3xl text-[#0B3D6B] dark:text-[#E8A020]" />
             </div>
-            <h2 className="font-jakarta font-bold text-[#0B3D6B]">Welcome to Epic Campus</h2>
-            <p className="mt-1 text-sm text-[#5A6A7A]">How would you like to join?</p>
+            <h2 className="font-jakarta font-bold text-[#0B3D6B] dark:text-white">Welcome to Epic Campus</h2>
+            <p className="mt-1 text-sm text-[#5A6A7A] dark:text-white/60">How would you like to join?</p>
             <div className="mt-5 space-y-3">
               <button
                 type="button"
@@ -585,12 +585,12 @@ export default function LoginPage() {
                   setGoogleUser(null)
                   alert('Your request has been sent to the admin. You will receive access once approved.')
                 }}
-                className="flex w-full items-center gap-3 rounded-xl border-2 border-[#DDE3EC] p-4 hover:border-[#E8A020]"
+                className="flex w-full items-center gap-3 rounded-xl border-2 border-[#DDE3EC] dark:border-white/10 p-4 hover:border-[#E8A020] dark:hover:border-[#E8A020]"
               >
-                <span className="ti ti-school text-2xl text-[#0B3D6B]" />
+                <span className="ti ti-school text-2xl text-[#0B3D6B] dark:text-[#E8A020]" />
                 <div className="text-left">
-                  <p className="font-bold text-[#0B3D6B]">Join as Student</p>
-                  <p className="text-xs text-[#5A6A7A]">Enrol in courses and track your progress</p>
+                  <p className="font-bold text-[#0B3D6B] dark:text-white">Join as Student</p>
+                  <p className="text-xs text-[#5A6A7A] dark:text-white/60">Enrol in courses and track your progress</p>
                 </div>
               </button>
               <button
@@ -610,12 +610,12 @@ export default function LoginPage() {
                   setGoogleUser(null)
                   alert('Your staff request has been sent to the admin for approval.')
                 }}
-                className="flex w-full items-center gap-3 rounded-xl border-2 border-[#DDE3EC] p-4 hover:border-[#E8A020]"
+                className="flex w-full items-center gap-3 rounded-xl border-2 border-[#DDE3EC] dark:border-white/10 p-4 hover:border-[#E8A020] dark:hover:border-[#E8A020]"
               >
-                <span className="ti ti-briefcase text-2xl text-[#0B3D6B]" />
+                <span className="ti ti-briefcase text-2xl text-[#0B3D6B] dark:text-[#E8A020]" />
                 <div className="text-left">
-                  <p className="font-bold text-[#0B3D6B]">Join as Staff</p>
-                  <p className="text-xs text-[#5A6A7A]">Access staff portal after admin approval</p>
+                  <p className="font-bold text-[#0B3D6B] dark:text-white">Join as Staff</p>
+                  <p className="text-xs text-[#5A6A7A] dark:text-white/60">Access staff portal after admin approval</p>
                 </div>
               </button>
             </div>

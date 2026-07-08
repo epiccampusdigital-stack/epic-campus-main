@@ -35,14 +35,14 @@ function StatCard({
   loading?: boolean
 }) {
   return (
-    <div className="rounded-xl border border-[#DDE3EC] bg-white p-5">
-      <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+    <div className="rounded-xl border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-slate-800 p-5">
+      <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">
         {label}
       </p>
       {loading ? (
-        <div className="mt-2 h-8 w-28 animate-pulse rounded bg-[#DDE3EC]" />
+        <div className="mt-2 h-8 w-28 animate-pulse rounded bg-[#DDE3EC] dark:bg-white/10" />
       ) : (
-        <p className="mt-1 font-jakarta text-2xl font-bold text-[#0B3D6B]">{value}</p>
+        <p className="mt-1 font-jakarta text-2xl font-bold text-[#0B3D6B] dark:text-[#E8A020]">{value}</p>
       )}
     </div>
   )
@@ -120,8 +120,8 @@ export default function PayrollPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="font-jakarta text-2xl font-bold text-[#0B3D6B]">Payroll</h1>
-          <p className="mt-1 font-inter text-sm text-[#5A6A7A]">
+          <h1 className="font-jakarta text-2xl font-bold text-[#0B3D6B] dark:text-white">Payroll</h1>
+          <p className="mt-1 font-inter text-sm text-[#5A6A7A] dark:text-white/50">
             Staff salary management
           </p>
         </div>
@@ -129,7 +129,7 @@ export default function PayrollPage() {
           <select
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
-            className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-2.5 font-inter text-sm outline-none focus:border-[#E8A020]"
+            className="rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-slate-800 px-3 py-2.5 font-inter text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020]"
           >
             {periodOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -174,23 +174,23 @@ export default function PayrollPage() {
         />
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-[#DDE3EC] bg-white">
+      <div className="overflow-hidden rounded-xl border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-slate-800">
         {loading ? (
-          <div className="animate-pulse divide-y divide-[#DDE3EC]">
+          <div className="animate-pulse divide-y divide-[#DDE3EC] dark:divide-white/10">
             {Array.from({ length: 10 }).map((_, i) => (
               <div key={i} className="flex gap-4 px-4 py-4">
-                <div className="h-3 w-32 flex-1 rounded bg-[#DDE3EC]" />
-                <div className="h-3 w-20 rounded bg-[#DDE3EC]" />
+                <div className="h-3 w-32 flex-1 rounded bg-[#DDE3EC] dark:bg-white/10" />
+                <div className="h-3 w-20 rounded bg-[#DDE3EC] dark:bg-white/10" />
               </div>
             ))}
           </div>
         ) : periodRecords.length === 0 ? (
           <div className="px-6 py-16 text-center">
-            <span className="ti ti-report-money text-4xl text-[#DDE3EC]" aria-hidden="true" />
-            <p className="mt-3 font-jakarta text-base font-semibold text-[#0B3D6B]">
+            <span className="ti ti-report-money text-4xl text-[#DDE3EC] dark:text-white/20" aria-hidden="true" />
+            <p className="mt-3 font-jakarta text-base font-semibold text-[#0B3D6B] dark:text-white">
               No payroll records for this period
             </p>
-            <p className="mt-1 font-inter text-sm text-[#5A6A7A]">
+            <p className="mt-1 font-inter text-sm text-[#5A6A7A] dark:text-white/50">
               Click Process Payroll to add staff salaries.
             </p>
           </div>
@@ -198,7 +198,7 @@ export default function PayrollPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1100px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#DDE3EC] bg-[#F5F7FB]">
+                <tr className="border-b border-[#DDE3EC] dark:border-white/10 bg-[#F5F7FB] dark:bg-white/[0.03]">
                   {[
                     'Staff Name',
                     'Role',
@@ -213,38 +213,38 @@ export default function PayrollPage() {
                   ].map((h) => (
                     <th
                       key={h}
-                      className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A]"
+                      className="px-4 py-3 font-jakarta text-xs font-semibold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50"
                     >
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#DDE3EC]">
+              <tbody className="divide-y divide-[#DDE3EC] dark:divide-white/10">
                 {pageItems.map((r) => (
-                  <tr key={r.id} className="transition-colors hover:bg-[#F5F7FB]/60">
-                    <td className="px-4 py-3 font-medium text-[#0D1B2A]">
+                  <tr key={r.id} className="transition-colors hover:bg-[#F5F7FB]/60 dark:hover:bg-white/[0.03]">
+                    <td className="px-4 py-3 font-medium text-[#0D1B2A] dark:text-white">
                       {r.staffName}
                     </td>
-                    <td className="px-4 py-3 capitalize text-[#5A6A7A]">
+                    <td className="px-4 py-3 capitalize text-[#5A6A7A] dark:text-white/60">
                       {r.role.replace(/([A-Z])/g, ' $1').trim()}
                     </td>
-                    <td className="px-4 py-3 text-[#5A6A7A]">
+                    <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">
                       {getSalaryTypeLabel(r.salaryType)}
                     </td>
-                    <td className="px-4 py-3 text-[#5A6A7A]">
+                    <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">
                       {formatPayrollAmount(r.baseSalary)}
                     </td>
-                    <td className="px-4 py-3 text-[#5A6A7A]">
+                    <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">
                       {r.hoursWorked ?? '—'}
                     </td>
-                    <td className="px-4 py-3 text-[#5A6A7A]">
+                    <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">
                       {r.commission > 0 ? formatPayrollAmount(r.commission) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-[#5A6A7A]">
+                    <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">
                       {formatPayrollAmount(r.deductions)}
                     </td>
-                    <td className="px-4 py-3 font-semibold text-[#0B3D6B]">
+                    <td className="px-4 py-3 font-semibold text-[#0B3D6B] dark:text-[#E8A020]">
                       {formatPayrollAmount(r.netPay)}
                     </td>
                     <td className="px-4 py-3">
@@ -259,14 +259,14 @@ export default function PayrollPage() {
                         <button
                           type="button"
                           onClick={() => setSlipRecord(r)}
-                          className="rounded-lg px-2 py-1 text-xs font-semibold text-[#0B3D6B] hover:bg-[#0B3D6B]/10"
+                          className="rounded-lg px-2 py-1 text-xs font-semibold text-[#0B3D6B] dark:text-[#E8A020] hover:bg-[#0B3D6B]/10 dark:hover:bg-white/10"
                         >
                           Slip
                         </button>
                         <button
                           type="button"
                           onClick={() => openEdit(r)}
-                          className="rounded-lg px-2 py-1 text-xs font-semibold text-[#5A6A7A] hover:bg-[#F5F7FB]"
+                          className="rounded-lg px-2 py-1 text-xs font-semibold text-[#5A6A7A] dark:text-white/60 hover:bg-[#F5F7FB] dark:hover:bg-white/10"
                         >
                           Edit
                         </button>
@@ -291,7 +291,7 @@ export default function PayrollPage() {
 
       {!loading && periodRecords.length > 0 && (
         <div className="flex items-center justify-between">
-          <p className="font-inter text-sm text-[#5A6A7A]">
+          <p className="font-inter text-sm text-[#5A6A7A] dark:text-white/60">
             Showing {(page - 1) * PAGE_SIZE + 1}–
             {Math.min(page * PAGE_SIZE, periodRecords.length)} of{' '}
             {periodRecords.length}
@@ -301,18 +301,18 @@ export default function PayrollPage() {
               type="button"
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="rounded-lg border border-[#DDE3EC] px-3 py-1.5 text-sm text-[#5A6A7A] disabled:opacity-40"
+              className="rounded-lg border border-[#DDE3EC] dark:border-white/10 px-3 py-1.5 text-sm text-[#5A6A7A] dark:text-white/70 disabled:opacity-40"
             >
               Previous
             </button>
-            <span className="flex items-center px-2 font-inter text-sm text-[#5A6A7A]">
+            <span className="flex items-center px-2 font-inter text-sm text-[#5A6A7A] dark:text-white/60">
               {page} / {totalPages}
             </span>
             <button
               type="button"
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="rounded-lg border border-[#DDE3EC] px-3 py-1.5 text-sm text-[#5A6A7A] disabled:opacity-40"
+              className="rounded-lg border border-[#DDE3EC] dark:border-white/10 px-3 py-1.5 text-sm text-[#5A6A7A] dark:text-white/70 disabled:opacity-40"
             >
               Next
             </button>

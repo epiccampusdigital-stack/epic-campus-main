@@ -97,19 +97,19 @@ export function getPipelineStages(): {
 export function getStatusColor(status: LeadStatus): string {
   switch (status) {
     case 'new':
-      return 'bg-sky-50 text-sky-700 border-sky-200'
+      return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800'
     case 'contacted':
-      return 'bg-indigo-50 text-indigo-700 border-indigo-200'
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-800'
     case 'interested':
-      return 'bg-violet-50 text-violet-700 border-violet-200'
+      return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800'
     case 'applied':
-      return 'bg-amber-50 text-amber-800 border-amber-200'
+      return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800'
     case 'enrolled':
-      return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/40 dark:text-green-300 dark:border-green-800'
     case 'lost':
-      return 'bg-red-50 text-red-700 border-red-200'
+      return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800'
     default:
-      return 'bg-[#F5F7FB] text-[#5A6A7A] border-[#DDE3EC]'
+      return 'bg-[#F5F7FB] text-[#5A6A7A] border-[#DDE3EC] dark:bg-white/[0.06] dark:text-white/60 dark:border-white/10'
   }
 }
 

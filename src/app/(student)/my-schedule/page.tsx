@@ -454,26 +454,24 @@ export default function MySchedulePage() {
   const groupRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   const courseId = student?.courseId ?? ''
+  const noCourse = !courseId
+  const [showAll, setShowAll] = useState(false)
+  // Filter to the student's course by default; skip the filter if they opt to see
+  // everything, or if no course is set on their profile.
+  const filterByCourse = !noCourse && !showAll
 
-  // Load sessions for this student's enrolled course only.
+  // Load sessions — scoped to the student's course unless "show all" is active.
   useEffect(() => {
     if (!student) return
-    if (!courseId) {
-      setSessions([])
-      setLoading(false)
-      return
-    }
     let cancelled = false
     async function load() {
       setLoading(true)
       try {
-        const snap = await getDocs(
-          query(
-            collection(db, 'sessions'),
-            where('courseId', '==', courseId),
-            orderBy('date', 'asc'),
-          ),
-        )
+        const base = collection(db, 'sessions')
+        const q = filterByCourse
+          ? query(base, where('courseId', '==', courseId), orderBy('date', 'asc'))
+          : query(base, orderBy('date', 'asc'))
+        const snap = await getDocs(q)
         if (!cancelled) {
           setSessions(snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<Session, 'id'>) })))
         }
@@ -486,7 +484,7 @@ export default function MySchedulePage() {
     }
     void load()
     return () => { cancelled = true }
-  }, [student, courseId])
+  }, [student, courseId, filterByCourse])
 
   const today = isoToday()
 
@@ -601,20 +599,14 @@ export default function MySchedulePage() {
         <p className="text-sm text-[#5A6A7A] dark:text-white/50">Classes, exams and workshops</p>
       </div>
 
-      {!courseId ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0B3D6B]/10 dark:bg-white/[0.06]">
-            <span className="ti ti-school text-[28px] text-[#0B3D6B] dark:text-white/30" />
-          </div>
-          <h3 className="font-jakarta text-[18px] font-bold text-[#0B3D6B] dark:text-white mb-2">
-            No course enrolled
-          </h3>
-          <p className="max-w-xs text-[14px] text-[#5A6A7A] dark:text-white/40 leading-relaxed">
-            Your schedule will appear here once you&apos;re enrolled in a course.
-          </p>
+      {noCourse && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm font-medium text-amber-800 dark:text-amber-300">
+          <span className="ti ti-info-circle text-base shrink-0" />
+          No course assigned — showing all sessions
         </div>
-      ) : (
-        <>
+      )}
+
+      <>
           {/* ── TOP CONTROLS BAR ─────────────────────────────────────────── */}
           <div className="sticky top-0 z-20 flex min-h-[64px] flex-wrap items-center justify-between gap-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -648,21 +640,38 @@ export default function MySchedulePage() {
               </span>
             </div>
 
-            <div className="flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700">
-              {(['month', 'week', 'list'] as const).map(v => (
+            <div className="flex items-center gap-2">
+              {courseId && (
                 <button
-                  key={v}
                   type="button"
-                  onClick={() => selectView(v)}
-                  className={`h-11 rounded-md px-3 sm:px-4 text-xs sm:text-sm font-semibold capitalize transition-colors ${
-                    view === v
-                      ? 'bg-[#0B3D6B] text-white'
-                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  onClick={() => setShowAll(v => !v)}
+                  title={showAll ? 'Showing every course' : 'Showing only your course'}
+                  className={`flex h-11 items-center gap-1.5 rounded-lg border px-3 text-xs sm:text-sm font-semibold transition-colors ${
+                    showAll
+                      ? 'border-[#E8A020] bg-[#E8A020]/10 text-[#E8A020]'
+                      : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
                   }`}
                 >
-                  {v}
+                  <span className="ti ti-filter" />
+                  {showAll ? 'All sessions' : 'My course'}
                 </button>
-              ))}
+              )}
+              <div className="flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700">
+                {(['month', 'week', 'list'] as const).map(v => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => selectView(v)}
+                    className={`h-11 rounded-md px-3 sm:px-4 text-xs sm:text-sm font-semibold capitalize transition-colors ${
+                      view === v
+                        ? 'bg-[#0B3D6B] text-white'
+                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -742,8 +751,7 @@ export default function MySchedulePage() {
               )}
             </div>
           </div>
-        </>
-      )}
+      </>
 
       {/* Session detail panel */}
       {selected && <SessionPanel session={selected} onClose={() => setSelected(null)} />}

@@ -200,10 +200,9 @@ export function BottomBorderInput({
         placeholder={placeholder}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        className="w-full min-w-0 border-0 border-b-2 bg-transparent px-1 py-2.5 font-inter text-base outline-none disabled:opacity-60 sm:text-[15px]"
+        className="w-full min-w-0 border-0 border-b-2 bg-transparent px-1 py-2.5 font-inter text-base text-[#0D1B2A] outline-none placeholder-gray-400 disabled:opacity-60 dark:rounded-lg dark:bg-slate-800 dark:px-3 dark:text-white dark:placeholder-gray-400 dark:focus:ring-2 dark:focus:ring-[#E8A020]/50 sm:text-[15px]"
         style={{
           borderBottomColor: borderColor(focused, !!error),
-          color: '#0D1B2A',
         }}
       />
       {error && (
@@ -253,10 +252,9 @@ export function BottomBorderPassword({
           autoComplete={autoComplete}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          className="w-full min-w-0 border-0 border-b-2 bg-transparent py-2.5 pl-1 pr-14 font-inter text-base outline-none disabled:opacity-60 sm:text-[15px]"
+          className="w-full min-w-0 border-0 border-b-2 bg-transparent py-2.5 pl-1 pr-14 font-inter text-base text-[#0D1B2A] outline-none placeholder-gray-400 disabled:opacity-60 dark:rounded-lg dark:bg-slate-800 dark:pl-3 dark:text-white dark:placeholder-gray-400 dark:focus:ring-2 dark:focus:ring-[#E8A020]/50 sm:text-[15px]"
           style={{
             borderBottomColor: borderColor(focused, !!error),
-            color: '#0D1B2A',
           }}
         />
         <button
@@ -310,10 +308,9 @@ export function BottomBorderSelect({
           disabled={disabled}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          className="w-full min-w-0 appearance-none border-0 border-b-2 bg-transparent py-2.5 pl-1 pr-7 font-inter text-base outline-none disabled:opacity-60 sm:text-[15px]"
+          className="w-full min-w-0 appearance-none border-0 border-b-2 bg-transparent py-2.5 pl-1 pr-7 font-inter text-base text-[#0D1B2A] outline-none disabled:opacity-60 dark:rounded-lg dark:bg-slate-800 dark:px-3 dark:text-white sm:text-[15px]"
           style={{
             borderBottomColor: borderColor(focused, !!error),
-            color: value ? '#0D1B2A' : '#5A6A7A',
           }}
         >
           {children}

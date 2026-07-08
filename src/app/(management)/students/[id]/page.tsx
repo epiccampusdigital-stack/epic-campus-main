@@ -303,11 +303,12 @@ export default function StudentProfilePage() {
             where('studentId', '==', studentId),
             orderBy('date', 'desc'),
           ),
-        ).catch(() => ({ docs: [] })),
+        ).catch((err) => { console.error('[StudentProfile] attendance', err); return { docs: [] } }),
         getDocs(
           query(collection(db, 'examResults'), where('studentId', '==', studentId)),
-        ),
-        getDocs(collection(db, 'students', studentId, 'documents')),
+        ).catch((err) => { console.error('[StudentProfile] exams', err); return { docs: [] } }),
+        getDocs(collection(db, 'students', studentId, 'documents'))
+          .catch((err) => { console.error('[StudentProfile] documents', err); return { docs: [] } }),
       ])
 
       setPayments(

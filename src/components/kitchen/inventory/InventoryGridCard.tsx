@@ -8,6 +8,7 @@ import {
   getExpiryStatus,
 } from '@/lib/kitchen/expiryHelpers'
 import { useKitchenSinhala } from '@/lib/kitchen/useKitchenSinhala'
+import { formatQty } from '@/lib/kitchen-utils'
 import type { InventoryItem } from '@/types/kitchen'
 
 interface InventoryGridCardProps {
@@ -16,11 +17,6 @@ interface InventoryGridCardProps {
   onRestock: () => void
   onRemove: () => void
   onDelete?: (item: InventoryItem) => void
-}
-
-function formatQty(n: number): string {
-  if (Number.isInteger(n)) return n.toString()
-  return parseFloat(n.toFixed(3)).toString()
 }
 
 function stockBarColor(item: InventoryItem): string {

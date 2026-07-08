@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   collection,
   addDoc,
@@ -15,6 +15,8 @@ import { useKitchen } from '@/app/kitchen/context'
 import CountStepper from '@/components/kitchen/CountStepper'
 import { getFoodEmoji } from '@/lib/kitchen/foodImages'
 import { formatLKR } from '@/lib/utils/formatCurrency'
+import { formatQty } from '@/lib/kitchen-utils'
+import { downloadOrderChecklistPdf } from '@/lib/kitchen/orderChecklistPdf'
 import type { InventoryItem, KitchenOrder, OrderItem, OrderStatus } from '@/types/kitchen'
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
@@ -24,6 +26,20 @@ const STATUS_STYLES: Record<OrderStatus, string> = {
   ordered: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   received: 'bg-teal-50 text-teal-700 border-teal-200',
   cancelled: 'bg-red-50 text-red-700 border-red-200',
+}
+
+// Cap an order quantity at a sane per-order maximum so a bad calc can't request
+// hundreds of kg. Discrete "units" items get a higher ceiling than weighed goods.
+function capOrderQty(qty: number, unit: string): number {
+  const max = unit === 'units' ? 500 : 100
+  return Math.min(qty, max)
+}
+
+// Round order quantities to sensible increments the storekeeper can actually buy.
+function roundOrderQty(qty: number): number {
+  if (qty < 10) return Number(qty.toFixed(1))
+  if (qty <= 100) return Math.round(qty)
+  return Math.round(qty / 5) * 5
 }
 
 function toDate(ts: unknown): string {
@@ -47,6 +63,12 @@ export default function OrdersPage() {
   const [generated, setGenerated] = useState(false)
   const [studentTarget, setStudentTarget] = useState('130')
   const [smartLoading, setSmartLoading] = useState(false)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  function scrollToList() {
+    // Defer to next tick so the generated list has rendered before we scroll to it.
+    setTimeout(() => listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+  }
 
   async function loadData() {
     setLoading(true)
@@ -81,22 +103,29 @@ export default function OrdersPage() {
     )
     if (lowItems.length === 0) {
       showToast('All items are sufficiently stocked!')
-      setGenerated(true)
       setOrderItems([])
+      setGenerated(true)
+      scrollToList()
       return
     }
-    const rows: OrderItem[] = lowItems.map((i) => ({
-      itemId: i.id,
-      itemName: i.itemName,
-      unit: i.unit,
-      currentStock: i.currentStock,
-      minStockLevel: i.minStockLevel,
-      orderQty: parseFloat(Math.max(0, (i.minStockLevel * 3) - i.currentStock).toFixed(4)),
-      unitCost: i.unitCost ?? 0,
-      totalCost: parseFloat((Math.max(0, (i.minStockLevel * 3) - i.currentStock) * (i.unitCost ?? 0)).toFixed(2)),
-    }))
+    const rows: OrderItem[] = lowItems.map((i) => {
+      // Restock up to 3× the minimum level, then round to a buyable increment.
+      const orderQty = roundOrderQty(capOrderQty(Math.max(0, (i.minStockLevel * 3) - i.currentStock), i.unit))
+      const unitCost = i.unitCost ?? 0
+      return {
+        itemId: i.id,
+        itemName: i.itemName,
+        unit: i.unit,
+        currentStock: i.currentStock,
+        minStockLevel: i.minStockLevel,
+        orderQty,
+        unitCost,
+        totalCost: parseFloat((orderQty * unitCost).toFixed(2)),
+      }
+    })
     setOrderItems(rows)
     setGenerated(true)
+    scrollToList()
   }
 
   async function generateSmartOrder() {
@@ -126,12 +155,21 @@ export default function OrdersPage() {
 
       const target = parseInt(studentTarget) || 130
       const rows: OrderItem[] = inventoryItems
-        .map(item => {
+        .map((item): OrderItem | null => {
+          // Already well stocked (over 3× the minimum) — no need to order.
+          if (item.currentStock > item.minStockLevel * 3) return null
+
           const usage = usageMap[item.id]
           const daysOfData = usage?.days.size ?? 0
-          const dailyAvg = daysOfData > 0 ? (usage.totalUsed / daysOfData) : 0
-          const scaledAvg = dailyAvg * (target / 100)
-          const recommended = parseFloat(Math.max(0, (scaledAvg * 35) - item.currentStock).toFixed(4))
+          // Use the real recent daily usage when we have history; otherwise fall back
+          // to a conservative 50g/student/day so brand-new items still get ordered.
+          const dailyUsage = daysOfData > 0
+            ? usage.totalUsed / daysOfData
+            : target * 0.05
+          // Project ~30 days of need, net of what's already in stock, then cap + round.
+          const raw = Math.max(0, (dailyUsage * 30) - item.currentStock)
+          const recommended = roundOrderQty(capOrderQty(raw, item.unit))
+          const unitCost = item.unitCost ?? 0
           return {
             itemId: item.id,
             itemName: item.itemName,
@@ -139,14 +177,15 @@ export default function OrdersPage() {
             currentStock: item.currentStock,
             minStockLevel: item.minStockLevel,
             orderQty: recommended,
-            unitCost: item.unitCost ?? 0,
-            totalCost: parseFloat((recommended * (item.unitCost ?? 0)).toFixed(2)),
+            unitCost,
+            totalCost: parseFloat((recommended * unitCost).toFixed(2)),
           }
         })
-        .filter(r => r.orderQty > 0)
+        .filter((r): r is OrderItem => r != null && r.orderQty > 0)
 
       setOrderItems(rows)
       setGenerated(true)
+      scrollToList()
     } catch (err) {
       console.error('[SmartOrder]', err)
     } finally {
@@ -164,6 +203,11 @@ export default function OrdersPage() {
   }
 
   const totalEstimate = orderItems.reduce((s, i) => s + i.totalCost, 0)
+
+  function handleDownloadPdf() {
+    if (orderItems.length === 0) return
+    void downloadOrderChecklistPdf(orderItems)
+  }
 
   async function handleSubmit() {
     if (orderItems.length === 0) return
@@ -205,7 +249,7 @@ export default function OrdersPage() {
             <div className="min-w-0 flex-1">
               <p className="font-bold text-[#0D1B2A] dark:text-white">{item.itemName}</p>
               <p className={`text-sm ${isLow ? 'font-semibold text-red-600' : 'text-gray-500'}`}>
-                Stock: {item.currentStock} {item.unit} (min {item.minStockLevel})
+                Stock: {formatQty(item.currentStock)} {item.unit} (min {formatQty(item.minStockLevel)})
               </p>
             </div>
           </div>
@@ -277,8 +321,19 @@ export default function OrdersPage() {
       </div>
 
       {generated && (
-        <div className="rounded-xl border border-white/90 bg-white/65 p-4 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05] md:p-5">
-          <h2 className="mb-4 text-base font-bold text-[#0D1B2A] dark:text-white">New Order</h2>
+        <div ref={listRef} className="rounded-xl border border-white/90 bg-white/65 p-4 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05] md:p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-bold text-[#0D1B2A] dark:text-white">Generated Order List</h2>
+            {orderItems.length > 0 && (
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                className="inline-flex items-center gap-2 rounded-xl border border-[#0B3D6B] bg-transparent px-4 py-2 text-sm font-bold text-[#0B3D6B] hover:bg-[#0B3D6B]/10 dark:border-[#E8A020] dark:text-[#E8A020] dark:hover:bg-[#E8A020]/10"
+              >
+                <span className="ti ti-download" /> Download PDF Checklist
+              </button>
+            )}
+          </div>
           {orderItems.length === 0 ? (
             <p className="text-sm text-emerald-600">All items are sufficiently stocked!</p>
           ) : (
@@ -302,8 +357,8 @@ export default function OrdersPage() {
                         <td className="py-2 font-medium text-[#0D1B2A] dark:text-white">
                           {item.itemName} ({item.unit})
                         </td>
-                        <td className="py-2 text-right text-[#5A6A7A]">{item.currentStock}</td>
-                        <td className="py-2 text-right text-[#5A6A7A]">{item.minStockLevel}</td>
+                        <td className="py-2 text-right text-[#5A6A7A]">{formatQty(item.currentStock)}</td>
+                        <td className="py-2 text-right text-[#5A6A7A]">{formatQty(item.minStockLevel)}</td>
                         <td className="py-2 text-right">
                           <input
                             type="number"

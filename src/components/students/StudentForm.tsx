@@ -12,11 +12,11 @@ import {
   Timestamp,
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { auth, db, storage } from '@/lib/firebase/client'
+import { db, storage } from '@/lib/firebase/client'
 import { COURSES, COURSE_MAP } from '@/lib/constants/courses'
 import {
   generateStudentCode,
-  generateTempPassword,
+  generateFriendlyPassword,
   sendWhatsAppNotification,
   sendCredentialsEmail,
 } from '@/lib/students/helpers'
@@ -41,6 +41,7 @@ export interface StudentFormValues {
   dateOfBirth: string
   mobile: string
   email: string
+  password: string
   address: string
   courseId: CourseId | ''
   batchId: string
@@ -76,6 +77,7 @@ function makeEmptyForm(): StudentFormValues {
     dateOfBirth: '',
     mobile: '',
     email: '',
+    password: generateFriendlyPassword(),
     address: '',
     courseId: '',
     batchId: '',
@@ -118,6 +120,7 @@ function studentToForm(s: Student): StudentFormValues {
     dateOfBirth: s.dateOfBirth?.slice(0, 10) ?? '',
     mobile: s.mobile,
     email: s.email ?? '',
+    password: generateFriendlyPassword(),
     address: s.address ?? '',
     courseId: s.courseId,
     batchId: s.batchId,
@@ -340,8 +343,8 @@ export default function StudentForm({
     studentDocId: string,
     email: string,
     name: string,
+    password: string,
   ): Promise<{ uid: string; password: string; created: boolean } | undefined> {
-    const password = generateTempPassword()
     const res = await fetch('/api/students/create-account', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -362,6 +365,10 @@ export default function StudentForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!user) return
+    if (!form.mobile.trim()) {
+      setError('Phone number is required — reception must enter a phone number so login credentials can be sent via WhatsApp.')
+      return
+    }
     setSaving(true)
     setError('')
 
@@ -543,6 +550,7 @@ export default function StudentForm({
               studentDocId,
               form.email.trim(),
               form.name.trim(),
+              form.password.trim() || generateFriendlyPassword(),
             )
             if (authResult?.uid) {
               await updateDoc(doc(db, 'students', studentDocId), { uid: authResult.uid })
@@ -621,34 +629,21 @@ export default function StudentForm({
     }
   }
 
-  async function sendCredsWhatsApp() {
+  function sendCredsWhatsApp() {
     if (!createdCreds) return
     if (!createdCreds.phone) {
       setWhatsAppState('error')
       return
     }
-    setWhatsAppState('sending')
-    try {
-      const token = await auth.currentUser?.getIdToken()
-      const res = await fetch('/api/students/send-credentials', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          phone: createdCreds.phone,
-          studentName: createdCreds.name,
-          email: createdCreds.email,
-          password: createdCreds.password,
-          studentCode: createdCreds.studentCode,
-        }),
-      })
-      const data = (await res.json()) as { success?: boolean }
-      setWhatsAppState(data.success ? 'sent' : 'error')
-    } catch {
-      setWhatsAppState('error')
-    }
+    // Normalise to an international number for wa.me (Sri Lanka: leading 0 → 94).
+    const phone = createdCreds.phone.replace(/\D/g, '').replace(/^0/, '94')
+    const text =
+      `Welcome to EPIC Campus! Your login:\n` +
+      `Email: ${createdCreds.email}\n` +
+      `Password: ${createdCreds.password}\n` +
+      `Login: https://epiccampus.live/login`
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer')
+    setWhatsAppState('sent')
   }
 
   async function copyCreds() {
@@ -772,13 +767,18 @@ export default function StudentForm({
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <FieldLabel>Phone (WhatsApp) *</FieldLabel>
+                  <FieldLabel>Phone (WhatsApp) <span className="text-red-500">*</span></FieldLabel>
                   <TextInput
                     value={form.mobile}
                     onChange={(v) => setField('mobile', v)}
                     placeholder="07XXXXXXXX"
                     required
                   />
+                  {!form.mobile.trim() && (
+                    <p className="mt-1 text-xs font-medium text-red-500">
+                      Required to send login credentials via WhatsApp
+                    </p>
+                  )}
                 </div>
                 <div>
                   <FieldLabel>Email</FieldLabel>
@@ -788,8 +788,50 @@ export default function StudentForm({
                     onChange={(v) => setField('email', v)}
                     placeholder="student@email.com"
                   />
+                  <p className="mt-1 text-xs text-[#5A6A7A]">
+                    You can use the student&apos;s Google Gmail address here — they will be able to login with Google too.
+                  </p>
                 </div>
               </div>
+
+              {!isEdit && (
+                <div className="rounded-lg border border-[#DDE3EC] bg-[#F5F7FB] p-4">
+                  <FieldLabel>Login Password</FieldLabel>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={form.password}
+                      onChange={(e) => setField('password', e.target.value)}
+                      placeholder="Auto-generated password"
+                      className="flex-1 rounded-lg border border-[#DDE3EC] bg-white px-3 py-2.5 font-mono text-base font-semibold text-[#0B3D6B] outline-none focus:border-[#E8A020] sm:text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setField('password', generateFriendlyPassword())}
+                      className="shrink-0 rounded-lg border border-[#DDE3EC] bg-white px-3 py-2.5 text-sm font-semibold text-[#0B3D6B] hover:bg-[#F5F7FB]"
+                      title="Generate a new password"
+                    >
+                      <span className="ti ti-refresh mr-1" aria-hidden="true" />
+                      Generate Password
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void navigator.clipboard?.writeText(form.password).catch(() => {})
+                      }}
+                      className="shrink-0 rounded-lg border border-[#DDE3EC] bg-white p-2.5 text-[#5A6A7A] hover:bg-[#F5F7FB]"
+                      title="Copy password"
+                      aria-label="Copy password"
+                    >
+                      <span className="ti ti-copy" aria-hidden="true" />
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-xs text-[#5A6A7A]">
+                    Share this password with the student. They can change it from their portal.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <FieldLabel>Address</FieldLabel>
                 <textarea
@@ -1242,6 +1284,10 @@ export default function StudentForm({
                 <span className="text-[#5A6A7A] dark:text-white/50">Password</span>
                 <span className="font-mono text-base font-bold text-[#0B3D6B] dark:text-[#E8A020]">{createdCreds.password}</span>
               </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-[#5A6A7A] dark:text-white/50">Login URL</span>
+                <span className="font-semibold text-[#0D1B2A] dark:text-white break-all">epiccampus.live/login</span>
+              </div>
             </div>
 
             <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
@@ -1249,11 +1295,11 @@ export default function StudentForm({
             </div>
 
             {whatsAppState === 'sent' && (
-              <p className="mt-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">✓ Sent via WhatsApp</p>
+              <p className="mt-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">✓ Opened WhatsApp with the message ready to send</p>
             )}
             {whatsAppState === 'error' && (
               <p className="mt-2 text-xs font-semibold text-red-600 dark:text-red-400">
-                Could not send WhatsApp{createdCreds.phone ? ' — number may not be on WhatsApp' : ' — no phone number on file'}. Copy the details instead.
+                No phone number on file — copy the details instead.
               </p>
             )}
 

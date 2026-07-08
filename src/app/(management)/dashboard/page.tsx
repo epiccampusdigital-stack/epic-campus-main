@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { collection, doc, getDoc, getDocs, query, where, orderBy } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
@@ -88,6 +88,53 @@ interface KitchenOverview {
   lastWeekWaste: number
 }
 
+interface DashExpense {
+  amount: number
+  category: string
+  location: string
+  month: string
+}
+
+interface FinanceAccom {
+  rentPaid: number
+  budget: number | null
+  houseCount: number
+  billsUtil: number
+}
+
+/** Additive finance/expense summary tile (Finance Overview + Expense Breakdown rows). */
+function FinanceTile({
+  label,
+  value,
+  valueClass,
+  sub,
+  borderColor,
+  badge,
+}: {
+  label: string
+  value: string
+  valueClass: string
+  sub?: string
+  borderColor: string
+  badge?: ReactNode
+}) {
+  return (
+    <div
+      className="card-hover rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.04] dark:backdrop-blur-sm"
+      style={{ borderTopWidth: 2, borderTopColor: borderColor }}
+    >
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-white/40">{label}</p>
+      <p className={`text-2xl font-black ${valueClass}`}>{value}</p>
+      {badge && <div className="mt-1">{badge}</div>}
+      {sub && <p className="mt-1 text-xs text-gray-500 dark:text-white/40">{sub}</p>}
+    </div>
+  )
+}
+
+function FinanceTileSkeleton() {
+  return <div className="h-24 animate-pulse rounded-xl bg-gray-100 dark:bg-white/[0.06]" />
+}
+
 export default function DashboardPage() {
   const { user, hasRole } = useManagement()
   const userRoles = user?.roles ?? []
@@ -111,6 +158,10 @@ export default function DashboardPage() {
   const [pendingEnrollments, setPendingEnrollments] = useState(0)
   const [todayExamAttempts, setTodayExamAttempts] = useState(0)
   const [pendingConsultations, setPendingConsultations] = useState(0)
+  // Finance overview / expense breakdown tile data (all filter-aware).
+  const [allExpenses, setAllExpenses] = useState<DashExpense[]>([])
+  const [financeAccom, setFinanceAccom] = useState<FinanceAccom | null>(null)
+  const [financeAccomLoading, setFinanceAccomLoading] = useState(true)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -118,7 +169,7 @@ export default function DashboardPage() {
       const todayStart = new Date()
       todayStart.setHours(0, 0, 0, 0)
 
-      const [studentsSnap, paymentsSnap, attendanceSnap, staffSnap, enrollSnap, examSnap, consultSnap] = await Promise.all([
+      const [studentsSnap, paymentsSnap, attendanceSnap, staffSnap, enrollSnap, examSnap, consultSnap, expensesSnap] = await Promise.all([
         getDocs(collection(db, 'students')),
         getDocs(collection(db, 'payments')),
         getDocs(collection(db, 'attendance')),
@@ -126,6 +177,9 @@ export default function DashboardPage() {
         getDocs(query(collection(db, 'enrollmentApplications'), where('status', '==', 'pending'))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'examAttempts'), where('completedAt', '>=', todayStart))).catch(() => ({ docs: [] })),
         getDocs(query(collection(db, 'consultationRequests'), where('status', '==', 'pending'))).catch(() => ({ docs: [] })),
+        // Additive: expenses for the Finance/Expense tiles. Resilient so a read
+        // denial (e.g. teacher role) never breaks the rest of the dashboard load.
+        getDocs(collection(db, 'expenses')).catch(() => ({ docs: [] as { data: () => Record<string, unknown> }[] })),
       ])
       setAllStudents(
         studentsSnap.docs.map((d) =>
@@ -150,6 +204,17 @@ export default function DashboardPage() {
       setPendingEnrollments(enrollSnap.docs.length)
       setTodayExamAttempts(examSnap.docs.length)
       setPendingConsultations(consultSnap.docs.length)
+      setAllExpenses(
+        expensesSnap.docs.map((d) => {
+          const data = d.data() as Record<string, unknown>
+          return {
+            amount: Number(data.amount || 0),
+            category: String(data.category ?? ''),
+            location: String(data.location ?? ''),
+            month: String(data.month ?? ''),
+          }
+        }),
+      )
       if (hasRole('admin') || hasRole('owner')) {
         setPartnerNotifications(await fetchUnreadPartnerNotifications())
         const appSnap = await getDocs(
@@ -276,6 +341,55 @@ export default function DashboardPage() {
     void loadAccommodation()
   }, [user, hasRole])
 
+  // Finance tiles: rent paid + monthly budget + accommodation utility bills for the
+  // SELECTED month/location. Separate effect (keyed on the filters) because rent
+  // payments and bills live in per-month subcollections that must be re-read when
+  // the month or location filter changes — the once-only loadData can't cover that.
+  useEffect(() => {
+    if (!user || !(hasRole('admin') || hasRole('owner') || hasRole('accountant') || hasRole('reception'))) {
+      setFinanceAccomLoading(false)
+      return
+    }
+    let cancelled = false
+    async function loadFinanceAccom() {
+      setFinanceAccomLoading(true)
+      try {
+        const housesSnap = await getDocs(collection(db, 'accommodations'))
+        let rentPaid = 0
+        let houseCount = 0
+        let billsUtil = 0
+        await Promise.all(
+          housesSnap.docs.map(async (h) => {
+            const data = h.data()
+            const loc = String(data.location ?? '').toLowerCase()
+            if (locationFilter && loc !== locationFilter) return
+            houseCount++
+            const [rentSnap, billSnap] = await Promise.all([
+              getDoc(doc(db, 'accommodations', h.id, 'rentPayments', monthFilter)).catch(() => null),
+              getDoc(doc(db, 'accommodations', h.id, 'bills', monthFilter)).catch(() => null),
+            ])
+            if (rentSnap?.exists() && (rentSnap.data() as { paid?: boolean }).paid) {
+              rentPaid += Number(data.monthlyRent || 0)
+            }
+            if (billSnap?.exists()) {
+              const b = billSnap.data() as { electricity?: number; water?: number; internet?: number }
+              billsUtil += Number(b.electricity || 0) + Number(b.water || 0) + Number(b.internet || 0)
+            }
+          }),
+        )
+        const budgetSnap = await getDoc(doc(db, 'accommodationBudget', monthFilter)).catch(() => null)
+        const budget = budgetSnap?.exists() ? Number((budgetSnap.data() as { budget?: number }).budget ?? 0) : null
+        if (!cancelled) setFinanceAccom({ rentPaid, budget, houseCount, billsUtil })
+      } catch {
+        if (!cancelled) setFinanceAccom(null)
+      } finally {
+        if (!cancelled) setFinanceAccomLoading(false)
+      }
+    }
+    void loadFinanceAccom()
+    return () => { cancelled = true }
+  }, [user, hasRole, monthFilter, locationFilter])
+
   useEffect(() => {
     if (
       user &&
@@ -341,6 +455,25 @@ export default function DashboardPage() {
       totalPendingFees,
     }
   }, [filteredPayments, filteredStudents, filteredAttendance, monthFilter])
+
+  // Expense breakdown for the selected month + location (case-insensitive; a 'Both'
+  // expense counts under any single-location filter).
+  const financeExpense = useMemo(() => {
+    const locMatch = (loc: string) => {
+      if (!locationFilter) return true
+      const l = loc.toLowerCase()
+      return l === locationFilter || l === 'both'
+    }
+    const rows = allExpenses.filter((e) => e.month === monthFilter && locMatch(e.location))
+    const total = rows.reduce((s, e) => s + e.amount, 0)
+    const salary = rows.filter((e) => e.category === 'Salary').reduce((s, e) => s + e.amount, 0)
+    const utility = rows
+      .filter((e) => e.category.toLowerCase().includes('utilit') || e.category.toLowerCase().includes('telecom'))
+      .reduce((s, e) => s + e.amount, 0)
+    const excluded = new Set(['Salary', 'Utilities (CEB/Water/Internet)', 'Rent', 'Telecom'])
+    const misc = rows.filter((e) => !excluded.has(e.category)).reduce((s, e) => s + e.amount, 0)
+    return { total, salary, utility, misc }
+  }, [allExpenses, monthFilter, locationFilter])
 
   const pendingItems = useMemo(() => {
     const scopedIds = new Set(filteredStudents.map((s) => s.id))
@@ -424,12 +557,7 @@ export default function DashboardPage() {
       value: `${stats.attendancePresent} / ${stats.attendanceSessions}`,
       sub: 'Present / sessions',
     },
-    {
-      label: 'Total Pending Fees',
-      value: formatLKR(stats.totalPendingFees),
-      sub: 'Outstanding on partial payments',
-      amber: true,
-    },
+    // Total Pending Fees moved to the new Finance Overview row below.
   ]
 
   const quickActions = [
@@ -569,6 +697,120 @@ export default function DashboardPage() {
           </Link>
         )}
       </section>
+
+      {/* ── FINANCE OVERVIEW ── (respects the month + location filters above) */}
+      <div>
+        <p className="mt-8 mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-white/30">
+          Finance Overview
+        </p>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => <FinanceTileSkeleton key={i} />)
+          ) : (
+            <>
+              <FinanceTile
+                label="Total Income This Month"
+                value={formatLKR(stats.monthIncome)}
+                valueClass="text-[#059669]"
+                sub="From student payments"
+                borderColor="#059669"
+              />
+              <FinanceTile
+                label="Total Expenses This Month"
+                value={formatLKR(financeExpense.total)}
+                valueClass="text-[#dc2626]"
+                sub="Salaries + utilities + misc"
+                borderColor="#dc2626"
+              />
+              {(() => {
+                const net = stats.monthIncome - financeExpense.total
+                const badge =
+                  net > 0 ? (
+                    <span className="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-700 dark:bg-green-900/20 dark:text-green-400">Profit ↑</span>
+                  ) : net < 0 ? (
+                    <span className="inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-900/20 dark:text-red-400">Loss ↓</span>
+                  ) : (
+                    <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">Break even</span>
+                  )
+                return (
+                  <FinanceTile
+                    label="Net Profit / Loss"
+                    value={formatLKR(net)}
+                    valueClass={net > 0 ? 'text-[#059669]' : net < 0 ? 'text-[#dc2626]' : 'text-[#E8A020]'}
+                    sub="Income minus expenses"
+                    borderColor="#E8A020"
+                    badge={badge}
+                  />
+                )
+              })()}
+              <FinanceTile
+                label="Total Pending Fees"
+                value={formatLKR(stats.totalPendingFees)}
+                valueClass="text-[#d97706]"
+                sub="Outstanding on partial payments"
+                borderColor="#d97706"
+              />
+            </>
+          )}
+        </div>
+
+        {/* ── EXPENSE BREAKDOWN ── */}
+        <p className="mt-6 mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-white/30">
+          Expense Breakdown
+        </p>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {loading || financeAccomLoading ? (
+            Array.from({ length: 4 }).map((_, i) => <FinanceTileSkeleton key={i} />)
+          ) : (
+            <>
+              {(() => {
+                const rentPaid = financeAccom?.rentPaid ?? 0
+                const budget = financeAccom?.budget ?? null
+                const houses = financeAccom?.houseCount ?? 0
+                const badge =
+                  budget == null ? (
+                    <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-500 dark:bg-white/[0.08] dark:text-white/50">No budget set</span>
+                  ) : rentPaid < budget ? (
+                    <span className="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-700 dark:bg-green-900/20 dark:text-green-400">Under budget</span>
+                  ) : (
+                    <span className="inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-900/20 dark:text-red-400">Over budget</span>
+                  )
+                return (
+                  <FinanceTile
+                    label="Accommodation This Month"
+                    value={formatLKR(rentPaid)}
+                    valueClass="text-[#0B3D6B] dark:text-[#E8A020]"
+                    sub={`${houses} house${houses === 1 ? '' : 's'} · Budget: ${budget != null ? formatLKR(budget) : '—'}`}
+                    borderColor="#0B3D6B"
+                    badge={badge}
+                  />
+                )
+              })()}
+              <FinanceTile
+                label="Salary Expenses"
+                value={formatLKR(financeExpense.salary)}
+                valueClass="text-[#0B3D6B] dark:text-[#E8A020]"
+                sub="Staff salaries this month"
+                borderColor="#0B3D6B"
+              />
+              <FinanceTile
+                label="Utility Bills"
+                value={formatLKR(financeExpense.utility + (financeAccom?.billsUtil ?? 0))}
+                valueClass="text-[#0B3D6B] dark:text-[#E8A020]"
+                sub="CEB + Water + Internet"
+                borderColor="#0B3D6B"
+              />
+              <FinanceTile
+                label="Miscellaneous Expenses"
+                value={formatLKR(financeExpense.misc)}
+                valueClass="text-[#0B3D6B] dark:text-[#E8A020]"
+                sub="Other expenses this month"
+                borderColor="#0B3D6B"
+              />
+            </>
+          )}
+        </div>
+      </div>
 
       <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl p-4">
         <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50 mb-3">Quick Actions</p>

@@ -248,7 +248,7 @@ service cloud.firestore {
 
     match /wasteLog/{doc} {
       allow read, write: if request.auth != null &&
-        request.auth.token.role in ['kitchen', 'admin', 'owner'];
+        request.auth.token.role in ['admin', 'owner', 'kitchen', 'kitchenStaff', 'kitchen_staff', 'accountant'];
     }
 
     match /kitchenOrders/{doc} {
@@ -445,15 +445,16 @@ service cloud.firestore {
         request.auth.token.role in ['admin','owner','reception','accountant'];
     }
 
-    match /accommodations/{docId}/inventory/{itemId} {
-      allow read: if request.auth != null;
+    match /accommodations/{houseId}/inventory/{itemId} {
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin','owner','accountant','reception'];
       allow write: if request.auth != null &&
-        request.auth.token.role in ['admin','owner','reception','accountant'];
+        request.auth.token.role in ['admin','owner','accountant'];
     }
 
     match /accommodations/{houseId}/bills/{billId} {
       allow read: if request.auth != null &&
-        request.auth.token.role in ['admin','owner','accountant','reception'];
+        request.auth.token.role in ['admin','owner','accountant'];
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin','owner','accountant'];
     }

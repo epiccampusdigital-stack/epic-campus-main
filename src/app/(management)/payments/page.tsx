@@ -555,8 +555,8 @@ export default function PaymentsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-jakarta text-2xl font-bold text-[#0D1B2A]">Student Payment Tracker</h1>
-          <p className="font-inter text-sm text-[#5A6A7A]">
+          <h1 className="font-jakarta text-2xl font-bold text-[#0D1B2A] dark:text-white">Student Payment Tracker</h1>
+          <p className="font-inter text-sm text-[#5A6A7A] dark:text-white/60">
             Track payment plans, mark installments paid, and manage student fee schedules.
           </p>
         </div>
@@ -575,23 +575,23 @@ export default function PaymentsPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
-          <p className="text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">Students</p>
-          <p className="mt-2 text-2xl font-bold text-[#0B3D6B]">{students.length}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Students</p>
+          <p className="mt-2 text-2xl font-bold text-[#0B3D6B] dark:text-[#E8A020]">{students.length}</p>
         </div>
         <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
-          <p className="text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">Payment plans</p>
-          <p className="mt-2 text-2xl font-bold text-[#0B3D6B]">{plans.length}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Payment plans</p>
+          <p className="mt-2 text-2xl font-bold text-[#0B3D6B] dark:text-[#E8A020]">{plans.length}</p>
         </div>
         <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
-          <p className="text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">Fully paid</p>
-          <p className="mt-2 text-2xl font-bold text-[#0B3D6B]">{statusCounts.paid}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Fully paid</p>
+          <p className="mt-2 text-2xl font-bold text-[#0B3D6B] dark:text-[#E8A020]">{statusCounts.paid}</p>
         </div>
         <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
-          <p className="text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">Partial</p>
-          <p className="mt-2 text-2xl font-bold text-[#0B3D6B]">{statusCounts.partial}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Partial</p>
+          <p className="mt-2 text-2xl font-bold text-[#0B3D6B] dark:text-[#E8A020]">{statusCounts.partial}</p>
         </div>
         <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:bg-gray-800">
-          <p className="text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">Overdue</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Overdue</p>
           <p className="mt-2 text-2xl font-bold text-red-600">{statusCounts.overdue}</p>
         </div>
       </div>
@@ -715,7 +715,7 @@ export default function PaymentsPage() {
                           <div className="h-full rounded-full bg-[#E8A020]" style={{ width: `${row.progress}%` }} />
                         </div>
                       </td>
-                      <td className="px-4 py-3 font-semibold text-[#0B3D6B]">
+                      <td className="px-4 py-3 font-semibold text-[#0B3D6B] dark:text-[#E8A020]">
                         {formatLKR(row.totalPaid)} / {formatLKR(row.totalFee)}
                       </td>
                       <td className="px-4 py-3">
@@ -728,7 +728,7 @@ export default function PaymentsPage() {
                           <button
                             type="button"
                             onClick={() => setSelectedStudentId(row.student.id)}
-                            className="rounded-lg border border-[#DDE3EC] px-3 py-2 text-xs font-semibold text-[#0B3D6B] hover:bg-[#F5F7FB]"
+                            className="rounded-lg border border-[#DDE3EC] dark:border-white/10 px-3 py-2 text-xs font-semibold text-[#0B3D6B] dark:text-white/80 hover:bg-[#F5F7FB] dark:hover:bg-white/10"
                           >
                             View
                           </button>
@@ -744,7 +744,7 @@ export default function PaymentsPage() {
                             <button
                               type="button"
                               onClick={() => setSetupPlanStudentId(row.student.id)}
-                              className="rounded-lg border border-[#DDE3EC] px-3 py-2 text-xs font-semibold text-[#0B3D6B] hover:bg-[#F5F7FB]"
+                              className="rounded-lg border border-[#DDE3EC] dark:border-white/10 px-3 py-2 text-xs font-semibold text-[#0B3D6B] dark:text-white/80 hover:bg-[#F5F7FB] dark:hover:bg-white/10"
                             >
                               Set up plan
                             </button>
@@ -761,7 +761,7 @@ export default function PaymentsPage() {
 
         {!loading && filteredRows.length > 0 && (
           <div className="border-t border-[#DDE3EC] px-4 py-4 dark:border-gray-700">
-            <div className="flex flex-col gap-2 text-sm text-[#5A6A7A] sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 text-sm text-[#5A6A7A] dark:text-white/60 sm:flex-row sm:items-center sm:justify-between">
               <p>
                 Showing {(page - 1) * PAGE_SIZE + 1} - {Math.min(page * PAGE_SIZE, filteredRows.length)} of {filteredRows.length} students
               </p>
@@ -770,16 +770,16 @@ export default function PaymentsPage() {
                   type="button"
                   disabled={page <= 1}
                   onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-1.5 text-sm text-[#0B3D6B] hover:bg-[#F5F7FB] disabled:opacity-40"
+                  className="rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-white/10 px-3 py-1.5 text-sm text-[#0B3D6B] dark:text-white hover:bg-[#F5F7FB] dark:hover:bg-white/20 disabled:opacity-40"
                 >
                   Previous
                 </button>
-                <span className="text-sm text-[#5A6A7A]">Page {page} of {Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))}</span>
+                <span className="text-sm text-[#5A6A7A] dark:text-white/60">Page {page} of {Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))}</span>
                 <button
                   type="button"
                   disabled={page >= Math.ceil(filteredRows.length / PAGE_SIZE)}
                   onClick={() => setPage((current) => Math.min(Math.ceil(filteredRows.length / PAGE_SIZE), current + 1))}
-                  className="rounded-lg border border-[#DDE3EC] bg-white px-3 py-1.5 text-sm text-[#0B3D6B] hover:bg-[#F5F7FB] disabled:opacity-40"
+                  className="rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-white/10 px-3 py-1.5 text-sm text-[#0B3D6B] dark:text-white hover:bg-[#F5F7FB] dark:hover:bg-white/20 disabled:opacity-40"
                 >
                   Next
                 </button>
@@ -794,13 +794,13 @@ export default function PaymentsPage() {
           <div className="w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl dark:bg-gray-900">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h2 className="text-xl font-bold text-[#0D1B2A]">{selectedRow.student.name}</h2>
-                <p className="mt-1 text-sm text-[#5A6A7A]">{COURSE_MAP[selectedRow.student.courseId]?.label ?? selectedRow.student.courseId} | {selectedRow.student.branchId || 'Branch not set'}</p>
+                <h2 className="text-xl font-bold text-[#0D1B2A] dark:text-white">{selectedRow.student.name}</h2>
+                <p className="mt-1 text-sm text-[#5A6A7A] dark:text-white/60">{COURSE_MAP[selectedRow.student.courseId]?.label ?? selectedRow.student.courseId} | {selectedRow.student.branchId || 'Branch not set'}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedStudentId(null)}
-                className="rounded-full border border-[#DDE3EC] p-2 text-[#0B3D6B] hover:bg-[#F5F7FB]"
+                className="rounded-full border border-[#DDE3EC] dark:border-white/10 p-2 text-[#0B3D6B] dark:text-white/70 hover:bg-[#F5F7FB] dark:hover:bg-white/10"
               >
                 <span className="ti ti-x" />
               </button>
@@ -808,26 +808,26 @@ export default function PaymentsPage() {
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-[#DDE3EC] bg-[#F5F7FB] p-4 dark:bg-gray-800">
-                <p className="text-xs uppercase tracking-[0.16em] text-[#5A6A7A]">Plan status</p>
-                <p className="mt-2 text-lg font-bold text-[#0B3D6B]">{formatStatusLabel(selectedRow.status)}</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-[#5A6A7A] dark:text-white/50">Plan status</p>
+                <p className="mt-2 text-lg font-bold text-[#0B3D6B] dark:text-[#E8A020]">{formatStatusLabel(selectedRow.status)}</p>
               </div>
               <div className="rounded-2xl border border-[#DDE3EC] bg-[#F5F7FB] p-4 dark:bg-gray-800">
-                <p className="text-xs uppercase tracking-[0.16em] text-[#5A6A7A]">Progress</p>
-                <p className="mt-2 text-lg font-bold text-[#0B3D6B]">{selectedRow.progress}%</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-[#5A6A7A] dark:text-white/50">Progress</p>
+                <p className="mt-2 text-lg font-bold text-[#0B3D6B] dark:text-[#E8A020]">{selectedRow.progress}%</p>
               </div>
               <div className="rounded-2xl border border-[#DDE3EC] bg-[#F5F7FB] p-4 dark:bg-gray-800">
-                <p className="text-xs uppercase tracking-[0.16em] text-[#5A6A7A]">Paid</p>
-                <p className="mt-2 text-lg font-bold text-emerald-700">{formatLKR(selectedRow.totalPaid)}</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-[#5A6A7A] dark:text-white/50">Paid</p>
+                <p className="mt-2 text-lg font-bold text-emerald-700 dark:text-emerald-400">{formatLKR(selectedRow.totalPaid)}</p>
               </div>
               <div className="rounded-2xl border border-[#DDE3EC] bg-[#F5F7FB] p-4 dark:bg-gray-800">
-                <p className="text-xs uppercase tracking-[0.16em] text-[#5A6A7A]">Total fee</p>
-                <p className="mt-2 text-lg font-bold text-[#0B3D6B]">{formatLKR(selectedRow.totalFee)}</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-[#5A6A7A] dark:text-white/50">Total fee</p>
+                <p className="mt-2 text-lg font-bold text-[#0B3D6B] dark:text-[#E8A020]">{formatLKR(selectedRow.totalFee)}</p>
               </div>
             </div>
 
             <div className="mt-6 rounded-2xl border border-[#DDE3EC] bg-white p-4 dark:bg-gray-950">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-lg font-bold text-[#0D1B2A]">Installment schedule</h3>
+                <h3 className="text-lg font-bold text-[#0D1B2A] dark:text-white">Installment schedule</h3>
                 {selectedRow.plan && canAddInstallment && (
                   <button
                     type="button"
@@ -841,7 +841,7 @@ export default function PaymentsPage() {
 
               {!selectedRow.plan ? (
                 <div className="mt-5 rounded-2xl border border-dashed border-[#DDE3EC] p-6 text-center">
-                  <p className="text-sm text-[#5A6A7A]">No payment plan is configured for this student.</p>
+                  <p className="text-sm text-[#5A6A7A] dark:text-white/60">No payment plan is configured for this student.</p>
                   <button
                     type="button"
                     onClick={() => {
@@ -963,13 +963,13 @@ export default function PaymentsPage() {
           <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl dark:bg-gray-900">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h2 className="text-xl font-bold text-[#0D1B2A]">Set up payment plan</h2>
-                <p className="mt-1 text-sm text-[#5A6A7A]">Create installment terms for this student.</p>
+                <h2 className="text-xl font-bold text-[#0D1B2A] dark:text-white">Set up payment plan</h2>
+                <p className="mt-1 text-sm text-[#5A6A7A] dark:text-white/60">Create installment terms for this student.</p>
               </div>
               <button
                 type="button"
                 onClick={() => setSetupPlanStudentId(null)}
-                className="rounded-full border border-[#DDE3EC] p-2 text-[#0B3D6B] hover:bg-[#F5F7FB]"
+                className="rounded-full border border-[#DDE3EC] dark:border-white/10 p-2 text-[#0B3D6B] dark:text-white/70 hover:bg-[#F5F7FB] dark:hover:bg-white/10"
               >
                 <span className="ti ti-x" />
               </button>
@@ -1011,7 +1011,7 @@ export default function PaymentsPage() {
               <button
                 type="button"
                 onClick={() => setSetupPlanStudentId(null)}
-                className="rounded-lg border border-[#DDE3EC] px-5 py-2.5 text-sm font-semibold text-[#0B3D6B] hover:bg-[#F5F7FB]"
+                className="rounded-lg border border-[#DDE3EC] dark:border-white/10 px-5 py-2.5 text-sm font-semibold text-[#0B3D6B] dark:text-white/80 hover:bg-[#F5F7FB] dark:hover:bg-white/10"
               >
                 Cancel
               </button>
@@ -1030,15 +1030,15 @@ export default function PaymentsPage() {
       {confirmBulkOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-6">
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl dark:bg-gray-900">
-            <h3 className="text-lg font-bold text-[#0D1B2A]">Confirm bulk payment</h3>
-            <p className="mt-3 text-sm text-[#5A6A7A]">
+            <h3 className="text-lg font-bold text-[#0D1B2A] dark:text-white">Confirm bulk payment</h3>
+            <p className="mt-3 text-sm text-[#5A6A7A] dark:text-white/60">
               Mark {selectedRows.length} student{selectedRows.length === 1 ? '' : 's'}' next unpaid installment as paid?
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setConfirmBulkOpen(false)}
-                className="rounded-lg border border-[#DDE3EC] px-5 py-2.5 text-sm font-semibold text-[#0B3D6B] hover:bg-[#F5F7FB]"
+                className="rounded-lg border border-[#DDE3EC] dark:border-white/10 px-5 py-2.5 text-sm font-semibold text-[#0B3D6B] dark:text-white/80 hover:bg-[#F5F7FB] dark:hover:bg-white/10"
               >
                 Cancel
               </button>

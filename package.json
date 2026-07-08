@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "upgrade:functions": "cd .firebase/epic-campus/functions && npm install firebase-functions@latest --legacy-peer-deps"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

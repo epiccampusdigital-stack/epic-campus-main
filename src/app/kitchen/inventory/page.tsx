@@ -25,14 +25,8 @@ import InventoryItemSlideOver, {
 import FoodEmoji from '@/components/kitchen/FoodEmoji'
 import { CATEGORY_PILLS, getFoodEmoji } from '@/lib/kitchen/foodImages'
 import { formatLKR } from '@/lib/utils/formatCurrency'
+import { formatQty } from '@/lib/kitchen-utils'
 import type { InventoryCategory, InventoryItem } from '@/types/kitchen'
-
-function formatQty(n: number): string {
-  if (!isFinite(n)) return '0'
-  const fixed = parseFloat(n.toFixed(4))
-  if (Number.isInteger(fixed)) return fixed.toString()
-  return fixed.toString().replace(/\.?0+$/, '')
-}
 
 const CATEGORY_LABELS: Record<InventoryCategory, string> = {
   grains: 'Grains & Rice',

@@ -30,14 +30,14 @@ function StatCard({
   loading?: boolean
 }) {
   return (
-    <div className="rounded-xl border border-[#DDE3EC] bg-white p-5">
-      <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A]">
+    <div className="rounded-xl border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-slate-800 p-5">
+      <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">
         {label}
       </p>
       {loading ? (
-        <div className="mt-2 h-8 w-16 animate-pulse rounded bg-[#DDE3EC]" />
+        <div className="mt-2 h-8 w-16 animate-pulse rounded bg-[#DDE3EC] dark:bg-white/10" />
       ) : (
-        <p className="mt-1 font-jakarta text-2xl font-bold text-[#0B3D6B]">{value}</p>
+        <p className="mt-1 font-jakarta text-2xl font-bold text-[#0B3D6B] dark:text-[#E8A020]">{value}</p>
       )}
     </div>
   )
@@ -115,8 +115,8 @@ export default function CrmPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="font-jakarta text-2xl font-bold text-[#0B3D6B]">CRM</h1>
-          <p className="mt-1 font-inter text-sm text-[#5A6A7A]">
+          <h1 className="font-jakarta text-2xl font-bold text-[#0B3D6B] dark:text-white">CRM</h1>
+          <p className="mt-1 font-inter text-sm text-[#5A6A7A] dark:text-white/60">
             Lead pipeline management
           </p>
         </div>
@@ -138,19 +138,19 @@ export default function CrmPage() {
       </div>
 
       {agentStats.length > 0 && (
-        <div className="rounded-xl border border-[#DDE3EC] bg-white p-5">
-          <h2 className="font-jakarta text-sm font-bold text-[#0B3D6B]">
+        <div className="rounded-xl border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-slate-800 p-5">
+          <h2 className="font-jakarta text-sm font-bold text-[#0B3D6B] dark:text-white">
             Agent Commission Tracking
           </h2>
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#DDE3EC]">
+                <tr className="border-b border-[#DDE3EC] dark:border-white/10">
                   {['Agent', 'Total Leads', 'Enrolled', 'Conversion', 'Commission Owed'].map(
                     (h) => (
                       <th
                         key={h}
-                        className="pb-2 font-jakarta text-xs font-semibold uppercase text-[#5A6A7A]"
+                        className="pb-2 font-jakarta text-xs font-semibold uppercase text-[#5A6A7A] dark:text-white/50"
                       >
                         {h}
                       </th>
@@ -158,16 +158,16 @@ export default function CrmPage() {
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#DDE3EC]">
+              <tbody className="divide-y divide-[#DDE3EC] dark:divide-white/10">
                 {agentStats.map((a) => (
                   <tr key={a.agentName}>
-                    <td className="py-2.5 font-medium text-[#0D1B2A]">
+                    <td className="py-2.5 font-medium text-[#0D1B2A] dark:text-white">
                       {a.agentName}
                     </td>
-                    <td className="py-2.5 text-[#5A6A7A]">{a.totalLeads}</td>
-                    <td className="py-2.5 text-[#5A6A7A]">{a.enrolled}</td>
-                    <td className="py-2.5 text-[#5A6A7A]">{a.conversionRate}%</td>
-                    <td className="py-2.5 font-semibold text-[#0B3D6B]">
+                    <td className="py-2.5 text-[#5A6A7A] dark:text-white/60">{a.totalLeads}</td>
+                    <td className="py-2.5 text-[#5A6A7A] dark:text-white/60">{a.enrolled}</td>
+                    <td className="py-2.5 text-[#5A6A7A] dark:text-white/60">{a.conversionRate}%</td>
+                    <td className="py-2.5 font-semibold text-[#0B3D6B] dark:text-[#E8A020]">
                       {formatLKR(a.commissionOwed)}
                     </td>
                   </tr>
@@ -178,15 +178,15 @@ export default function CrmPage() {
         </div>
       )}
 
-      <div className="flex flex-col gap-4 rounded-xl border border-[#DDE3EC] bg-white p-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="inline-flex rounded-lg border border-[#DDE3EC] p-1">
+      <div className="flex flex-col gap-4 rounded-xl border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-slate-800 p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="inline-flex rounded-lg border border-[#DDE3EC] dark:border-white/10 p-1">
           <button
             type="button"
             onClick={() => setViewMode('table')}
             className={`rounded-md px-4 py-2 font-jakarta text-sm font-semibold transition-colors ${
               viewMode === 'table'
                 ? 'bg-[#0B3D6B] text-white'
-                : 'text-[#5A6A7A] hover:bg-[#F5F7FB]'
+                : 'text-[#5A6A7A] dark:text-white/60 hover:bg-[#F5F7FB] dark:hover:bg-white/10'
             }`}
           >
             Table View
@@ -197,7 +197,7 @@ export default function CrmPage() {
             className={`rounded-md px-4 py-2 font-jakarta text-sm font-semibold transition-colors ${
               viewMode === 'kanban'
                 ? 'bg-[#0B3D6B] text-white'
-                : 'text-[#5A6A7A] hover:bg-[#F5F7FB]'
+                : 'text-[#5A6A7A] dark:text-white/60 hover:bg-[#F5F7FB] dark:hover:bg-white/10'
             }`}
           >
             Kanban View
@@ -211,12 +211,12 @@ export default function CrmPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search name, phone, email…"
-              className="min-w-[200px] rounded-lg border border-[#DDE3EC] px-3 py-2 font-inter text-sm outline-none focus:border-[#E8A020]"
+              className="min-w-[200px] rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-slate-900 px-3 py-2 font-inter text-sm text-[#0D1B2A] dark:text-white outline-none placeholder-gray-400 focus:border-[#E8A020]"
             />
             <select
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value as LeadSource | '')}
-              className="rounded-lg border border-[#DDE3EC] px-3 py-2 font-inter text-sm outline-none focus:border-[#E8A020]"
+              className="rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-slate-900 px-3 py-2 font-inter text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020]"
             >
               <option value="">All sources</option>
               {LEAD_SOURCES.map((s) => (
@@ -228,7 +228,7 @@ export default function CrmPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as LeadStatus | '')}
-              className="rounded-lg border border-[#DDE3EC] px-3 py-2 font-inter text-sm outline-none focus:border-[#E8A020]"
+              className="rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-slate-900 px-3 py-2 font-inter text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020]"
             >
               <option value="">All statuses</option>
               <option value="new">New Inquiry</option>
@@ -241,7 +241,7 @@ export default function CrmPage() {
             <select
               value={courseFilter}
               onChange={(e) => setCourseFilter(e.target.value as CourseId | '')}
-              className="rounded-lg border border-[#DDE3EC] px-3 py-2 font-inter text-sm outline-none focus:border-[#E8A020]"
+              className="rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-slate-900 px-3 py-2 font-inter text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020]"
             >
               <option value="">All courses</option>
               {COURSES.map((c) => (
@@ -253,7 +253,7 @@ export default function CrmPage() {
             <select
               value={agentFilter}
               onChange={(e) => setAgentFilter(e.target.value)}
-              className="rounded-lg border border-[#DDE3EC] px-3 py-2 font-inter text-sm outline-none focus:border-[#E8A020]"
+              className="rounded-lg border border-[#DDE3EC] dark:border-white/10 bg-white dark:bg-slate-900 px-3 py-2 font-inter text-sm text-[#0D1B2A] dark:text-white outline-none focus:border-[#E8A020]"
             >
               <option value="">All agents</option>
               {agents.map((a) => (

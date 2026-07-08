@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
       baseSalary: Number(baseSalary ?? 0),
       commissionRate: commissionRate != null ? Number(commissionRate) : null,
       createdAt: now,
+      updatedAt: now,
       approvedAt: status === 'active' ? now : null,
       locationAssigned: locationAssigned ?? null,
     }

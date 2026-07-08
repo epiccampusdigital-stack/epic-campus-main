@@ -4,6 +4,7 @@ export type InventoryCategory = 'grains' | 'protein' | 'vegetables' | 'dairy' | 
 export type StockUnit = 'kg' | 'litres' | 'units' | 'grams'
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'tea' | 'morning-tea' | 'evening-tea'
 export type WasteReason = 'overcooked' | 'expired' | 'leftover' | 'spoiled' | 'dropped' | 'other'
+export type WasteType = 'food_waste' | 'spoiled' | 'other'
 export type OrderStatus = 'draft' | 'submitted' | 'approved' | 'ordered' | 'received' | 'cancelled'
 
 export interface InventoryItem {
@@ -80,6 +81,13 @@ export interface WasteEntry {
   loggedBy: string
   loggedByName: string
   createdAt: Timestamp
+  // Simplified weight-based waste log (new form). Legacy item-based entries omit these.
+  wasteType?: WasteType
+  weightKg?: number
+  spoiledItems?: string
+  expiredItems?: string
+  mealType?: string
+  loggedAt?: Timestamp
 }
 
 export interface OrderItem {

@@ -46,15 +46,24 @@ export default function SendCredentialsModal({
 
   async function copyCredentials() {
     const text =
-      `EPIC Campus login details\n` +
-      `Name: ${student!.name}\n` +
-      `Student Code: ${student!.studentCode ?? ''}\n` +
-      `Portal: epiccampus.live\n` +
+      `EPIC Campus Login Details\n` +
+      `Student: ${student!.name}\n` +
+      `Code: ${student!.studentCode ?? ''}\n` +
       `Email: ${email}\n` +
-      `Password: ${password}`
+      `Password: ${password}\n` +
+      `Portal: epiccampus.live`
     try {
       await navigator.clipboard.writeText(text)
-      toast.success('Credentials copied')
+      toast.success('Copied!')
+    } catch {
+      toast.error('Could not copy')
+    }
+  }
+
+  async function copyEmail() {
+    try {
+      await navigator.clipboard.writeText(email)
+      toast.success('Email copied')
     } catch {
       toast.error('Could not copy')
     }
@@ -126,14 +135,37 @@ export default function SendCredentialsModal({
         </div>
 
         <div className="space-y-3">
-          <div className="rounded-xl bg-[#F5F7FB] dark:bg-white/[0.04] px-4 py-3 text-sm">
-            <p className="font-semibold text-[#0D1B2A] dark:text-white">{student.name}</p>
-            <p className="mt-0.5 text-xs text-[#5A6A7A] dark:text-white/50">
-              {student.studentCode ? `${student.studentCode} · ` : ''}{email || 'no email'}
-            </p>
-            <p className="mt-0.5 text-xs text-[#5A6A7A] dark:text-white/50">
-              <span className="ti ti-brand-whatsapp text-green-600" /> {phone || 'no phone'}
-            </p>
+          <div className="space-y-2.5 rounded-xl bg-[#F5F7FB] dark:bg-white/[0.04] px-4 py-3 text-sm">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">Student</p>
+              <p className="font-semibold text-[#0D1B2A] dark:text-white">{student.name}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">Code</p>
+              <p className="font-mono font-semibold text-[#0D1B2A] dark:text-white">{student.studentCode || '—'}</p>
+            </div>
+            <div className="flex items-end justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">Email</p>
+                <p className="truncate font-semibold text-[#0B3D6B] dark:text-[#E8A020]">{email || 'No email saved'}</p>
+              </div>
+              {email && (
+                <button
+                  type="button"
+                  onClick={() => void copyEmail()}
+                  title="Copy email"
+                  className="shrink-0 rounded-lg border border-gray-200 dark:border-white/10 px-2 py-1.5 text-xs font-semibold text-[#0B3D6B] dark:text-white/70 hover:bg-gray-50 dark:hover:bg-white/[0.06]"
+                >
+                  <span className="ti ti-copy mr-1" /> Copy Email
+                </button>
+              )}
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">Phone</p>
+              <p className={`font-semibold ${phone ? 'text-[#0D1B2A] dark:text-white' : 'text-amber-600 dark:text-amber-400'}`}>
+                {phone || 'No phone saved'}
+              </p>
+            </div>
           </div>
 
           <div>
@@ -157,24 +189,31 @@ export default function SendCredentialsModal({
             </div>
           </div>
 
-          <div className="rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-            Note: Student must have WhatsApp active on this number.
-          </div>
+          {phone ? (
+            <div className="rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+              Note: Student must have WhatsApp active on this number.
+            </div>
+          ) : (
+            <div className="rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+              No phone number saved for this student. Add their phone number first to send via WhatsApp, or copy the credentials and share manually.
+            </div>
+          )}
         </div>
 
         <div className="mt-5 flex gap-3">
           <button
             type="button"
             onClick={() => void copyCredentials()}
-            className="flex-1 rounded-xl border border-gray-200 dark:border-white/10 py-2.5 text-sm font-semibold text-gray-700 dark:text-white/70 hover:bg-gray-50 dark:hover:bg-white/[0.06]"
+            className={`${phone ? 'flex-1' : 'flex-[2]'} rounded-xl border border-gray-200 dark:border-white/10 py-2.5 text-sm font-semibold text-gray-700 dark:text-white/70 hover:bg-gray-50 dark:hover:bg-white/[0.06]`}
           >
-            <span className="ti ti-copy mr-1" /> Copy
+            <span className="ti ti-copy mr-1" /> Copy Credentials
           </button>
           <button
             type="button"
-            disabled={sending}
+            disabled={sending || !phone}
             onClick={() => void resetAndSend()}
-            className="flex-[2] rounded-xl bg-green-600 py-2.5 text-sm font-bold text-white hover:bg-green-700 disabled:opacity-50"
+            title={!phone ? 'Phone number required to send via WhatsApp' : undefined}
+            className={`${phone ? 'flex-[2]' : 'flex-1'} rounded-xl bg-green-600 py-2.5 text-sm font-bold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 dark:disabled:bg-white/10 dark:disabled:text-white/40`}
           >
             {sending ? (
               <><span className="ti ti-loader animate-spin mr-1" /> Sending…</>

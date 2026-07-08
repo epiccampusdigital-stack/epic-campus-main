@@ -254,6 +254,24 @@ h1, h2, h3, h4, h5, h6 {
   color: rgba(255, 255, 255, 0.5);
 }
 
+/* ── Form inputs are always readable ──────────────────────────────────────
+   Safety net so any input/textarea/select that lacks an explicit dark: class
+   never renders dark text on a dark surface. Elements with a Tailwind dark:
+   utility (two classes) win over this rule and keep their intended styling. */
+input, textarea, select {
+  color-scheme: inherit;
+}
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark textarea,
+.dark select {
+  color: white;
+  background-color: rgb(30 41 59); /* slate-800 */
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: rgb(156 163 175); /* gray-400 */
+}
+
 /* ── Homepage-only surfaces (kept separate from shared dashboard/program cards) ─ */
 .home-stat-card {
   border-radius: 16px;

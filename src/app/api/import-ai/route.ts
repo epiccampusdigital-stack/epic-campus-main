@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import { adminAuth, adminDb } from '@/lib/firebase/admin'
 
-const MODEL = 'claude-sonnet-4-6'
+const MODEL = 'claude-haiku-4-5-20251001'
 const MAX_FILES = 5
 const MAX_FILE_BYTES = 10 * 1024 * 1024 // 10MB
 // Cap how much text we hand to the model so a large file can't blow the context window.
