@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { collection, doc, getDoc, getDocs, query, where, orderBy } from 'firebase/firestore'
-import { db } from '@/lib/firebase/client'
+import toast from 'react-hot-toast'
+import { auth, db } from '@/lib/firebase/client'
 import { formatLKR } from '@/lib/utils/formatCurrency'
 import { parsePayment, getStatusColor } from '@/lib/payments/helpers'
 import { parseStudent } from '@/lib/students/helpers'
@@ -140,6 +141,8 @@ export default function DashboardPage() {
   const userRoles = user?.roles ?? []
   const isPureTeacher = userRoles.length > 0 && userRoles.every((r) => r === 'teacher')
   const isPureReception = userRoles.length > 0 && userRoles.every((r) => r === 'reception')
+  // Finance visibility — income/expense/profit data is restricted to these roles only.
+  const canSeeFinance = hasRole('admin') || hasRole('owner') || hasRole('accountant')
   const [loading, setLoading] = useState(true)
   const [kitchenOverview, setKitchenOverview] = useState<KitchenOverview | null>(null)
   const [accomOverview, setAccomOverview] = useState<{ rent: number; billsThis: number; billsPrev: number; budget: number | null; rentPaid: number } | null>(null)
@@ -154,6 +157,8 @@ export default function DashboardPage() {
   const [pendingApprovals, setPendingApprovals] = useState<
     { id: string; displayName: string; email: string; requestedRole: string; createdAt: unknown }[]
   >([])
+  // Which pending approval is currently being processed (approve/reject), for the spinner.
+  const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null)
   const [staffCount, setStaffCount] = useState(0)
   const [pendingEnrollments, setPendingEnrollments] = useState(0)
   const [todayExamAttempts, setTodayExamAttempts] = useState(0)
@@ -529,13 +534,14 @@ export default function DashboardPage() {
     return <ReceptionDashboard showFinances={user?.showFinances ?? false} />
   }
 
-  const statCards: { label: string; value: string; sub: string; amber?: boolean }[] = [
+  const statCards: { label: string; value: string; sub: string; amber?: boolean; finance?: boolean }[] = [
     {
       label: isTodayInMonth(monthFilter) ? "Today's Collection" : 'Month collection',
       value: formatLKR(
         isTodayInMonth(monthFilter) ? stats.todayCollection : stats.monthIncome,
       ),
       sub: isTodayInMonth(monthFilter) ? 'Paid today' : `Paid in ${monthFilter}`,
+      finance: true,
     },
     {
       label: 'Active Students',
@@ -546,11 +552,13 @@ export default function DashboardPage() {
       label: 'Pending Payments',
       value: String(stats.pendingPayments),
       sub: 'In selected month & course',
+      finance: true,
     },
     {
       label: 'Month Income',
       value: formatLKR(stats.monthIncome),
       sub: monthFilter,
+      finance: true,
     },
     {
       label: 'Attendance (month)',
@@ -558,7 +566,7 @@ export default function DashboardPage() {
       sub: 'Present / sessions',
     },
     // Total Pending Fees moved to the new Finance Overview row below.
-  ]
+  ].filter((c) => canSeeFinance || !c.finance)
 
   const quickActions = [
     { title: 'Register Student', subtitle: 'Add a new enrolment', href: '/students', icon: 'ti-user-plus' },
@@ -698,7 +706,8 @@ export default function DashboardPage() {
         )}
       </section>
 
-      {/* ── FINANCE OVERVIEW ── (respects the month + location filters above) */}
+      {/* ── FINANCE OVERVIEW ── (finance roles only: admin / owner / accountant) */}
+      {canSeeFinance && (
       <div>
         <p className="mt-8 mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-white/30">
           Finance Overview
@@ -811,6 +820,7 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+      )}
 
       <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white/65 dark:bg-white/[0.05] backdrop-blur-2xl p-4">
         <p className="font-inter text-xs font-medium uppercase tracking-wide text-[#5A6A7A] dark:text-white/50 mb-3">Quick Actions</p>
@@ -853,34 +863,64 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex gap-2">
                   <button type="button"
+                    disabled={approvalBusyId === a.id}
                     onClick={async () => {
-                      const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore')
-                      await updateDoc(doc(db, 'pendingApprovals', a.id), { status: 'rejected', updatedAt: serverTimestamp() })
-                      setPendingApprovals(prev => prev.filter(x => x.id !== a.id))
+                      setApprovalBusyId(a.id)
+                      try {
+                        const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore')
+                        await updateDoc(doc(db, 'pendingApprovals', a.id), { status: 'rejected', updatedAt: serverTimestamp() })
+                        setPendingApprovals(prev => prev.filter(x => x.id !== a.id))
+                        toast.success('Request rejected')
+                      } catch (err) {
+                        console.error('[Approvals] reject failed', err)
+                        toast.error(err instanceof Error ? err.message : 'Could not reject request')
+                      } finally {
+                        setApprovalBusyId(null)
+                      }
                     }}
-                    className="rounded-lg border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">
+                    className="rounded-lg border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">
                     Reject
                   </button>
                   <button type="button"
+                    disabled={approvalBusyId === a.id}
                     onClick={async () => {
-                      const res = await fetch('/api/students/create-account', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          email: a.email,
-                          displayName: a.displayName,
-                          role: a.requestedRole === 'staff' ? 'teacher' : 'student',
-                          uid: undefined,
-                        }),
-                      })
-                      if (res.ok) {
+                      setApprovalBusyId(a.id)
+                      try {
+                        // The create-account route requires a staff Bearer token — without
+                        // it the call 401s and the approval silently no-ops (the original bug).
+                        const token = await auth.currentUser?.getIdToken()
+                        if (!token) throw new Error('Not signed in — please reload and try again.')
+                        const res = await fetch('/api/students/create-account', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${token}`,
+                          },
+                          body: JSON.stringify({
+                            email: a.email,
+                            displayName: a.displayName,
+                            role: a.requestedRole === 'staff' ? 'teacher' : 'student',
+                          }),
+                        })
+                        const data = (await res.json().catch(() => ({}))) as { error?: string }
+                        if (!res.ok) throw new Error(data.error || `Approval failed (${res.status})`)
                         const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore')
                         await updateDoc(doc(db, 'pendingApprovals', a.id), { status: 'approved', updatedAt: serverTimestamp() })
                         setPendingApprovals(prev => prev.filter(x => x.id !== a.id))
+                        toast.success('Student approved')
+                      } catch (err) {
+                        console.error('[Approvals] approve failed', err)
+                        toast.error(err instanceof Error ? err.message : 'Approval failed')
+                      } finally {
+                        setApprovalBusyId(null)
                       }
                     }}
-                    className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700">
-                    Approve
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60">
+                    {approvalBusyId === a.id ? (
+                      <><span className="ti ti-loader animate-spin" /> Approving…</>
+                    ) : (
+                      'Approve'
+                    )}
                   </button>
                 </div>
               </div>

@@ -40,6 +40,9 @@ export async function POST(req: NextRequest) {
       password: providedPassword,
       displayName,
       studentCode: providedStudentCode,
+      idNumber,
+      loginEmail,
+      personalEmail,
       enrollmentId,
       phone,
       address,
@@ -64,7 +67,18 @@ export async function POST(req: NextRequest) {
       notes,
     } = body
 
-    let resolvedEmail = String(email ?? '')
+    // Student ID login: when an idNumber is supplied, the Firebase Auth email is the
+    // synthetic {idNumber}@epiccampus.lk (the Student ID is the username). The real
+    // address is kept separately as personalEmail and never used for auth.
+    const resolvedIdNumber = idNumber != null ? String(idNumber) : undefined
+    const resolvedLoginEmail = resolvedIdNumber
+      ? `${resolvedIdNumber}@epiccampus.lk`
+      : loginEmail
+        ? String(loginEmail)
+        : undefined
+    const resolvedPersonalEmail = personalEmail ? String(personalEmail) : undefined
+
+    let resolvedEmail = resolvedLoginEmail ?? String(email ?? '')
     let resolvedName = String(displayName ?? '')
     let resolvedPhone = String(phone ?? '')
     // Left undefined (not defaulted) unless actually provided — createStudentAccount()
@@ -159,6 +173,9 @@ export async function POST(req: NextRequest) {
       batchId: resolvedBatchId,
       agentId: resolvedAgentId ?? null,
       notes: notes ? String(notes) : undefined,
+      idNumber: resolvedIdNumber,
+      loginEmail: resolvedLoginEmail,
+      personalEmail: resolvedPersonalEmail,
     })
 
     if (enrollmentId) {

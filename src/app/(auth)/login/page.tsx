@@ -87,6 +87,11 @@ async function completeSignIn(user: User): Promise<SignInResult> {
   }
 
     if (!res.ok) {
+      if (res.status === 429) {
+        const message = 'Too many login attempts. Please wait 10 minutes and try again.'
+        console.error('[login] Session API error:', message)
+        throw new Error(message)
+      }
       let message = `Session creation failed (${res.status})`
       try {
         const data = (await res.json()) as { error?: string }
@@ -230,14 +235,19 @@ export default function LoginPage() {
     setError('')
     setLoadingGoogle(true)
     try {
+      // Firebase auto-links Google to an existing account when the email matches.
       const result = await signInWithPopup(auth, googleProvider)
+      // Only accounts reception has already provisioned may sign in with Google —
+      // i.e. a users/{uid} doc with a role must already exist. Never auto-create
+      // an account here, so random Google users can't gain access.
       const userDoc = await getDoc(doc(db, 'users', result.user.uid))
-      if (userDoc.exists()) {
+      if (userDoc.exists() && userDoc.data()?.role) {
         const info = await completeSignIn(result.user)
         router.push(info.redirectPath)
       } else {
-        setGoogleUser(result.user)
-        setShowRoleSelect(true)
+        // Unknown Google account — sign back out so no session lingers, then reject.
+        await signOut(auth)
+        setError('Account not found. Please contact reception.')
       }
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''
@@ -259,7 +269,28 @@ export default function LoginPage() {
     setError('')
     setLoadingEmail(true)
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password)
+      // Resolve the login into a Firebase Auth email. NIC (12-digit or 9-digit+V/X),
+      // 9-digit Student ID, or a bare username → synthetic @epiccampus.lk; a full
+      // email is used as-is.
+      const input = email.trim()
+      let emailToUse: string
+      if (/^\d{12}$/.test(input)) {
+        // New NIC — 12 digits
+        emailToUse = `${input}@epiccampus.lk`
+      } else if (/^\d{9}[VvXx]$/.test(input)) {
+        // Old NIC — 9 digits + V/X
+        emailToUse = `${input.toUpperCase()}@epiccampus.lk`
+      } else if (/^\d{9}$/.test(input)) {
+        // Student ID — 9 digits
+        emailToUse = `${input}@epiccampus.lk`
+      } else if (input.includes('@')) {
+        // Full email as-is
+        emailToUse = input
+      } else {
+        // Username → append the campus domain
+        emailToUse = `${input}@epiccampus.lk`
+      }
+      const result = await signInWithEmailAndPassword(auth, emailToUse, password)
       const info = await completeSignIn(result.user)
 
       // TODO: Re-enable 2FA when Twilio live number is activated
@@ -445,9 +476,10 @@ export default function LoginPage() {
             <form onSubmit={handleEmailSignIn}>
               <BottomBorderInput
                 id="email"
-                label="Email Address"
-                type="email"
-                autoComplete="email"
+                label="NIC / Student ID / Email"
+                type="text"
+                autoComplete="username"
+                placeholder="Type your NIC number or email"
                 value={email}
                 onChange={setEmail}
                 disabled={isLoading}

@@ -53,6 +53,12 @@ export interface CreateStudentAccountInput {
   batchId?: string
   agentId?: string | null
   notes?: string
+  /** 9-digit Student ID (login username). When set, {idNumber}@epiccampus.lk is the auth email. */
+  idNumber?: string
+  /** Synthetic auth login email ({idNumber}@epiccampus.lk). */
+  loginEmail?: string
+  /** The student's real/personal email — stored for contact only, never used for auth. */
+  personalEmail?: string
 }
 
 export interface CreateStudentAccountResult {
@@ -182,12 +188,17 @@ export async function createStudentAccount(
     }
     if (input.agentId != null) mergeFields.agentId = input.agentId
     if (input.notes != null) mergeFields.notes = input.notes
+    if (input.idNumber != null) mergeFields.idNumber = input.idNumber
+    if (input.loginEmail != null) mergeFields.loginEmail = input.loginEmail
+    if (input.personalEmail != null) mergeFields.personalEmail = input.personalEmail
 
     await adminDb.collection('students').doc(studentDocId).set(mergeFields, { merge: true })
   } else {
     await adminDb.collection('students').doc(studentDocId).set({
       studentCode,
-      idNumber: studentCode,
+      idNumber: input.idNumber ?? studentCode,
+      loginEmail: input.loginEmail ?? null,
+      personalEmail: input.personalEmail ?? null,
       uid,
       name: displayName,
       nic: '',

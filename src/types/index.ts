@@ -128,6 +128,12 @@ export interface Student {
   name: string
   nic: string
   email?: string
+  /** 9-digit numeric Student ID used as the login username (→ {idNumber}@epiccampus.lk). */
+  idNumber?: string
+  /** Auto-generated Firebase Auth login email: {idNumber}@epiccampus.lk. */
+  loginEmail?: string
+  /** The student's real/personal email — never used for auth, kept for contact only. */
+  personalEmail?: string
   mobile: string
   address?: string
   dateOfBirth?: string

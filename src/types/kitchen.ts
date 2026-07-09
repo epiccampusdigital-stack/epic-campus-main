@@ -99,6 +99,8 @@ export interface OrderItem {
   orderQty: number
   unitCost: number
   totalCost: number
+  /** Inventory category, carried so the order list can group by category. */
+  category?: InventoryCategory
 }
 
 export interface KitchenOrder {

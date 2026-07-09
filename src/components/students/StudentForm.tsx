@@ -42,6 +42,8 @@ export interface StudentFormValues {
   nic: string
   dateOfBirth: string
   mobile: string
+  /** 9-digit numeric Student ID — the login username (→ {idNumber}@epiccampus.lk). */
+  idNumber: string
   email: string
   password: string
   address: string
@@ -73,12 +75,22 @@ export interface StudentFormValues {
   guardianPortalCode: string
 }
 
+/** Generates a random 9-digit numeric Student ID (100000000–999999999). Used as
+ *  the login username via {idNumber}@epiccampus.lk. Uniqueness is re-checked
+ *  against existing students at submit time. */
+function generateIdNumber(): string {
+  return String(Math.floor(100000000 + Math.random() * 900000000))
+}
+
+const LOGIN_EMAIL_DOMAIN = 'epiccampus.lk'
+
 function makeEmptyForm(): StudentFormValues {
   return {
     name: '',
     nic: '',
     dateOfBirth: '',
     mobile: '',
+    idNumber: generateIdNumber(),
     email: '',
     password: generateFriendlyPassword(),
     address: '',
@@ -123,7 +135,8 @@ function studentToForm(s: Student): StudentFormValues {
     nic: s.nic,
     dateOfBirth: s.dateOfBirth?.slice(0, 10) ?? '',
     mobile: s.mobile,
-    email: s.email ?? '',
+    idNumber: s.idNumber ?? generateIdNumber(),
+    email: s.personalEmail ?? s.email ?? '',
     password: generateFriendlyPassword(),
     address: s.address ?? '',
     courseId: s.courseId,
@@ -285,6 +298,7 @@ export default function StudentForm({
   const [createdCreds, setCreatedCreds] = useState<{
     name: string
     studentCode: string
+    idNumber: string
     email: string
     password: string
     phone: string
@@ -363,7 +377,9 @@ export default function StudentForm({
 
   async function createAuthAccount(
     studentDocId: string,
-    email: string,
+    loginEmail: string,
+    idNumber: string,
+    personalEmail: string,
     name: string,
     password: string,
   ): Promise<{ uid: string; password: string; created: boolean } | undefined> {
@@ -374,7 +390,15 @@ export default function StudentForm({
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ email, password, displayName: name, studentId: studentDocId }),
+      body: JSON.stringify({
+        email: loginEmail,
+        loginEmail,
+        idNumber,
+        personalEmail: personalEmail || null,
+        password,
+        displayName: name,
+        studentId: studentDocId,
+      }),
     })
     if (!res.ok) {
       const data = (await res.json()) as { error?: string }
@@ -384,7 +408,9 @@ export default function StudentForm({
     // account was created vs. an existing one reused).
     const data = (await res.json()) as { uid: string; password?: string; created?: boolean }
     const effectivePassword = data.password ?? password
-    await sendCredentialsEmail(email, name, effectivePassword)
+    // Welcome email goes to the student's REAL address only — the synthetic login
+    // email ({id}@epiccampus.lk) is not a real mailbox. Skip when none on file.
+    if (personalEmail) await sendCredentialsEmail(personalEmail, name, effectivePassword)
     return { uid: data.uid, password: effectivePassword, created: data.created ?? true }
   }
 
@@ -401,6 +427,7 @@ export default function StudentForm({
     let pendingCreds: {
       name: string
       studentCode: string
+      idNumber: string
       email: string
       password: string
       phone: string
@@ -447,12 +474,22 @@ export default function StudentForm({
             ? Math.max(0, feeAmountNum - paidAmountNum)
             : feeAmountNum
 
+      // form.email now holds the PERSONAL email. The doc's `email` field is the auth
+      // identity — on edit we must preserve the existing login email (synthetic for
+      // ID-login students), never overwrite it with the personal address. On create
+      // it's overridden with the generated login email below.
+      const personalEmailValue = form.email.trim() || null
+      const emailForDoc = isEdit
+        ? (student?.loginEmail ?? student?.email ?? personalEmailValue)
+        : personalEmailValue
+
       const payload = {
         name: form.name.trim(),
         nic: form.nic.trim(),
         dateOfBirth: form.dateOfBirth || null,
         mobile: form.mobile.trim(),
-        email: form.email.trim() || null,
+        email: emailForDoc,
+        personalEmail: personalEmailValue,
         address: form.address.trim() || null,
         photoUrl: photoUrl ?? null,
         courseId: form.courseId,
@@ -543,9 +580,24 @@ export default function StudentForm({
         const allSnap = await getDocs(collection(db, 'students'))
         const studentCode = await generateStudentCode(allSnap.size)
 
+        // Ensure the 9-digit Student ID is unique before it becomes the login username.
+        const existingIds = new Set(
+          allSnap.docs.map((d) => String(d.data().idNumber ?? '')).filter(Boolean),
+        )
+        let finalIdNumber = form.idNumber
+        while (existingIds.has(finalIdNumber)) finalIdNumber = generateIdNumber()
+        const loginEmail = `${finalIdNumber}@${LOGIN_EMAIL_DOMAIN}`
+        const personalEmail = form.email.trim()
+
         await setDoc(doc(db, 'students', studentDocId), {
           ...payload,
           studentCode,
+          idNumber: finalIdNumber,
+          loginEmail,
+          // payload already carries personalEmail (= form.email). Auth identity is the
+          // synthetic login email, keeping createStudentAccount's email-based dedup
+          // aligned with the Firebase Auth account.
+          email: loginEmail,
           uid: null,
           feeSchedule: defaultFeeSchedule(),
           parentAccessCode: generateParentAccessCode(),
@@ -571,35 +623,38 @@ export default function StudentForm({
           console.warn('[StudentForm] Payment plan sync skipped:', planErr)
         }
 
-        if (form.email.trim()) {
-          try {
-            const authResult = await createAuthAccount(
-              studentDocId,
-              form.email.trim(),
-              form.name.trim(),
-              form.password.trim() || generateFriendlyPassword(),
-            )
-            if (authResult?.uid) {
-              await updateDoc(doc(db, 'students', studentDocId), { uid: authResult.uid })
-              // Only surface credentials for a genuinely new account — an existing
-              // account's real password wasn't changed, so showing one would mislead.
-              if (authResult.created) {
-                pendingCreds = {
-                  name: form.name.trim(),
-                  studentCode,
-                  email: form.email.trim(),
-                  password: authResult.password,
-                  phone: form.mobile.trim(),
-                }
+        // Every student now gets a login — the Student ID is the username, so no
+        // typed email is required.
+        try {
+          const authResult = await createAuthAccount(
+            studentDocId,
+            loginEmail,
+            finalIdNumber,
+            personalEmail,
+            form.name.trim(),
+            form.password.trim() || generateFriendlyPassword(),
+          )
+          if (authResult?.uid) {
+            await updateDoc(doc(db, 'students', studentDocId), { uid: authResult.uid })
+            // Only surface credentials for a genuinely new account — an existing
+            // account's real password wasn't changed, so showing one would mislead.
+            if (authResult.created) {
+              pendingCreds = {
+                name: form.name.trim(),
+                studentCode,
+                idNumber: finalIdNumber,
+                email: loginEmail,
+                password: authResult.password,
+                phone: form.mobile.trim(),
               }
             }
-          } catch (authErr) {
-            // Surface the failure instead of silently swallowing it — otherwise
-            // reception thinks the login was created when it wasn't.
-            console.error('[StudentForm] Account creation failed:', authErr)
-            setError('Failed to create login account. Please try again.')
-            return
           }
+        } catch (authErr) {
+          // Surface the failure instead of silently swallowing it — otherwise
+          // reception thinks the login was created when it wasn't.
+          console.error('[StudentForm] Account creation failed:', authErr)
+          setError('Failed to create login account. Please try again.')
+          return
         }
 
         if (form.mobile.trim()) {
@@ -670,9 +725,10 @@ export default function StudentForm({
     const phone = createdCreds.phone.replace(/\D/g, '').replace(/^0/, '94')
     const text =
       `Welcome to EPIC Campus! Your login:\n` +
-      `Email: ${createdCreds.email}\n` +
+      `Student ID: ${createdCreds.idNumber}\n` +
+      `Login Email: ${createdCreds.email}\n` +
       `Password: ${createdCreds.password}\n` +
-      `Login: https://epiccampus.live/login`
+      `Login at: https://www.epiccampus.live`
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer')
     setWhatsAppState('sent')
   }
@@ -683,8 +739,9 @@ export default function StudentForm({
       `EPIC Campus login details\n` +
       `Name: ${createdCreds.name}\n` +
       `Student Code: ${createdCreds.studentCode}\n` +
-      `Portal: epiccampus.live\n` +
-      `Email: ${createdCreds.email}\n` +
+      `Student ID (login): ${createdCreds.idNumber}\n` +
+      `Portal: www.epiccampus.live\n` +
+      `Login Email: ${createdCreds.email}\n` +
       `Password: ${createdCreds.password}`
     try {
       await navigator.clipboard.writeText(text)
@@ -812,7 +869,7 @@ export default function StudentForm({
                   )}
                 </div>
                 <div>
-                  <FieldLabel>Email</FieldLabel>
+                  <FieldLabel>Personal Email (optional)</FieldLabel>
                   <TextInput
                     type="email"
                     value={form.email}
@@ -820,13 +877,32 @@ export default function StudentForm({
                     placeholder="student@email.com"
                   />
                   <p className="mt-1 text-xs text-[#5A6A7A]">
-                    You can use the student&apos;s Google Gmail address here — they will be able to login with Google too.
+                    Contact email only — NOT the login. Students log in with their Student ID (below). A Gmail address here also lets them sign in with Google.
                   </p>
                 </div>
               </div>
 
               {!isEdit && (
                 <div className="rounded-lg border border-[#DDE3EC] bg-[#F5F7FB] p-4">
+                  <FieldLabel>Login ID (Student ID)</FieldLabel>
+                  <div className="mb-3 flex items-center gap-2">
+                    <div className="flex-1 rounded-lg border border-[#DDE3EC] bg-white px-3 py-2.5 font-mono text-base font-bold tracking-wider text-[#0B3D6B]">
+                      {form.idNumber}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setField('idNumber', generateIdNumber())}
+                      className="shrink-0 rounded-lg border border-[#DDE3EC] bg-white px-3 py-2.5 text-sm font-semibold text-[#0B3D6B] hover:bg-[#F5F7FB]"
+                      title="Generate a new Student ID"
+                    >
+                      <span className="ti ti-refresh mr-1" aria-hidden="true" />
+                      New ID
+                    </button>
+                  </div>
+                  <FieldLabel>Login Email (auto-generated)</FieldLabel>
+                  <div className="mb-3 w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2.5 font-mono text-sm text-[#5A6A7A]">
+                    {form.idNumber}@{LOGIN_EMAIL_DOMAIN}
+                  </div>
                   <FieldLabel>Login Password</FieldLabel>
                   <div className="flex items-center gap-2">
                     <input
@@ -1327,7 +1403,11 @@ export default function StudentForm({
                 <span className="font-mono font-semibold text-[#0D1B2A] dark:text-white">{createdCreds.studentCode}</span>
               </div>
               <div className="flex justify-between gap-3">
-                <span className="text-[#5A6A7A] dark:text-white/50">Email</span>
+                <span className="text-[#5A6A7A] dark:text-white/50">Login ID</span>
+                <span className="font-mono text-base font-bold text-[#0B3D6B] dark:text-[#E8A020]">{createdCreds.idNumber}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-[#5A6A7A] dark:text-white/50">Login Email</span>
                 <span className="font-semibold text-[#0D1B2A] dark:text-white break-all">{createdCreds.email}</span>
               </div>
               <div className="flex justify-between gap-3 border-t border-[#DDE3EC] dark:border-white/[0.08] pt-2">

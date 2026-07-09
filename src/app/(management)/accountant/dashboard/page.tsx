@@ -100,23 +100,46 @@ function minutesAgoLabel(when: Date | null): string {
   return `${mins} minutes ago`
 }
 
-function FinanceTile({
+// ── Tile breakdown row shapes (FIX 2 expandable details) ──────────────────────
+interface PaymentRow { name: string; course: string; amount: number; date: string; method: string }
+interface PendingRow { name: string; course: string; fee: number; paid: number; balance: number }
+interface HouseRow { name: string; rent: number; ceb: number; water: number; internet: number; total: number; paid: boolean }
+interface SalaryRow { name: string; role: string; netPay: number; status: string }
+interface UtilityRow { place: string; ceb: number; water: number; internet: number; other: number; total: number; month: string }
+interface MiscRow { date: string; category: string; description: string; amount: number }
+interface MonthRevRow { month: string; collections: number; studentsPaid: number; runningTotal: number }
+
+/** Finance tile that expands in-place to reveal a detailed breakdown (FIX 2). */
+function ExpandableTile({
+  tileId,
   label,
   value,
   sub,
   valueClass = 'text-[#0B3D6B] dark:text-[#E8A020]',
   loading,
   badge,
+  expandedTile,
+  onToggle,
+  children,
 }: {
+  tileId?: string
   label: string
   value: string
   sub?: string
   valueClass?: string
   loading?: boolean
   badge?: { text: string; tone: string } | null
+  expandedTile?: string | null
+  onToggle?: (id: string) => void
+  children?: React.ReactNode
 }) {
+  const hasDetail = !!tileId && !!children
+  const open = hasDetail && expandedTile === tileId
   return (
-    <div className="rounded-[12px] border border-white/90 bg-white/65 p-4 backdrop-blur-2xl dark:border-white/[0.08] dark:bg-white/[0.05]">
+    <div
+      className={`rounded-[12px] border border-white/90 bg-white/65 p-4 backdrop-blur-2xl dark:border-white/[0.08] dark:bg-white/[0.05] ${hasDetail ? 'cursor-pointer' : ''}`}
+      onClick={hasDetail ? () => onToggle?.(tileId!) : undefined}
+    >
       <div className="flex items-start justify-between gap-2">
         <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-gray-400 dark:text-white/40">{label}</p>
         {badge && (
@@ -125,8 +148,32 @@ function FinanceTile({
       </div>
       <p className={`mt-2 text-xl font-bold ${valueClass}`}>{loading ? '…' : value}</p>
       {sub && <p className="mt-0.5 text-xs text-gray-400 dark:text-white/40">{sub}</p>}
+      {hasDetail && (
+        <p className="mt-1 text-right text-[10px] font-semibold text-[#0B3D6B] dark:text-[#E8A020]">
+          {open ? '▲ Close' : '▼ Details'}
+        </p>
+      )}
+      {hasDetail && (
+        <div className={`overflow-hidden transition-all duration-300 ${open ? 'mt-3 max-h-[560px] overflow-y-auto' : 'max-h-0'}`}>
+          <div onClick={(e) => e.stopPropagation()} className="border-t border-[#DDE3EC] pt-2 dark:border-white/[0.08]">
+            {children}
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+// Keep the plain tile for cards that have no drill-down (Today / Net Profit).
+function FinanceTile(props: {
+  label: string
+  value: string
+  sub?: string
+  valueClass?: string
+  loading?: boolean
+  badge?: { text: string; tone: string } | null
+}) {
+  return <ExpandableTile {...props} />
 }
 
 export default function AccountantKitchenDashboard() {
@@ -159,6 +206,27 @@ export default function AccountantKitchenDashboard() {
   const [rentTotal, setRentTotal] = useState(0)
   const [accomUtilities, setAccomUtilities] = useState(0)
   const [rentUnpaidCount, setRentUnpaidCount] = useState(0)
+  const [kitchenExpMonth, setKitchenExpMonth] = useState(0)
+
+  // Tile drill-down data (FIX 2)
+  const [expandedTile, setExpandedTile] = useState<string | null>(null)
+  const [monthPayments, setMonthPayments] = useState<PaymentRow[]>([])
+  const [pendingList, setPendingList] = useState<PendingRow[]>([])
+  const [houseRows, setHouseRows] = useState<HouseRow[]>([])
+  const [salaryRows, setSalaryRows] = useState<SalaryRow[]>([])
+  const [utilityRows, setUtilityRows] = useState<UtilityRow[]>([])
+  const [miscRows, setMiscRows] = useState<MiscRow[]>([])
+  const [monthlyRevRows, setMonthlyRevRows] = useState<MonthRevRow[]>([])
+  const [fullyPaidCount, setFullyPaidCount] = useState(0)
+  const [enrolledCount, setEnrolledCount] = useState(0)
+  const [historicalGapCount, setHistoricalGapCount] = useState(0)
+
+  // Kitchen daily meal cost (FIX 3)
+  const [activeStudentCount, setActiveStudentCount] = useState(0)
+  const [kitchenMealsCount, setKitchenMealsCount] = useState(0)
+  const [kitchenDailySpend, setKitchenDailySpend] = useState<{ date: string; amount: number }[]>([])
+
+  const toggleTile = (id: string) => setExpandedTile((prev) => (prev === id ? null : id))
 
   // AI Finance Intelligence
   const [aiData, setAiData] = useState<AiFinanceSummary | null>(null)
@@ -248,16 +316,29 @@ export default function AccountantKitchenDashboard() {
         ),
       ).catch(() => EMPTY_SNAP)
       let utilBillsTotal = 0
+      const utilityRowsData: UtilityRow[] = []
       for (const b of billsSnap.docs) {
         const d = b.data()
-        utilBillsTotal += Number(d.ceb ?? 0) + Number(d.water ?? 0) + Number(d.internet ?? 0) + Number(d.other ?? 0)
+        const ceb = Number(d.ceb ?? 0)
+        const water = Number(d.water ?? 0)
+        const internet = Number(d.internet ?? 0)
+        const other = Number(d.other ?? 0)
+        utilBillsTotal += ceb + water + internet + other
+        utilityRowsData.push({
+          place: String(d.houseName ?? d.location ?? d.houseId ?? '—'),
+          ceb,
+          water,
+          internet,
+          other,
+          total: ceb + water + internet + other,
+          month: String(d.month ?? ''),
+        })
       }
 
       // ── Collections, all-time revenue + pending, from payment-plan installments ──
-      // Track which students already have a payment plan so lump-sum enrollment
-      // payments (paid students with NO plan doc) can be folded in without
-      // double-counting plan students.
-      const planStudentIds = new Set<string>()
+      const planStudentIds = new Set<string>() // any student that has a plan doc
+      const paidThisMonthIds = new Set<string>() // Set A: has a paid installment THIS month
+      const paidEverIds = new Set<string>()      // has a paid installment on ANY date
       for (const p of paymentsSnap.docs) {
         planStudentIds.add(p.id)
         const sid = p.data().studentId
@@ -266,36 +347,72 @@ export default function AccountantKitchenDashboard() {
 
       const todayKey = new Date().toISOString().slice(0, 10) // 'YYYY-MM-DD'
       const incomeByMonth: Record<string, number> = {}
+      const paidStudentsByMonth: Record<string, Set<string>> = {}
+      const payments: PaymentRow[] = [] // this-month payment detail (tile drill-down)
+      const pendingRows: PendingRow[] = []
       let incomeMonth = 0          // TILE A: installments paid this month
       let incomeMonthCount = 0
-      let todayIncome = 0          // FIX 2: installments paid today
+      let todayIncome = 0          // installments paid today
       let allTimeInstallments = 0  // TILE B: every paid installment, any date
-      let pendingFromPlans = 0     // FIX 4: unpaid installments across all plans
+      let pendingFromPlans = 0     // unpaid installments across all plans
       let plansWithOutstanding = 0
+
+      const markPaidStudent = (mk: string, id: string) => {
+        if (!paidStudentsByMonth[mk]) paidStudentsByMonth[mk] = new Set()
+        paidStudentsByMonth[mk].add(id)
+      }
+
       for (const p of paymentsSnap.docs) {
         const data = p.data() as Record<string, unknown>
+        const sid = String(data.studentId ?? p.id)
+        const studentName = String(data.studentName ?? '')
+        const program = String(data.program ?? data.courseId ?? '')
         const installments = Array.isArray(data.installments)
           ? (data.installments as Array<Record<string, unknown>>)
           : null
         if (installments) {
           let hasUnpaid = false
+          let unpaidSum = 0
+          let paidSum = 0
+          const totalFee = Number(data.totalFee ?? 0)
           for (const inst of installments) {
             const amt = Number(inst.amount ?? 0)
             if (inst.paidAt) {
               const mk = monthKeyOf(inst.paidAt)
               incomeByMonth[mk] = (incomeByMonth[mk] ?? 0) + amt
               allTimeInstallments += amt
+              paidEverIds.add(sid)
+              markPaidStudent(mk, sid)
+              paidSum += amt
               if (mk === curMonth) {
                 incomeMonth += amt
                 incomeMonthCount += 1
+                paidThisMonthIds.add(sid)
+                payments.push({
+                  name: studentName,
+                  course: program,
+                  amount: amt,
+                  date: dateKeyOf(inst.paidAt),
+                  method: inst.paidBy ? String(inst.paidBy) : '—',
+                })
               }
               if (dateKeyOf(inst.paidAt) === todayKey) todayIncome += amt
             } else {
               pendingFromPlans += amt
+              unpaidSum += amt
               hasUnpaid = true
             }
           }
-          if (hasUnpaid) plansWithOutstanding += 1
+          if (hasUnpaid) {
+            plansWithOutstanding += 1
+            pendingRows.push({
+              name: studentName,
+              course: program,
+              fee: totalFee || paidSum + unpaidSum,
+              paid: paidSum,
+              balance: unpaidSum,
+            })
+          }
         } else if (data.amount != null) {
           // Defensive: flat transaction receipts (amount + status/verified + a date field)
           const status = String(data.status ?? '')
@@ -306,9 +423,13 @@ export default function AccountantKitchenDashboard() {
             const mk = monthKeyOf(dateVal)
             incomeByMonth[mk] = (incomeByMonth[mk] ?? 0) + amt
             allTimeInstallments += amt
+            paidEverIds.add(sid)
+            markPaidStudent(mk, sid)
             if (mk === curMonth) {
               incomeMonth += amt
               incomeMonthCount += 1
+              paidThisMonthIds.add(sid)
+              payments.push({ name: studentName, course: program, amount: amt, date: dateKeyOf(dateVal), method: '—' })
             }
             if (dateKeyOf(dateVal) === todayKey) todayIncome += amt
           } else {
@@ -317,38 +438,56 @@ export default function AccountantKitchenDashboard() {
         }
       }
 
-      // ── Enrollment lump-sum income + student-level pending (students with NO plan) ──
-      // Reception can mark a student's paymentStatus 'paid' with no installment plan
-      // (lump sum on enrollment) — invisible to the installment loop above. Fold it
-      // into TILE A (this month), TILE B (all time) and pending, skipping any student
-      // already covered by a payment plan so nothing is double-counted.
+      // ── Student-doc FALLBACK (FIX 1): historical 'paid' students whose paidAt was
+      // never recorded on installments still count, via feeAmount + enrollmentDate.
+      // Dedup: skip students already represented by a paid installment (Set A / ever).
       let enrollmentsPaidThisMonth = 0   // TILE A add-on
       let paidEnrollmentCount = 0
-      let revenueFromPaidNoPlan = 0      // TILE B add-on (all-time)
-      let pendingFromStudents = 0        // FIX 4 (no-plan pending/partial)
+      let revenueFromPaidStudents = 0    // TILE B add-on (paid students with no paid installment)
+      let pendingFromStudents = 0        // no-plan pending/partial
       let noPlanPendingCount = 0
+      let fullyPaid = 0
+      let activeStudents = 0
+      let historicalGap = 0
       for (const sDoc of studentsSnap.docs) {
-        if (planStudentIds.has(sDoc.id)) continue // covered by plan logic above
         const s = sDoc.data() as Record<string, unknown>
+        const sid = sDoc.id
         const status = String(s.paymentStatus ?? '').toLowerCase()
         const fee = Number(s.feeAmount ?? 0)
+        const paidAmt = Number(s.paidAmount ?? 0)
+        const name = String(s.name ?? '')
+        const course = String(s.courseId ?? '')
+        if (String(s.status ?? '') === 'active') activeStudents += 1
+
         if (status === 'paid') {
-          revenueFromPaidNoPlan += fee
-          const enrollMk = monthKeyOf(s.enrollmentDate) || monthKeyOf(s.createdAt)
-          if (enrollMk === curMonth) {
-            enrollmentsPaidThisMonth += fee
-            paidEnrollmentCount += 1
+          fullyPaid += 1
+          // Only add via student doc when NOT already captured by a paid installment.
+          if (!paidEverIds.has(sid)) {
+            historicalGap += 1
+            revenueFromPaidStudents += fee
+            const enrollMk = monthKeyOf(s.enrollmentDate) || monthKeyOf(s.createdAt)
+            markPaidStudent(enrollMk, sid)
+            if (enrollMk === curMonth && !paidThisMonthIds.has(sid)) {
+              enrollmentsPaidThisMonth += fee
+              paidEnrollmentCount += 1
+              payments.push({ name, course, amount: fee, date: String(s.enrollmentDate ?? '').slice(0, 10), method: 'Enrollment' })
+            }
           }
-        } else if (status === 'pending' || status === 'partial') {
-          pendingFromStudents += fee
+        } else if ((status === 'pending' || status === 'partial') && !planStudentIds.has(sid)) {
+          const balance = paidAmt > 0 ? Math.max(0, fee - paidAmt) : fee
+          pendingFromStudents += balance
           noPlanPendingCount += 1
+          pendingRows.push({ name, course, fee, paid: paidAmt, balance })
         }
       }
 
       const thisMonthCollections = incomeMonth + enrollmentsPaidThisMonth
-      const allTimeRevenue = allTimeInstallments + revenueFromPaidNoPlan
+      const allTimeRevenue = allTimeInstallments + revenueFromPaidStudents
       const totalPending = pendingFromPlans + pendingFromStudents
       const outstandingStudents = plansWithOutstanding + noPlanPendingCount
+
+      payments.sort((a, b) => b.date.localeCompare(a.date))
+      pendingRows.sort((a, b) => b.balance - a.balance)
 
       // ── Expenses (current month) ──
       const monthExpenses = expensesSnap.docs
@@ -374,6 +513,22 @@ export default function AccountantKitchenDashboard() {
           return c !== SALARY_CATEGORY && c !== UTILITY_CATEGORY
         })
         .reduce((s, d) => s + Number(d.amount ?? 0), 0)
+      const kitchenExpMonthVal = monthExpenses
+        .filter((d) => String(d.category ?? '') === 'Kitchen & Canteen')
+        .reduce((s, d) => s + Number(d.amount ?? 0), 0)
+      const miscRowsData: MiscRow[] = monthExpenses
+        .filter((d) => {
+          const c = String(d.category ?? '')
+          return c !== SALARY_CATEGORY && c !== UTILITY_CATEGORY
+        })
+        .map((d) => ({
+          date: String(d.date ?? '').slice(0, 10),
+          category: String(d.category ?? 'Other'),
+          description: String(d.description ?? ''),
+          amount: Number(d.amount ?? 0),
+        }))
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, 10)
 
       // ── Salaries (TILE 6): prefer payroll collection for the current period ──
       const periodPayroll = payrollSnap.docs
@@ -381,6 +536,12 @@ export default function AccountantKitchenDashboard() {
         .filter((d) => String(d.period ?? '') === curMonth)
       const payrollTotal = periodPayroll.reduce((s, d) => s + Number(d.netPay ?? 0), 0)
       const salary = periodPayroll.length > 0 ? payrollTotal : salaryFromExpenses
+      const salaryRowsData: SalaryRow[] = periodPayroll.map((d) => ({
+        name: String(d.staffName ?? ''),
+        role: String(d.role ?? ''),
+        netPay: Number(d.netPay ?? 0),
+        status: String(d.status ?? 'pending'),
+      }))
 
       // ── Accommodation rent + utilities (TILE 5), from each house's current bill ──
       const houses = housesSnap.docs
@@ -389,19 +550,34 @@ export default function AccountantKitchenDashboard() {
       const rent = houses.reduce((s, h) => s + Number(h.data.monthlyRent ?? 0), 0)
       const billResults = await Promise.all(
         houses.map(async (h) => {
+          const name = String(h.data.name ?? '')
+          const houseRent = Number(h.data.monthlyRent ?? 0)
           try {
             const s = await getDoc(doc(db, 'accommodations', h.id, 'bills', curMonth))
-            if (!s.exists()) return { paid: false, utilities: 0 }
+            if (!s.exists()) return { name, rent: houseRent, ceb: 0, water: 0, internet: 0, utilities: 0, paid: false }
             const b = s.data() as Record<string, unknown>
-            const utilities = Number(b.ceb ?? 0) + Number(b.water ?? 0) + Number(b.internet ?? 0) + Number(b.other ?? 0)
-            return { paid: Boolean(b.rentPaid ?? b.paid ?? false), utilities }
+            const ceb = Number(b.ceb ?? 0)
+            const water = Number(b.water ?? 0)
+            const internet = Number(b.internet ?? 0)
+            const other = Number(b.other ?? 0)
+            const utilities = ceb + water + internet + other
+            return { name, rent: houseRent, ceb, water, internet, utilities, paid: Boolean(b.rentPaid ?? b.paid ?? false) }
           } catch {
-            return { paid: false, utilities: 0 }
+            return { name, rent: houseRent, ceb: 0, water: 0, internet: 0, utilities: 0, paid: false }
           }
         }),
       )
       const accomUtil = billResults.reduce((s, r) => s + r.utilities, 0)
       const rentUnpaid = billResults.filter((r) => !r.paid).length
+      const houseRowsData: HouseRow[] = billResults.map((r) => ({
+        name: r.name,
+        rent: r.rent,
+        ceb: r.ceb,
+        water: r.water,
+        internet: r.internet,
+        total: r.rent + r.utilities,
+        paid: r.paid,
+      }))
 
       // ── Total expenses (TILE 2): all expenses + accommodation rent + utility bills.
       // Add payroll salaries only when they aren't already logged in the expenses
@@ -438,6 +614,33 @@ export default function AccountantKitchenDashboard() {
           .reduce((s, d) => s + (Number(d.amount) || 0), 0),
       }))
 
+      // ── Monthly revenue detail (Total Revenue tile drill-down) ──
+      let runningRev = 0
+      const monthlyRevData: MonthRevRow[] = months.map((m) => {
+        const collections = incomeByMonth[m] ?? 0
+        runningRev += collections
+        return {
+          month: m.slice(5),
+          collections,
+          studentsPaid: paidStudentsByMonth[m]?.size ?? 0,
+          runningTotal: runningRev,
+        }
+      })
+
+      // ── Kitchen daily spend — last 14 days (FIX 3) ──
+      const dailyCostMap: Record<string, number> = {}
+      for (const m of allMeals) {
+        const dstr = String(m.date ?? '').slice(0, 10)
+        if (!dstr) continue
+        dailyCostMap[dstr] = (dailyCostMap[dstr] ?? 0) + (Number(m.estimatedCost) || 0)
+      }
+      const dailySpend = Array.from({ length: 14 }, (_, i) => {
+        const d = new Date()
+        d.setDate(d.getDate() - (13 - i))
+        const iso = d.toISOString().slice(0, 10)
+        return { date: `${iso.slice(5, 7)}/${iso.slice(8, 10)}`, amount: dailyCostMap[iso] ?? 0 }
+      })
+
       // ── Commissions (existing) ──
       const agentPaid = agentCommSnap.docs.reduce((sum, dRef) => {
         const data = dRef.data()
@@ -473,6 +676,25 @@ export default function AccountantKitchenDashboard() {
       setRentTotal(rent)
       setAccomUtilities(accomUtil)
       setRentUnpaidCount(rentUnpaid)
+      setKitchenExpMonth(kitchenExpMonthVal)
+
+      // Tile drill-down data (FIX 2)
+      setMonthPayments(payments)
+      setPendingList(pendingRows)
+      setHouseRows(houseRowsData)
+      setSalaryRows(salaryRowsData)
+      setUtilityRows(utilityRowsData)
+      setMiscRows(miscRowsData)
+      setMonthlyRevRows(monthlyRevData)
+      setFullyPaidCount(fullyPaid)
+      setEnrolledCount(studentsSnap.docs.length)
+      setHistoricalGapCount(historicalGap)
+
+      // Kitchen (FIX 3)
+      setActiveStudentCount(activeStudents)
+      setKitchenMealsCount(curMeals.length)
+      setKitchenDailySpend(dailySpend)
+
       setLastUpdated(new Date())
     } catch (err) {
       console.error('[AccountantKitchenDashboard]', err)
@@ -517,6 +739,20 @@ export default function AccountantKitchenDashboard() {
     { name: 'Miscellaneous', value: aiData?.expenses?.miscellaneous ?? 0 },
   ].filter((d) => d.value > 0)
 
+  // Kitchen daily-cost derived stats (FIX 3)
+  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()
+  const kitchenDailyAvg = daysInMonth > 0 ? monthCost / daysInMonth : 0
+  const kitchenPerStudentDay = activeStudentCount > 0 ? kitchenDailyAvg / activeStudentCount : 0
+
+  // Sub-total of this month's collections by course (tile drill-down)
+  const collectionsByCourse = Object.entries(
+    monthPayments.reduce<Record<string, number>>((acc, p) => {
+      const k = p.course || '—'
+      acc[k] = (acc[k] ?? 0) + p.amount
+      return acc
+    }, {}),
+  )
+
   // Finance data is sensitive — only admin/owner/accountant may view this page.
   const allowedRoles = ['admin', 'owner', 'accountant']
   if (user && !allowedRoles.includes(user.role)) {
@@ -541,14 +777,53 @@ export default function AccountantKitchenDashboard() {
           <h2 className="text-sm font-bold text-[#0D1B2A] dark:text-white">Finance Overview</h2>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <FinanceTile
+        <div className="grid grid-cols-2 items-start gap-4 lg:grid-cols-4">
+          <ExpandableTile
+            tileId="collections"
             label="This Month's Collections"
             value={formatLKR(incomeThisMonth)}
             sub={`Payments received in ${monthYearLabel}`}
             valueClass="text-emerald-600 dark:text-emerald-400"
             loading={loading}
-          />
+            expandedTile={expandedTile}
+            onToggle={toggleTile}
+          >
+            <div className="space-y-1 text-[11px]">
+              {monthPayments.length === 0 ? (
+                <p className="text-gray-400 dark:text-white/40">No payments recorded this month.</p>
+              ) : (
+                <>
+                  {monthPayments.slice(0, 10).map((p, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-[#0D1B2A] dark:text-white">
+                        {p.name || '—'} <span className="text-gray-400">· {p.course || '—'}</span>
+                      </span>
+                      <span className="shrink-0 whitespace-nowrap">
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatLKR(p.amount)}</span>{' '}
+                        <span className="text-gray-400">{p.date}</span>
+                      </span>
+                    </div>
+                  ))}
+                  {monthPayments.length > 10 && (
+                    <Link href="/payments" className="block pt-1 font-semibold text-[#0B3D6B] dark:text-[#E8A020]">
+                      View all {monthPayments.length} payments →
+                    </Link>
+                  )}
+                  {collectionsByCourse.length > 0 && (
+                    <div className="mt-1 border-t border-[#DDE3EC] pt-1 dark:border-white/10">
+                      {collectionsByCourse.map(([c, amt]) => (
+                        <div key={c} className="flex justify-between text-gray-500 dark:text-white/50">
+                          <span className="truncate">{c}</span>
+                          <span>{formatLKR(amt)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </ExpandableTile>
+
           <FinanceTile
             label="Today's Collection"
             value={formatLKR(todayCollection)}
@@ -556,20 +831,67 @@ export default function AccountantKitchenDashboard() {
             valueClass="text-emerald-600 dark:text-emerald-400"
             loading={loading}
           />
-          <FinanceTile
+
+          <ExpandableTile
+            tileId="revenue"
             label="Total Revenue (All Time)"
             value={formatLKR(totalRevenue)}
             sub="All confirmed payments to date"
             valueClass="text-[#0B3D6B] dark:text-[#1A6BAD]"
             loading={loading}
-          />
-          <FinanceTile
+            expandedTile={expandedTile}
+            onToggle={toggleTile}
+          >
+            <div className="space-y-1 text-[11px]">
+              <div className="h-24">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyRevRows}>
+                    <XAxis dataKey="month" tick={{ fontSize: 9 }} />
+                    <Tooltip formatter={(v) => formatLKR(Number(v) || 0)} />
+                    <Bar dataKey="collections" fill="#0B3D6B" radius={[2, 2, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {monthlyRevRows.map((r) => (
+                <div key={r.month} className="flex items-center justify-between gap-2 text-gray-500 dark:text-white/50">
+                  <span>{r.month}</span>
+                  <span className="text-[#0D1B2A] dark:text-white">{formatLKR(r.collections)}</span>
+                  <span>{r.studentsPaid} paid</span>
+                  <span className="text-gray-400">Σ {formatLKR(r.runningTotal)}</span>
+                </div>
+              ))}
+              <p className="mt-1 border-t border-[#DDE3EC] pt-1 font-semibold text-[#0D1B2A] dark:border-white/10 dark:text-white">
+                {fullyPaidCount} of {enrolledCount} students fully paid
+              </p>
+            </div>
+          </ExpandableTile>
+
+          <ExpandableTile
+            tileId="expenses"
             label="Total Expenses This Month"
             value={formatLKR(totalExpenses)}
             sub="Salaries + utilities + misc"
             valueClass="text-[#0B3D6B] dark:text-white"
             loading={loading}
-          />
+            expandedTile={expandedTile}
+            onToggle={toggleTile}
+          >
+            <div className="space-y-1 text-[11px]">
+              {[
+                { label: 'Salaries', value: salaryTotal, href: '/payroll', extra: `${salaryRows.length} staff` },
+                { label: 'Accommodation rent', value: rentTotal + accomUtilities, href: '/accommodation', extra: `${houseRows.length} houses` },
+                { label: 'Utility bills', value: utilityBillsTotal, href: '/utility-bills', extra: '' },
+                { label: 'Kitchen & Canteen', value: kitchenExpMonth, href: '/kitchen/reports', extra: '' },
+                { label: 'Miscellaneous', value: miscExpenses, href: '/accountant/expenses', extra: '' },
+              ].map((row) => (
+                <Link key={row.label} href={row.href} className="flex items-center justify-between gap-2 rounded px-1 py-0.5 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.05]">
+                  <span className="text-[#0D1B2A] dark:text-white">{row.label} {row.extra && <span className="text-gray-400">({row.extra})</span>}</span>
+                  <span className="font-semibold text-[#0B3D6B] dark:text-[#E8A020]">{formatLKR(row.value)}</span>
+                </Link>
+              ))}
+            </div>
+          </ExpandableTile>
+
           <FinanceTile
             label="Net Profit / Loss"
             value={formatLKR(netProfit)}
@@ -577,45 +899,171 @@ export default function AccountantKitchenDashboard() {
             valueClass={netColor}
             loading={loading}
           />
-          <FinanceTile
+
+          <ExpandableTile
+            tileId="pending"
             label="Total Pending Fees"
             value={formatLKR(pendingFees)}
             sub={`${pendingStudentCount} student${pendingStudentCount === 1 ? '' : 's'} with outstanding balance`}
             valueClass="text-amber-600 dark:text-amber-400"
             loading={loading}
-          />
-          <FinanceTile
+            expandedTile={expandedTile}
+            onToggle={toggleTile}
+          >
+            <div className="space-y-1 text-[11px]">
+              {pendingList.length === 0 ? (
+                <p className="text-gray-400 dark:text-white/40">No outstanding balances.</p>
+              ) : (
+                <>
+                  {pendingList.slice(0, 10).map((p, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-[#0D1B2A] dark:text-white">
+                        {p.name || '—'} <span className="text-gray-400">· {p.course || '—'}</span>
+                      </span>
+                      <span className="shrink-0 font-semibold text-amber-600 dark:text-amber-400">{formatLKR(p.balance)}</span>
+                    </div>
+                  ))}
+                  {pendingList.length > 10 && (
+                    <Link href="/payments" className="block pt-1 font-semibold text-[#0B3D6B] dark:text-[#E8A020]">
+                      View all →
+                    </Link>
+                  )}
+                  <p className="mt-1 border-t border-[#DDE3EC] pt-1 font-semibold text-[#0D1B2A] dark:border-white/10 dark:text-white">
+                    {formatLKR(pendingFees)} from {pendingList.length} students
+                  </p>
+                </>
+              )}
+            </div>
+          </ExpandableTile>
+
+          <ExpandableTile
+            tileId="accommodation"
             label="Accommodation This Month"
             value={formatLKR(rentTotal + accomUtilities)}
             sub={`${formatLKR(rentTotal)} rent + ${formatLKR(accomUtilities)} utilities`}
             loading={loading}
+            expandedTile={expandedTile}
+            onToggle={toggleTile}
             badge={
               !loading && rentUnpaidCount > 0
                 ? { text: `${rentUnpaidCount} unpaid`, tone: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' }
                 : null
             }
-          />
-          <FinanceTile
+          >
+            <div className="space-y-1 text-[11px]">
+              {houseRows.length === 0 ? (
+                <p className="text-gray-400 dark:text-white/40">No houses.</p>
+              ) : (
+                <>
+                  {houseRows.map((h, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-[#0D1B2A] dark:text-white">{h.name || '—'}</span>
+                      <span className="shrink-0">
+                        <span className="font-semibold text-[#0B3D6B] dark:text-[#E8A020]">{formatLKR(h.total)}</span>{' '}
+                        <span className={h.paid ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
+                          {h.paid ? 'Paid' : 'Unpaid'}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                  <p className="mt-1 border-t border-[#DDE3EC] pt-1 font-semibold text-[#0D1B2A] dark:border-white/10 dark:text-white">
+                    {formatLKR(rentTotal + accomUtilities)} across {houseRows.length} houses
+                  </p>
+                </>
+              )}
+            </div>
+          </ExpandableTile>
+
+          <ExpandableTile
+            tileId="salary"
             label="Salary Expenses"
             value={formatLKR(salaryTotal)}
             sub="Staff salaries this month"
             valueClass="text-[#0B3D6B] dark:text-white"
             loading={loading}
-          />
-          <FinanceTile
+            expandedTile={expandedTile}
+            onToggle={toggleTile}
+          >
+            <div className="space-y-1 text-[11px]">
+              {salaryRows.length === 0 ? (
+                <p className="text-gray-400 dark:text-white/40">No payroll processed for this month.</p>
+              ) : (
+                <>
+                  {salaryRows.map((r, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-[#0D1B2A] dark:text-white">
+                        {r.name || '—'} <span className="text-gray-400">· {r.role || '—'}</span>
+                      </span>
+                      <span className="shrink-0">
+                        <span className="font-semibold text-[#0B3D6B] dark:text-[#E8A020]">{formatLKR(r.netPay)}</span>{' '}
+                        <span className={r.status === 'paid' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>
+                          {r.status === 'paid' ? 'Paid' : 'Pending'}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                  <p className="mt-1 border-t border-[#DDE3EC] pt-1 font-semibold text-[#0D1B2A] dark:border-white/10 dark:text-white">
+                    {formatLKR(salaryTotal)} for {salaryRows.length} staff
+                  </p>
+                </>
+              )}
+            </div>
+          </ExpandableTile>
+
+          <ExpandableTile
+            tileId="utility"
             label="Utility Bills"
             value={formatLKR(utilityBillsTotal)}
             sub="CEB + water + internet + other"
             valueClass="text-[#0B3D6B] dark:text-white"
             loading={loading}
-          />
-          <FinanceTile
+            expandedTile={expandedTile}
+            onToggle={toggleTile}
+          >
+            <div className="space-y-1 text-[11px]">
+              {utilityRows.length === 0 ? (
+                <p className="text-gray-400 dark:text-white/40">No utility bills this month.</p>
+              ) : (
+                <>
+                  {utilityRows.map((r, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-[#0D1B2A] dark:text-white">{r.place}</span>
+                      <span className="shrink-0 font-semibold text-[#0B3D6B] dark:text-[#E8A020]">{formatLKR(r.total)}</span>
+                    </div>
+                  ))}
+                  <p className="mt-1 border-t border-[#DDE3EC] pt-1 font-semibold text-[#0D1B2A] dark:border-white/10 dark:text-white">
+                    Grand total {formatLKR(utilityBillsTotal)}
+                  </p>
+                </>
+              )}
+            </div>
+          </ExpandableTile>
+
+          <ExpandableTile
+            tileId="misc"
             label="Miscellaneous Expenses"
             value={formatLKR(miscExpenses)}
             sub="Other expenses this month"
             valueClass="text-[#0B3D6B] dark:text-white"
             loading={loading}
-          />
+            expandedTile={expandedTile}
+            onToggle={toggleTile}
+          >
+            <div className="space-y-1 text-[11px]">
+              {miscRows.length === 0 ? (
+                <p className="text-gray-400 dark:text-white/40">No miscellaneous expenses.</p>
+              ) : (
+                miscRows.map((r, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-[#0D1B2A] dark:text-white">
+                      <span className="text-gray-400">{r.date}</span> {r.category}{r.description ? ` · ${r.description}` : ''}
+                    </span>
+                    <span className="shrink-0 font-semibold text-[#0B3D6B] dark:text-[#E8A020]">{formatLKR(r.amount)}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </ExpandableTile>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[#DDE3EC] dark:border-white/[0.08] pt-3">
@@ -630,6 +1078,36 @@ export default function AccountantKitchenDashboard() {
           >
             <span className={`ti ti-refresh ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
+        </div>
+      </div>
+
+      {/* ── Kitchen This Month (FIX 3) ─────────────────────────────────────── */}
+      <div className="rounded-xl border border-white/90 bg-white/65 p-5 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05]">
+        <h2 className="mb-4 text-sm font-bold text-[#0D1B2A] dark:text-white">Kitchen This Month</h2>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {[
+            { label: 'Total Kitchen Spend', value: formatLKR(monthCost), sub: monthYearLabel },
+            { label: 'Daily Average Spend', value: formatLKR(kitchenDailyAvg), sub: 'per day' },
+            { label: 'Per Student Per Day', value: activeStudentCount > 0 ? formatLKR(kitchenPerStudentDay) : '—', sub: `${activeStudentCount} active students` },
+            { label: 'Meals Logged', value: String(kitchenMealsCount), sub: 'meal sessions' },
+          ].map((c) => (
+            <div key={c.label} className="rounded-[12px] border border-white/90 bg-white/65 p-4 backdrop-blur-2xl dark:border-white/[0.08] dark:bg-white/[0.05]">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-gray-400 dark:text-white/40">{c.label}</p>
+              <p className="mt-2 text-xl font-bold text-[#0B3D6B] dark:text-[#E8A020]">{loading ? '…' : c.value}</p>
+              <p className="mt-0.5 text-xs text-gray-400 dark:text-white/40">{c.sub}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-5">
+          <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">Daily Kitchen Spend — Last 14 Days</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={kitchenDailySpend}>
+              <XAxis dataKey="date" tick={{ fontSize: 9 }} />
+              <YAxis tick={{ fontSize: 9 }} />
+              <Tooltip formatter={(v) => formatLKR(Number(v) || 0)} />
+              <Bar dataKey="amount" fill="#0B3D6B" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 

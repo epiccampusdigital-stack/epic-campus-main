@@ -62,6 +62,16 @@ function formatTime(s: number) {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
+// Fisher–Yates shuffle (returns a new array; does not mutate the input).
+function shuffleArray<T>(array: T[]): T[] {
+  const arr = [...array]
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
 function AudioPlayer({ src, playLimit }: { src: string; playLimit?: number }) {
   const audioRef = useRef<HTMLAudioElement>(null)
   const [playing, setPlaying] = useState(false)
@@ -142,6 +152,8 @@ export default function ExamPage() {
   const [error, setError] = useState('')
   const [toast, setToast] = useState('')
   const [attemptCount, setAttemptCount] = useState(0)
+  // Set when a student tries to advance without answering the current question.
+  const [unansweredWarning, setUnansweredWarning] = useState(false)
 
   const load = useCallback(async () => {
     if (!paperId) return
@@ -170,7 +182,11 @@ export default function ExamPage() {
       const qsSnap = await getDocs(
         query(collection(db, 'examQuestions'), where('paperId', '==', paperId), orderBy('order', 'asc'))
       ).catch(() => getDocs(query(collection(db, 'examQuestions'), where('paperId', '==', paperId))))
-      setQuestions(qsSnap.docs.map(d => ({ id: d.id, ...d.data() } as ExamQuestion)))
+      const fetchedQs = qsSnap.docs.map(d => ({ id: d.id, ...d.data() } as ExamQuestion))
+      // Shuffle QUESTIONS ONLY (not options): answers are saved/scored by option
+      // .index, so option order is left untouched to guarantee scoring is unaffected.
+      // Firestore is never modified — each student just sees a different question order.
+      setQuestions(shuffleArray(fetchedQs))
 
       setPhase('start')
     } catch (err) {
@@ -422,6 +438,40 @@ export default function ExamPage() {
           </div>
         </div>
 
+        {/* Summary row + per-question status tiles (correct / wrong / skipped) */}
+        <div className="rounded-2xl border border-[#DDE3EC] bg-white p-5">
+          <p className="text-center text-sm font-semibold text-[#0D1B2A]">
+            Answered: {Object.keys(answers).length} | Skipped: {questions.length - Object.keys(answers).length} | Total: {questions.length}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {questions.map((qs, i) => {
+              const ua = answers[qs.id]
+              const isSkipped = ua === undefined
+              const isCorrect = !isSkipped && Number(ua) === Number(qs.correctIndex)
+              return (
+                <div
+                  key={qs.id}
+                  title={`Q${i + 1}`}
+                  className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold ${
+                    isSkipped
+                      ? 'bg-gray-200 text-gray-500'
+                      : isCorrect
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-red-500 text-white'
+                  }`}
+                >
+                  {isSkipped ? '—' : isCorrect ? <span className="ti ti-check" /> : <span className="ti ti-x" />}
+                </div>
+              )
+            })}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] text-[#5A6A7A]">
+            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Correct</span>
+            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Wrong</span>
+            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-gray-200" /> Skipped</span>
+          </div>
+        </div>
+
         <div className="rounded-2xl border border-[#DDE3EC] bg-white p-5">
           <h2 className="font-jakarta font-bold text-[#0B3D6B] mb-3">Question Review</h2>
           <div className="max-h-72 overflow-y-auto space-y-2">
@@ -456,7 +506,14 @@ export default function ExamPage() {
           ) : (
             <button
               type="button"
-              onClick={() => { setAnswers({}); setFlagged(new Set()); setCurrentQ(0); setTimeLeft(paper?.timeLimitSeconds ?? 3600); setScore(null); setPhase('start') }}
+              onClick={() => {
+                setAnswers({}); setFlagged(new Set()); setCurrentQ(0)
+                setTimeLeft(paper?.timeLimitSeconds ?? 3600); setScore(null)
+                setUnansweredWarning(false)
+                // Re-shuffle question order for the retry (options left in place).
+                setQuestions(prev => shuffleArray(prev))
+                setPhase('start')
+              }}
               className="flex-1 rounded-xl bg-[#E8A020] py-3 text-sm font-bold text-[#0B3D6B]"
             >
               Try Again
@@ -567,12 +624,17 @@ export default function ExamPage() {
                   <button
                     key={opt.index}
                     type="button"
-                    onClick={() => setAnswers(prev => ({ ...prev, [q.id]: Number(opt.index) }))}
+                    onClick={() => {
+                      setAnswers(prev => ({ ...prev, [q.id]: Number(opt.index) }))
+                      // As soon as an answer is chosen, clear the "answer required" warning.
+                      setUnansweredWarning(false)
+                      setToast('')
+                    }}
                     className={`flex min-h-[52px] w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all ${
                       selected
                         ? 'border-[#E8A020] bg-[#FEF3E2] dark:bg-[#0B3D6B]/40 text-gray-900 dark:text-white'
                         : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600'
-                    }`}
+                    } ${unansweredWarning ? 'ring-2 ring-amber-400 ring-offset-1 dark:ring-offset-gray-800' : ''}`}
                   >
                     <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold ${
                       selected ? 'border-[#E8A020] bg-[#E8A020] text-white' : 'border-gray-300 dark:border-gray-500 text-[#5A6A7A] dark:text-white/60'
@@ -589,6 +651,40 @@ export default function ExamPage() {
                   </button>
                 )
               })}
+              {unansweredWarning && (
+                <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                  ⚠ Please select an answer to continue
+                </p>
+              )}
+
+              {/* Prominent Next / Submit — below the options, sticky on mobile. Reuses
+                  the existing navigation + submit logic (handleSubmit unchanged). */}
+              <div className="sticky bottom-4 z-10 mt-8 flex justify-center sm:static sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const isLast = currentQ === questions.length - 1
+                    if (!isLast) {
+                      // Force an answer before advancing (=== undefined so index 0/1 counts).
+                      if (q && answers[q.id] === undefined) {
+                        setUnansweredWarning(true)
+                        setToast('Please answer this question before continuing')
+                        return
+                      }
+                      setUnansweredWarning(false)
+                      setToast('')
+                      setCurrentQ(i => i + 1)
+                    } else {
+                      // Last question → same confirmed submit path as the top-bar Submit.
+                      if (confirm(`Submit? ${answered}/${questions.length} answered.`)) void handleSubmit()
+                    }
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#E8A020] px-10 py-4 text-xl font-bold text-white shadow-lg shadow-amber-400/40 transition-all duration-150 hover:scale-105 hover:bg-amber-500 sm:w-auto"
+                >
+                  {currentQ === questions.length - 1 ? 'Submit Exam' : 'Next Question'}
+                  <span className="ti ti-chevron-right text-2xl" />
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -600,44 +696,52 @@ export default function ExamPage() {
           <button
             type="button"
             disabled={currentQ === 0}
-            onClick={() => setCurrentQ(i => i - 1)}
+            onClick={() => { setUnansweredWarning(false); setToast(''); setCurrentQ(i => i - 1) }}
             className="flex items-center gap-2 rounded-xl border border-[#DDE3EC] dark:border-white/20 px-4 py-2 text-sm font-semibold text-[#5A6A7A] dark:text-white/60 disabled:opacity-40"
           >
             <span className="ti ti-arrow-left" /> Previous
           </button>
           <span className="whitespace-nowrap text-xs text-[#5A6A7A] dark:text-white/50">{answered} of {questions.length} answered</span>
-          <button
-            type="button"
-            disabled={currentQ === questions.length - 1}
-            onClick={() => setCurrentQ(i => i + 1)}
-            className="flex items-center gap-2 rounded-xl border border-[#DDE3EC] dark:border-white/20 px-4 py-2 text-sm font-semibold text-[#5A6A7A] dark:text-white/60 disabled:opacity-40"
-          >
-            Next <span className="ti ti-arrow-right" />
-          </button>
+          {/* Next/Submit moved below the answer options (prominent button). */}
         </div>
 
-        {/* Question number pills */}
+        {/* Question number pills — green (answered) / gold (current) / gray (not answered).
+            Forward jumps are only allowed to already-answered questions; back is free. */}
         <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
           {questions.map((qs, i) => {
             const isAnswered = answers[qs.id] !== undefined
             const isCurrent = i === currentQ
+            const canNavigate = i <= currentQ || isAnswered
             return (
               <button
                 key={qs.id}
                 type="button"
-                onClick={() => setCurrentQ(i)}
+                disabled={!canNavigate}
+                onClick={() => {
+                  if (!canNavigate) return
+                  setUnansweredWarning(false)
+                  setToast('')
+                  setCurrentQ(i)
+                }}
                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold transition-colors ${
                   isCurrent
-                    ? 'border-[#E8A020] bg-[#E8A020] text-[#0B3D6B]'
+                    ? 'border-[#E8A020] bg-[#E8A020] text-[#0B3D6B] animate-pulse'
                     : isAnswered
-                    ? 'border-[#0B3D6B] bg-[#0B3D6B] text-white'
+                    ? 'border-emerald-500 bg-emerald-500 text-white'
                     : 'border-gray-300 bg-transparent text-[#5A6A7A] dark:border-gray-600 dark:text-white/50'
-                } ${flagged.has(qs.id) ? 'ring-2 ring-amber-400 ring-offset-1 ring-offset-white dark:ring-offset-gray-900' : ''}`}
+                } ${!canNavigate ? 'cursor-not-allowed opacity-40' : ''} ${flagged.has(qs.id) ? 'ring-2 ring-amber-400 ring-offset-1 ring-offset-white dark:ring-offset-gray-900' : ''}`}
               >
-                {i + 1}
+                {isAnswered && !isCurrent ? <span className="ti ti-check" /> : i + 1}
               </button>
             )
           })}
+        </div>
+
+        {/* Legend */}
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-[#5A6A7A] dark:text-white/50">
+          <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Answered</span>
+          <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[#E8A020]" /> Current</span>
+          <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full border border-gray-300 dark:border-gray-600" /> Not answered</span>
         </div>
       </div>
     </div>

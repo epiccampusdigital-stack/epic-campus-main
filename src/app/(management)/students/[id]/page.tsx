@@ -13,7 +13,8 @@ import {
   where,
   orderBy,
 } from 'firebase/firestore'
-import { db } from '@/lib/firebase/client'
+import toast from 'react-hot-toast'
+import { auth, db } from '@/lib/firebase/client'
 import { COURSE_MAP } from '@/lib/constants/courses'
 import { parsePayment } from '@/lib/payments/helpers'
 import StudentFeePanel from '@/components/payments/StudentFeePanel'
@@ -21,7 +22,6 @@ import { parseAttendance } from '@/lib/attendance/helpers'
 import StudentAgentSection from '@/components/students/StudentAgentSection'
 import ParentAccessSection from '@/components/students/ParentAccessSection'
 import StudentForm from '@/components/students/StudentForm'
-import SendCredentialsModal from '@/components/students/SendCredentialsModal'
 import StudentIDCard from '@/components/students/StudentIDCard'
 import WhatsAppFollowUpModal from '@/components/students/WhatsAppFollowUpModal'
 import { useManagement } from '@/components/layout/ManagementContext'
@@ -71,6 +71,17 @@ function parseExamResult(id: string, data: Record<string, unknown>): ExamResult 
     createdAt: String(data.createdAt ?? new Date().toISOString()),
     createdBy: String(data.createdBy ?? ''),
   }
+}
+
+function generatePassword(): string {
+  const animals = ['Tiger', 'Eagle', 'Panda', 'Cobra', 'Wolf', 'Falcon', 'Lion', 'Bear', 'Shark', 'Hawk']
+  const words = ['Stone', 'River', 'Cloud', 'Storm', 'Fire', 'Moon', 'Star', 'Peak', 'Forest', 'Ocean']
+  const num = Math.floor(10 + Math.random() * 90)
+  return (
+    animals[Math.floor(Math.random() * animals.length)] +
+    num +
+    words[Math.floor(Math.random() * words.length)]
+  )
 }
 
 function InfoRow({ label, value }: { label: string; value?: string | null }) {
@@ -234,7 +245,7 @@ function GuardianCard({
 export default function StudentProfilePage() {
   const params = useParams()
   const router = useRouter()
-  const { user } = useManagement()
+  const { user, hasRole } = useManagement()
   const studentId = params.id as string
 
   const [student, setStudent] = useState<Student | null>(null)
@@ -248,11 +259,20 @@ export default function StudentProfilePage() {
   const [idCardOpen, setIdCardOpen] = useState(false)
   const [idDownloading, setIdDownloading] = useState(false)
   const [followUpOpen, setFollowUpOpen] = useState(false)
-  const [sendCredsOpen, setSendCredsOpen] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [loginType, setLoginType] = useState<'id' | 'email' | 'username' | 'record' | 'nic'>('id')
+  const [loginInput, setLoginInput] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loginSaving, setLoginSaving] = useState(false)
   const [regNumber, setRegNumber] = useState('')
   const [studentIdNum, setStudentIdNum] = useState('')
   const [savingIds, setSavingIds] = useState(false)
   const [idSaveMsg, setIdSaveMsg] = useState('')
+  // Last saved login credentials (read from the student doc for staff reference).
+  const [savedLoginEmail, setSavedLoginEmail] = useState('')
+  const [savedLastPassword, setSavedLastPassword] = useState('')
+  const [savedLoginType, setSavedLoginType] = useState('')
+  const [copiedField, setCopiedField] = useState<'email' | 'password' | null>(null)
 
   // Fee schedule state
   const [feeSchedule, setFeeSchedule] = useState<{
@@ -277,6 +297,9 @@ export default function StudentProfilePage() {
       setStudent(s)
       setRegNumber(String(studentData.registrationNumber ?? ''))
       setStudentIdNum(String(studentData.studentId ?? ''))
+      setSavedLoginEmail(String(studentData.loginEmail ?? ''))
+      setSavedLastPassword(String(studentData.lastPassword ?? ''))
+      setSavedLoginType(String(studentData.loginType ?? ''))
       const rawFs = studentData.feeSchedule as Record<string, unknown> | undefined
       if (rawFs) {
         setFeeSchedule({
@@ -344,6 +367,118 @@ export default function StudentProfilePage() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // The login email is derived from the Student ID ({idNumber}@epiccampus.lk); it
+  // falls back to a stored loginEmail, then the legacy real email for older students.
+  function deriveLoginEmail(s: Student | null): string {
+    if (!s) return ''
+    if (s.loginEmail) return s.loginEmail
+    if (s.idNumber) return `${s.idNumber}@epiccampus.lk`
+    return s.email ?? ''
+  }
+
+  // Option 4 ("ID from their student record"): prefer a stored idNumber, else the
+  // student code with hyphens/spaces stripped (EC-2025-001 → EC20250001).
+  function recordDerivedId(s: Student | null): string | null {
+    if (!s) return null
+    if (s.idNumber) return s.idNumber
+    if (s.studentCode) return s.studentCode.replace(/[-\s]/g, '')
+    return null
+  }
+
+  // The final Firebase Auth login email for whatever LOGIN TYPE is selected.
+  function computeFinalLoginEmail(): string {
+    const val = loginInput.trim()
+    switch (loginType) {
+      case 'email':
+        return val.toLowerCase()
+      case 'id':
+        return val ? `${val}@epiccampus.lk` : ''
+      case 'nic':
+        return val ? `${val}@epiccampus.lk` : ''
+      case 'username':
+        return val ? `${val.toLowerCase()}@epiccampus.lk` : ''
+      case 'record': {
+        const rec = recordDerivedId(student)
+        return rec ? `${rec}@epiccampus.lk` : ''
+      }
+      default:
+        return ''
+    }
+  }
+
+  function openLoginModal() {
+    setLoginType('id')
+    setLoginInput('')
+    setLoginPassword(generatePassword())
+    setShowLoginModal(true)
+  }
+
+  async function handleSaveLogin() {
+    // Students added manually have no Firebase Auth account (no uid) yet — that's
+    // fine: the set-login route creates one from studentId. Only require the doc.
+    if (!student) return
+    const finalLoginEmail = computeFinalLoginEmail()
+    if (!finalLoginEmail) {
+      toast.error(loginType === 'record' ? 'No ID found — choose another option' : 'Enter a login value')
+      return
+    }
+    if ((loginType === 'id' || loginType === 'username' || loginType === 'nic') && /\s/.test(loginInput.trim())) {
+      toast.error('Login value cannot contain spaces')
+      return
+    }
+    if (loginPassword.trim().length < 6) {
+      toast.error('Password must be at least 6 characters')
+      return
+    }
+    setLoginSaving(true)
+    try {
+      const token = await auth.currentUser?.getIdToken()
+      const res = await fetch('/api/students/set-login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          uid: student.uid,
+          loginEmail: finalLoginEmail,
+          password: loginPassword.trim(),
+          loginType,
+          studentId: student.id,
+        }),
+      })
+      const data = (await res.json()) as { success?: boolean; error?: string }
+      if (data.success) {
+        toast.success('Login created successfully')
+        setShowLoginModal(false)
+      } else {
+        toast.error('Error: ' + (data.error ?? 'Unknown error'))
+      }
+    } catch {
+      toast.error('Network error — try again')
+    } finally {
+      setLoginSaving(false)
+    }
+  }
+
+  function copyField(field: 'email' | 'password', value: string) {
+    if (!value) return
+    void navigator.clipboard.writeText(value).catch(() => {})
+    setCopiedField(field)
+    setTimeout(() => setCopiedField(null), 2000)
+  }
+
+  // Credentials card visibility — front-desk roles only.
+  const canSeeCredentials = hasRole('admin') || hasRole('owner') || hasRole('reception')
+
+  const LOGIN_TYPE_LABELS: Record<string, string> = {
+    id: 'Student ID Number',
+    nic: 'National ID Card (NIC)',
+    email: 'Gmail / Email',
+    username: 'Name @ epiccampus.lk',
+    record: 'Student record ID',
+  }
 
   if (loading) {
     return (
@@ -449,12 +584,11 @@ export default function StudentProfilePage() {
             </button>
             <button
               type="button"
-              onClick={() => setSendCredsOpen(true)}
-              disabled={!student.mobile}
+              onClick={openLoginModal}
               className="inline-flex items-center gap-2 rounded-lg border border-[#25D366] px-4 py-2 font-jakarta text-sm font-semibold text-[#128C7E] hover:bg-[#25D366]/10 disabled:opacity-50"
             >
               <span className="ti ti-key" aria-hidden="true" />
-              Send Login
+              Set Login
             </button>
             <button
               type="button"
@@ -668,6 +802,72 @@ export default function StudentProfilePage() {
                 </button>
               </div>
             </div>
+
+            {/* Login Credentials — admin / owner / reception only */}
+            {canSeeCredentials && (
+              <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+                <h3 className="mb-4 flex items-center gap-2 font-jakarta text-sm font-bold uppercase tracking-wide text-[#0B3D6B] dark:text-white">
+                  <span className="ti ti-lock text-base" aria-hidden="true" /> Login Credentials
+                </h3>
+                <div className="space-y-3">
+                  {/* Login Email */}
+                  <div className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">Login Email</p>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <span className={`min-w-0 truncate font-mono text-sm ${savedLoginEmail ? 'text-[#0D1B2A] dark:text-white' : 'text-[#5A6A7A] dark:text-white/40'}`}>
+                        {savedLoginEmail || 'Not set yet'}
+                      </span>
+                      {savedLoginEmail && (
+                        <button
+                          type="button"
+                          onClick={() => copyField('email', savedLoginEmail)}
+                          className="shrink-0 rounded-lg border border-[#DDE3EC] dark:border-white/15 px-2.5 py-1 text-xs font-semibold text-[#0B3D6B] dark:text-white/70 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06]"
+                        >
+                          {copiedField === 'email' ? 'Copied!' : 'Copy'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Last Password Set */}
+                  <div className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">Last Password Set</p>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <span className={`min-w-0 truncate font-mono text-sm font-bold ${savedLastPassword ? 'text-[#0B3D6B] dark:text-[#E8A020]' : 'text-[#5A6A7A] dark:text-white/40'}`}>
+                        {savedLastPassword || 'Not set yet'}
+                      </span>
+                      {savedLastPassword && (
+                        <button
+                          type="button"
+                          onClick={() => copyField('password', savedLastPassword)}
+                          className="shrink-0 rounded-lg border border-[#DDE3EC] dark:border-white/15 px-2.5 py-1 text-xs font-semibold text-[#0B3D6B] dark:text-white/70 hover:bg-[#F5F7FB] dark:hover:bg-white/[0.06]"
+                        >
+                          {copiedField === 'password' ? 'Copied!' : 'Copy'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Login Type (if recorded) */}
+                  {savedLoginType && (
+                    <div className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] p-3">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/40">Login Type</p>
+                      <span className="mt-1 block text-sm text-[#0D1B2A] dark:text-white">
+                        {LOGIN_TYPE_LABELS[savedLoginType] ?? savedLoginType}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={openLoginModal}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#0B3D6B] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0a3460]"
+                >
+                  <span className="ti ti-key" aria-hidden="true" /> Set / Reset Login
+                </button>
+              </div>
+            )}
+
             <div className="grid gap-8 lg:grid-cols-2">
             <div>
               <h3 className="mb-4 font-jakarta text-sm font-bold uppercase tracking-wide text-[#0B3D6B]">
@@ -677,7 +877,12 @@ export default function StudentProfilePage() {
                 <InfoRow label="NIC" value={student.nic} />
                 <InfoRow label="Date of Birth" value={formatDate(student.dateOfBirth)} />
                 <InfoRow label="Phone" value={student.mobile} />
-                <InfoRow label="Email" value={student.email} />
+                {student.idNumber && <InfoRow label="Login ID" value={student.idNumber} />}
+                <InfoRow label="Login Email" value={deriveLoginEmail(student)} />
+                <InfoRow
+                  label="Personal Email"
+                  value={student.personalEmail ?? (student.idNumber ? null : student.email)}
+                />
                 <InfoRow label="Address" value={student.address} />
               </dl>
             </div>
@@ -930,22 +1135,165 @@ export default function StudentProfilePage() {
         onSaved={loadData}
       />
 
-      <SendCredentialsModal
-        open={sendCredsOpen}
-        student={
-          student
-            ? {
-                id: student.id,
-                name: student.name,
-                email: student.email,
-                mobile: student.mobile,
-                studentCode: student.studentCode,
-                uid: student.uid,
-              }
-            : null
-        }
-        onClose={() => setSendCredsOpen(false)}
-      />
+      {showLoginModal && (
+        <>
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm"
+               onClick={() => setShowLoginModal(false)} />
+          <div className="fixed left-1/2 top-1/2 z-[70] w-full max-w-md
+                          -translate-x-1/2 -translate-y-1/2 rounded-2xl
+                          bg-[#0D1B2A] p-6 shadow-2xl">
+
+            <h2 className="text-lg font-bold text-white">Set Student Login</h2>
+            <p className="mt-1 text-sm text-gray-400">
+              Save credentials — student can log in immediately.
+            </p>
+
+            <div className="mt-4 space-y-3">
+              {/* Login type selector */}
+              <div>
+                <label className="text-xs font-bold uppercase text-gray-400">Login Type</label>
+                <select
+                  value={loginType}
+                  onChange={(e) => {
+                    setLoginType(e.target.value as 'id' | 'email' | 'username' | 'record' | 'nic')
+                    setLoginInput('')
+                  }}
+                  className="mt-1 w-full rounded-xl bg-[#0B3D6B] px-4 py-3 text-sm text-white outline-none"
+                >
+                  <option value="id">Student ID Number</option>
+                  <option value="nic">National ID Card (NIC)</option>
+                  <option value="email">Their Personal Gmail / Email</option>
+                  <option value="username">Name @ epiccampus.lk</option>
+                  <option value="record">ID from their student record</option>
+                </select>
+              </div>
+
+              {/* NIC — login email + password both derive from the NIC number */}
+              {loginType === 'nic' && (
+                <div>
+                  <label className="text-xs font-bold uppercase text-gray-400">NIC Number</label>
+                  <input
+                    type="text"
+                    value={loginInput}
+                    onChange={(e) => {
+                      setLoginInput(e.target.value)
+                      setLoginPassword(e.target.value) // NIC doubles as the password
+                    }}
+                    placeholder="e.g. 200012345678"
+                    className="mt-1 w-full rounded-xl bg-[#0B3D6B] px-4 py-3 font-mono text-sm text-white outline-none placeholder:text-gray-500"
+                  />
+                  <p className="mt-1 text-xs text-gray-400">Student types their NIC as password</p>
+                </div>
+              )}
+
+              {/* Conditional input per login type */}
+              {loginType === 'id' && (
+                <div>
+                  <label className="text-xs font-bold uppercase text-gray-400">Student ID</label>
+                  <input
+                    type="text"
+                    value={loginInput}
+                    onChange={(e) => setLoginInput(e.target.value)}
+                    placeholder="e.g. 200000001"
+                    className="mt-1 w-full rounded-xl bg-[#0B3D6B] px-4 py-3 font-mono text-sm text-white outline-none placeholder:text-gray-500"
+                  />
+                </div>
+              )}
+              {loginType === 'email' && (
+                <div>
+                  <label className="text-xs font-bold uppercase text-gray-400">Email Address</label>
+                  <input
+                    type="email"
+                    value={loginInput}
+                    onChange={(e) => setLoginInput(e.target.value)}
+                    placeholder="e.g. kasun@gmail.com"
+                    className="mt-1 w-full rounded-xl bg-[#0B3D6B] px-4 py-3 font-mono text-sm text-white outline-none placeholder:text-gray-500"
+                  />
+                </div>
+              )}
+              {loginType === 'username' && (
+                <div>
+                  <label className="text-xs font-bold uppercase text-gray-400">Username</label>
+                  <input
+                    type="text"
+                    value={loginInput}
+                    onChange={(e) => setLoginInput(e.target.value)}
+                    placeholder="e.g. kasun.silva"
+                    className="mt-1 w-full rounded-xl bg-[#0B3D6B] px-4 py-3 font-mono text-sm text-white outline-none placeholder:text-gray-500"
+                  />
+                  <p className="mt-1 text-xs text-gray-400">Letters and dots only, no spaces</p>
+                </div>
+              )}
+
+              {/* Read-only preview of the resolved login email */}
+              <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm">
+                {loginType === 'record' && !recordDerivedId(student) ? (
+                  <span className="font-semibold text-amber-400">No ID found — choose another option</span>
+                ) : (
+                  <span className="text-gray-300">
+                    Will log in as:{' '}
+                    <span className="font-mono font-bold text-white break-all">
+                      {computeFinalLoginEmail() || '—'}
+                    </span>
+                  </span>
+                )}
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="text-xs font-bold uppercase text-gray-400">Password</label>
+                <div className="mt-1 flex gap-2">
+                  <input
+                    type="text"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="flex-1 rounded-xl bg-[#0B3D6B] px-4 py-3 font-mono text-lg font-bold text-white outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setLoginPassword(generatePassword())}
+                    className="rounded-xl bg-[#0B3D6B] px-3 text-white hover:bg-[#1A6BAD]"
+                    title="Generate new password"
+                  >
+                    <span className="ti ti-refresh text-lg" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(
+                    `EPIC Campus Login\nLogin: ${computeFinalLoginEmail()}\nPassword: ${loginPassword}\nSite: www.epiccampus.live`,
+                  )
+                  toast.success('Copied!')
+                }}
+                className="flex-1 rounded-xl border border-gray-600 py-3 text-sm font-semibold text-white hover:bg-white/5"
+              >
+                Copy
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveLogin}
+                disabled={loginSaving || !computeFinalLoginEmail() || !loginPassword}
+                className="flex-1 rounded-xl bg-[#E8A020] py-3 text-sm font-bold text-[#0B3D6B] disabled:opacity-50"
+              >
+                {loginSaving ? 'Saving...' : 'Save & Activate'}
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowLoginModal(false)}
+              className="absolute right-4 top-4 text-gray-400 hover:text-white"
+            >
+              <span className="ti ti-x text-lg" />
+            </button>
+          </div>
+        </>
+      )}
 
       <WhatsAppFollowUpModal
         student={

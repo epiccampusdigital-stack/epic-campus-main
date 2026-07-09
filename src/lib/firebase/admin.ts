@@ -6,36 +6,57 @@ export const dynamic = 'force-dynamic'
 
 // Lazy factory — only runs when first property is accessed (at request time, not build time)
 function buildAdminApp(): App {
-  if (getApps().length > 0) return getApps()[0]
+  try {
+    // Guard against double-init — reuse the existing app if already initialized
+    if (getApps().length > 0) return getApps()[0]
 
-  const projectId =
-    process.env.FB_PROJECT_ID ??
-    process.env.FIREBASE_ADMIN_PROJECT_ID ??
-    process.env.FIREBASE_PROJECT_ID
-  const clientEmail =
-    process.env.FB_CLIENT_EMAIL ??
-    process.env.FIREBASE_ADMIN_CLIENT_EMAIL ??
-    process.env.FIREBASE_CLIENT_EMAIL
-  const privateKey = (
-    process.env.FB_PRIVATE_KEY ??
-    process.env.FIREBASE_ADMIN_PRIVATE_KEY ??
-    process.env.FIREBASE_PRIVATE_KEY
-  )
-    ?.replace(/\\n/g, '\n')
-    ?.replace(/^["']|["']$/g, '')
+    const projectId =
+      process.env.FB_PROJECT_ID ??
+      process.env.FIREBASE_ADMIN_PROJECT_ID ??
+      process.env.FIREBASE_PROJECT_ID
+    const clientEmail =
+      process.env.FB_CLIENT_EMAIL ??
+      process.env.FIREBASE_ADMIN_CLIENT_EMAIL ??
+      process.env.FIREBASE_CLIENT_EMAIL
+    const privateKey = (
+      process.env.FB_PRIVATE_KEY ??
+      process.env.FIREBASE_ADMIN_PRIVATE_KEY ??
+      process.env.FIREBASE_PRIVATE_KEY
+    )
+      ?.replace(/\\n/g, '\n')
+      ?.replace(/^["']|["']$/g, '')
 
-  if (!projectId || !clientEmail || !privateKey) {
-    console.error('Missing Firebase Admin env vars:', {
+    console.log('[admin] Init attempt:', {
       hasProjectId: !!projectId,
       hasClientEmail: !!clientEmail,
       hasPrivateKey: !!privateKey,
+      privateKeyStart: privateKey?.slice(0, 40),
     })
-    throw new Error('Firebase Admin credentials missing')
-  }
 
-  return initializeApp({
-    credential: cert({ projectId, clientEmail, privateKey }),
-  })
+    if (!projectId || !clientEmail || !privateKey) {
+      console.error('[admin] MISSING ENV VARS:', {
+        FB_PROJECT_ID: process.env.FB_PROJECT_ID ? 'SET' : 'MISSING',
+        FIREBASE_ADMIN_PROJECT_ID: process.env.FIREBASE_ADMIN_PROJECT_ID ? 'SET' : 'MISSING',
+        FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID ? 'SET' : 'MISSING',
+        FB_CLIENT_EMAIL: process.env.FB_CLIENT_EMAIL ? 'SET' : 'MISSING',
+        FIREBASE_ADMIN_CLIENT_EMAIL: process.env.FIREBASE_ADMIN_CLIENT_EMAIL ? 'SET' : 'MISSING',
+        FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL ? 'SET' : 'MISSING',
+        FB_PRIVATE_KEY: process.env.FB_PRIVATE_KEY ? 'SET' : 'MISSING',
+        FIREBASE_ADMIN_PRIVATE_KEY: process.env.FIREBASE_ADMIN_PRIVATE_KEY ? 'SET' : 'MISSING',
+        FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY ? 'SET' : 'MISSING',
+      })
+      throw new Error('Firebase Admin credentials missing')
+    }
+
+    return initializeApp({
+      credential: cert({ projectId, clientEmail, privateKey }),
+    })
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : String(err)
+    console.error('[firebase/admin] Initialization failed:', message, err)
+    throw new Error(`Firebase Admin initialization failed: ${message}`)
+  }
 }
 
 // Creates a Proxy that defers initialization until the first property access.

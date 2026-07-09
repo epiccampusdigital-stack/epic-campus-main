@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import {
   addDoc,
   collection,
@@ -762,6 +763,12 @@ export default function AdminExamsPage() {
                           <span className="ti ti-eye" /> View Questions
                         </button>
                       )}
+                      <Link
+                        href={`/exam-results?paper=${paper.id}`}
+                        className="inline-flex items-center gap-1 rounded-lg border border-[#E8A020]/40 bg-[#E8A020]/10 px-2 py-1 text-xs font-semibold text-[#B4770F] dark:text-[#E8A020]"
+                      >
+                        <span className="ti ti-chart-bar" /> View Results
+                      </Link>
                       <button type="button" onClick={() => { setSelectedPaper(paper); setActiveTab('questions'); void ensureDefaultSections(paper.id) }}
                         className="rounded-lg border border-[#DDE3EC] dark:border-white/20 px-2 py-1 text-xs font-semibold text-[#0B3D6B] dark:text-white/70">
                         Questions
