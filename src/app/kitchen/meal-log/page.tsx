@@ -218,6 +218,16 @@ export default function MealLogPage() {
     return logs.some((l) => l.date === fDate && l.mealType === fType)
   }, [logs, fDate, fType])
 
+  // FIX 4 — the wizard has unsaved input worth warning about before a stray close
+  // (backdrop / X / Escape). Derived so it resets automatically on save (resetWizard
+  // clears the fields) and whenever the sheet is closed.
+  const isDirty = useMemo(() => {
+    if (!showSlide) return false
+    return Boolean(
+      fType || fStudents || fStaff || fNotes.trim() || selected.some((s) => s.qty > 0),
+    )
+  }, [showSlide, fType, fStudents, fStaff, fNotes, selected])
+
   const hasValidIngredients = selected.some((s) => s.qty > 0)
 
   function showToast(msg: string, kind: 'success' | 'warning' = 'success') {
@@ -644,6 +654,7 @@ export default function MealLogPage() {
           setShowSlide(false)
           setEditingLogId(null)
         }}
+        confirmBeforeClose={isDirty}
         title={editingLogId ? 'Edit Meal Log' : 'Log Meal'}
         footer={slideFooter}
       >

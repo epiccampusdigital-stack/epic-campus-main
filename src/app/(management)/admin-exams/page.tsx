@@ -46,6 +46,9 @@ interface PaperDoc {
   examBatch?: string
   accessCode?: string
   codeGeneratedAt?: string
+  codeExpiresAt?: string
+  paperType?: 'practice' | 'exam'
+  shuffleEnabled?: boolean
   isUnlocked?: boolean
   unlockedAt?: unknown
 }
@@ -174,6 +177,8 @@ export default function AdminExamsPage() {
     title: '', description: '', categoryId: 'japan-ssw',
     totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1,
     hasAudioCheck: true, scoringScale: 250 as 250 | 100,
+    paperType: 'practice' as 'practice' | 'exam',
+    shuffleEnabled: false,
     isLive: false, examDate: '', examTime: '', examCourseId: '', examBatch: '',
   })
   const [editingPaper, setEditingPaper] = useState<PaperDoc | null>(null)
@@ -308,7 +313,7 @@ export default function AdminExamsPage() {
       }
       await loadPapers()
       setEditingPaper(null)
-      setPaperForm({ title: '', description: '', categoryId: 'japan-ssw', totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1, hasAudioCheck: true, scoringScale: 250 as 250 | 100, isLive: false, examDate: '', examTime: '', examCourseId: '', examBatch: '' })
+      setPaperForm({ title: '', description: '', categoryId: 'japan-ssw', totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1, hasAudioCheck: true, scoringScale: 250 as 250 | 100, paperType: 'practice' as 'practice' | 'exam', shuffleEnabled: false, isLive: false, examDate: '', examTime: '', examCourseId: '', examBatch: '' })
     } finally {
       setSavingPaper(false)
     }
@@ -358,7 +363,7 @@ export default function AdminExamsPage() {
 
   // ── Live exam code ───────────────────────────────────────────────────────────
   function generateCode(): string {
-    return String(Math.floor(1000 + Math.random() * 9000))
+    return String(Math.floor(10000 + Math.random() * 90000))
   }
 
   async function startLiveExam(paper: PaperDoc) {
@@ -615,6 +620,55 @@ export default function AdminExamsPage() {
               </div>
             </div>
 
+            <div>
+              <label className="mb-1 block text-xs font-medium text-[#5A6A7A] dark:text-white/50">Paper Type</label>
+              <div className="flex gap-2">
+                {([
+                  { value: 'practice', label: 'Practice' },
+                  { value: 'exam', label: 'Exam' },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setPaperForm(f => ({ ...f, paperType: opt.value }))}
+                    className={`flex-1 rounded-xl px-3 py-2 text-sm font-bold transition-all ${
+                      paperForm.paperType === opt.value
+                        ? 'bg-[#0B3D6B] text-white'
+                        : 'border border-[#DDE3EC] dark:border-white/20 text-[#5A6A7A] dark:text-white/60'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-[#5A6A7A] dark:text-white/40">
+                Exam papers require a rolling access code; practice papers use the student-access toggle.
+              </p>
+            </div>
+
+            {/* Shuffle Questions toggle — default OFF. Randomises question + option order per student. */}
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-[#DDE3EC] dark:border-white/20 px-3 py-2.5">
+              <div>
+                <p className="text-sm font-semibold text-[#0B3D6B] dark:text-white">Shuffle Questions</p>
+                <p className="text-xs text-[#5A6A7A] dark:text-white/40">Randomise question &amp; option order for each student</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={paperForm.shuffleEnabled}
+                onClick={() => setPaperForm(f => ({ ...f, shuffleEnabled: !f.shuffleEnabled }))}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  paperForm.shuffleEnabled ? 'bg-[#E8A020]' : 'bg-[#DDE3EC] dark:bg-white/20'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    paperForm.shuffleEnabled ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -668,7 +722,7 @@ export default function AdminExamsPage() {
 
             <div className="flex gap-3">
               {editingPaper && (
-                <button type="button" onClick={() => { setEditingPaper(null); setPaperForm({ title: '', description: '', categoryId: 'japan-ssw', totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1, hasAudioCheck: true, scoringScale: 250 as 250 | 100, isLive: false, examDate: '', examTime: '', examCourseId: '', examBatch: '' }) }}
+                <button type="button" onClick={() => { setEditingPaper(null); setPaperForm({ title: '', description: '', categoryId: 'japan-ssw', totalQuestions: 48, timeLimitSeconds: 3600, passMark: 80, order: 1, hasAudioCheck: true, scoringScale: 250 as 250 | 100, paperType: 'practice' as 'practice' | 'exam', shuffleEnabled: false, isLive: false, examDate: '', examTime: '', examCourseId: '', examBatch: '' }) }}
                   className="flex-1 rounded-xl border border-[#DDE3EC] dark:border-white/20 py-2.5 text-sm font-semibold text-[#5A6A7A] dark:text-white/60">
                   Cancel
                 </button>
@@ -703,31 +757,53 @@ export default function AdminExamsPage() {
                         }`}>
                           {paper.isPublished ? 'Published' : 'Draft'}
                         </span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          (paper.paperType ?? 'practice') === 'exam'
+                            ? 'bg-[#E8A020] text-white'
+                            : 'bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-white/50'
+                        }`}>
+                          {(paper.paperType ?? 'practice') === 'exam' ? 'EXAM' : 'PRACTICE'}
+                        </span>
                         <span className="rounded-full bg-[#0B3D6B]/10 dark:bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-[#0B3D6B] dark:text-white/60">
                           {paper.totalQuestions} question{paper.totalQuestions === 1 ? '' : 's'}
                         </span>
+                        {paper.shuffleEnabled && (
+                          <span className="rounded-full bg-purple-100 dark:bg-purple-900/30 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-400">
+                            Shuffle ON
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-[#5A6A7A] dark:text-white/40 mt-0.5">
                         {paper.totalQuestions}Q · {Math.round((paper.timeLimitSeconds ?? 3600)/60)}min · Pass {paper.passMark}% · Order #{paper.order}
                       </p>
-                      {/* Prominent Student Access toggle — first action, right under the title */}
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={paper.isUnlocked !== false}
-                        onClick={() => void handleToggleUnlock(paper)}
-                        title={paper.isUnlocked !== false
-                          ? "Click to lock — students won't see this paper"
-                          : 'Click to unlock — students can access this paper'}
-                        className={`mt-2 inline-flex min-w-[160px] cursor-pointer items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-all duration-200 hover:brightness-110 ${
-                          paper.isUnlocked !== false
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-white/50'
-                        }`}
-                      >
-                        <span className={`ti ${paper.isUnlocked !== false ? 'ti-lock-open' : 'ti-lock'}`} />
-                        Student Access: {paper.isUnlocked !== false ? 'ON' : 'OFF'}
-                      </button>
+                      {/* Exam papers → rolling access-code generator. Practice papers → student-access toggle. */}
+                      {(paper.paperType ?? 'practice') === 'exam' ? (
+                        <ExamCodeSection
+                          paper={paper}
+                          onUpdated={(patch) =>
+                            setPapers(prev => prev.map(p => (p.id === paper.id ? { ...p, ...patch } : p)))
+                          }
+                          onToast={setToast}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={paper.isUnlocked !== false}
+                          onClick={() => void handleToggleUnlock(paper)}
+                          title={paper.isUnlocked !== false
+                            ? "Click to lock — students won't see this paper"
+                            : 'Click to unlock — students can access this paper'}
+                          className={`mt-2 inline-flex min-w-[160px] cursor-pointer items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-all duration-200 hover:brightness-110 ${
+                            paper.isUnlocked !== false
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-white/50'
+                          }`}
+                        >
+                          <span className={`ti ${paper.isUnlocked !== false ? 'ti-lock-open' : 'ti-lock'}`} />
+                          Student Access: {paper.isUnlocked !== false ? 'ON' : 'OFF'}
+                        </button>
+                      )}
                     </div>
                     <div className="flex shrink-0 gap-1 flex-wrap justify-end items-center">
                       {paper.isLive && (
@@ -779,7 +855,7 @@ export default function AdminExamsPage() {
                         }`}>
                         {paper.isPublished ? 'Unpublish' : 'Publish'}
                       </button>
-                      <button type="button" onClick={() => { setEditingPaper(paper); setPaperForm({ title: paper.title, description: paper.description ?? '', categoryId: paper.categoryId, totalQuestions: paper.totalQuestions, timeLimitSeconds: paper.timeLimitSeconds, passMark: paper.passMark, order: paper.order, hasAudioCheck: paper.hasAudioCheck ?? true, scoringScale: (paper.scoringScale ?? 250) as 250 | 100, isLive: paper.isLive ?? false, examDate: paper.examDate ?? '', examTime: paper.examTime ?? '', examCourseId: paper.examCourseId ?? '', examBatch: paper.examBatch ?? '' }) }}
+                      <button type="button" onClick={() => { setEditingPaper(paper); setPaperForm({ title: paper.title, description: paper.description ?? '', categoryId: paper.categoryId, totalQuestions: paper.totalQuestions, timeLimitSeconds: paper.timeLimitSeconds, passMark: paper.passMark, order: paper.order, hasAudioCheck: paper.hasAudioCheck ?? true, scoringScale: (paper.scoringScale ?? 250) as 250 | 100, paperType: (paper.paperType ?? 'practice') as 'practice' | 'exam', shuffleEnabled: paper.shuffleEnabled ?? false, isLive: paper.isLive ?? false, examDate: paper.examDate ?? '', examTime: paper.examTime ?? '', examCourseId: paper.examCourseId ?? '', examBatch: paper.examBatch ?? '' }) }}
                         className="rounded-lg border border-[#DDE3EC] dark:border-white/20 px-2 py-1 text-xs text-[#5A6A7A] dark:text-white/60">
                         Edit
                       </button>
@@ -1302,6 +1378,146 @@ export default function AdminExamsPage() {
           </aside>
         </>
       )}
+    </div>
+  )
+}
+
+// ── Inline exam access-code generator shown on each EXAM paper card ─────────────
+// Displays the current 5-digit code + a live MM:SS countdown, auto-refreshes the
+// code when the 30-minute window elapses, and offers manual Regenerate / Revoke.
+function ExamCodeSection({
+  paper,
+  onUpdated,
+  onToast,
+}: {
+  paper: PaperDoc
+  onUpdated: (patch: Partial<PaperDoc>) => void
+  onToast: (msg: string) => void
+}) {
+  const [code, setCode] = useState(paper.accessCode ?? '')
+  const [expiry, setExpiry] = useState<Date | null>(
+    paper.codeExpiresAt ? new Date(paper.codeExpiresAt) : null,
+  )
+  const [secondsLeft, setSecondsLeft] = useState(0)
+  const [busy, setBusy] = useState(false)
+  // Guards the auto-refresh so a single expiry can't fire repeated saves.
+  const refreshingRef = useRef(false)
+
+  // Re-sync when the underlying paper doc changes (e.g. after a reload).
+  useEffect(() => {
+    setCode(paper.accessCode ?? '')
+    setExpiry(paper.codeExpiresAt ? new Date(paper.codeExpiresAt) : null)
+  }, [paper.accessCode, paper.codeExpiresAt])
+
+  const saveNewCode = useCallback(async (toastMsg: string) => {
+    if (refreshingRef.current) return
+    refreshingRef.current = true
+    setBusy(true)
+    try {
+      const newCode = String(Math.floor(10000 + Math.random() * 90000))
+      const now = new Date()
+      const exp = new Date(now.getTime() + 30 * 60 * 1000) // 30 minutes
+      await updateDoc(doc(db, 'examPapers', paper.id), {
+        accessCode: newCode,
+        codeGeneratedAt: now.toISOString(),
+        codeExpiresAt: exp.toISOString(),
+        isLive: true, // students validate against accessCode + isLive
+      })
+      setCode(newCode)
+      setExpiry(exp)
+      onUpdated({
+        accessCode: newCode,
+        codeGeneratedAt: now.toISOString(),
+        codeExpiresAt: exp.toISOString(),
+        isLive: true,
+      })
+      onToast(toastMsg)
+    } catch (err) {
+      console.error('[AdminExams] code save failed:', err)
+      onToast('Failed to update code — please try again')
+    } finally {
+      setBusy(false)
+      refreshingRef.current = false
+    }
+  }, [paper.id, onUpdated, onToast])
+
+  const revoke = useCallback(async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      await updateDoc(doc(db, 'examPapers', paper.id), {
+        accessCode: '',
+        codeExpiresAt: new Date().toISOString(),
+        isLive: false,
+      })
+      setCode('')
+      setExpiry(null)
+      onUpdated({ accessCode: '', isLive: false })
+      onToast('Code revoked')
+    } catch (err) {
+      console.error('[AdminExams] revoke failed:', err)
+      onToast('Failed to revoke — please try again')
+    } finally {
+      setBusy(false)
+    }
+  }, [busy, paper.id, onUpdated, onToast])
+
+  // Live countdown; triggers a single auto-refresh at zero.
+  useEffect(() => {
+    if (!expiry || !code) { setSecondsLeft(0); return }
+    function tick() {
+      const diff = Math.max(0, Math.floor((expiry!.getTime() - Date.now()) / 1000))
+      setSecondsLeft(diff)
+      if (diff === 0 && !refreshingRef.current) {
+        void saveNewCode('Code auto-refreshed')
+      }
+    }
+    tick()
+    const t = setInterval(tick, 1000)
+    return () => clearInterval(t)
+  }, [expiry, code, saveNewCode])
+
+  const mm = Math.floor(secondsLeft / 60)
+  const ss = secondsLeft % 60
+  const hasActiveCode = !!code && !!expiry && secondsLeft > 0
+
+  return (
+    <div className="mt-2 rounded-xl border-2 border-[#E8A020]/40 bg-[#E8A020]/[0.06] dark:bg-[#E8A020]/[0.08] p-4">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-[#B4770F] dark:text-[#E8A020]">Exam Code</p>
+      {hasActiveCode ? (
+        <>
+          <p className="mt-1 font-mono text-3xl font-black tracking-[0.35em] text-[#0B3D6B] dark:text-[#E8A020]">
+            {code}
+          </p>
+          <p className="mt-1 text-xs font-semibold text-[#5A6A7A] dark:text-white/60">
+            Expires in: <span className="font-mono">{mm}:{ss.toString().padStart(2, '0')}</span>
+          </p>
+        </>
+      ) : (
+        <p className="mt-1 text-sm font-semibold text-[#5A6A7A] dark:text-white/50">
+          No active code — generate one for students
+        </p>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void saveNewCode('New code generated')}
+          className="rounded-lg bg-[#E8A020] px-3 py-1.5 text-xs font-bold text-[#0B3D6B] hover:bg-[#d4911c] disabled:opacity-50"
+        >
+          {busy ? 'Working…' : hasActiveCode ? 'Regenerate Code' : 'Generate Code'}
+        </button>
+        {hasActiveCode && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void revoke()}
+            className="rounded-lg border border-red-300 dark:border-red-800 px-3 py-1.5 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+          >
+            Revoke
+          </button>
+        )}
+      </div>
     </div>
   )
 }

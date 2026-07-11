@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
+  addDoc,
   collection,
   doc,
   getDocs,
+  increment,
   limit,
   query,
   serverTimestamp,
@@ -229,6 +231,11 @@ export default function PaymentsPage() {
   })
   const [confirmBulkOpen, setConfirmBulkOpen] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
+  // FIX 3 — top-of-panel "Mark Fully Paid" + "Record Partial Payment" flow.
+  const [markingFullyPaid, setMarkingFullyPaid] = useState(false)
+  const [savingPartial, setSavingPartial] = useState(false)
+  const [showPartialForm, setShowPartialForm] = useState(false)
+  const [partialForm, setPartialForm] = useState({ paymentType: 'Cash', amount: '', note: '' })
   const [addingInstallment, setAddingInstallment] = useState(false)
   const [installmentForm, setInstallmentForm] = useState({
     label: '',
@@ -236,7 +243,9 @@ export default function PaymentsPage() {
     dueDate: new Date().toISOString().slice(0, 10),
   })
 
-  const canMarkPaid = user && (hasRole('admin') || hasRole('owner') || hasRole('accountant'))
+  // Reception granted payment write access (fully-paid / partial collection at the
+  // front desk). Mirrored in firestore.rules (payments update allows reception).
+  const canMarkPaid = user && (hasRole('admin') || hasRole('owner') || hasRole('accountant') || hasRole('reception'))
   const canAddInstallment = user && (hasRole('admin') || hasRole('owner'))
   const canBulkPay = canMarkPaid
   const isViewOnly = hasRole('accountant') && !canMarkPaid
@@ -441,6 +450,121 @@ export default function PaymentsPage() {
       toast.error('Unable to update installment.')
     } finally {
       setDetailLoading(false)
+    }
+  }
+
+  // FIX 3 — mark every unpaid installment paid in one action and settle the student
+  // doc. Works whether or not a plan exists (no plan → student doc only).
+  async function handleMarkFullyPaid(row: StudentPlanRow) {
+    if (!user || !canMarkPaid) return
+    if (!window.confirm(`Mark ${row.student.name} as fully paid?`)) return
+    setMarkingFullyPaid(true)
+    try {
+      const now = new Date().toISOString()
+      if (row.plan) {
+        const updatedInstallments = row.plan.installments.map((installment) =>
+          installment.paidAt
+            ? installment
+            : { ...installment, paidAt: now, paidBy: user.uid },
+        )
+        await updateDoc(doc(db, 'payments', row.plan.id), {
+          installments: updatedInstallments,
+        })
+      }
+      const paidAmount = row.totalFee || row.student.feeAmount || 0
+      await updateDoc(doc(db, 'students', row.student.id), {
+        paymentStatus: 'paid',
+        paidAmount,
+        pendingAmount: 0,
+        updatedAt: serverTimestamp(),
+      })
+      toast.success('Payment completed')
+      setSelectedStudentId(null)
+      await loadData()
+    } catch (err) {
+      console.error('[PaymentsPage] markFullyPaid', err)
+      toast.error('Unable to mark as fully paid.')
+    } finally {
+      setMarkingFullyPaid(false)
+    }
+  }
+
+  // FIX 3 — record a partial payment. The amount is applied to unpaid installments in
+  // due-date order; any whole installment it covers is marked paid, and the full
+  // payment (plus any uncovered remainder) is recorded in a partialPayments
+  // subcollection for the audit trail.
+  async function handleRecordPartial(row: StudentPlanRow) {
+    if (!user || !canMarkPaid) return
+    const amt = Number(partialForm.amount)
+    if (!amt || amt <= 0) {
+      toast.error('Enter a valid payment amount.')
+      return
+    }
+    setSavingPartial(true)
+    try {
+      const now = new Date().toISOString()
+      let remaining = amt
+
+      if (row.plan) {
+        const ordered = [...row.plan.installments].sort(
+          (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(),
+        )
+        const paidNow = new Set<string>()
+        for (const installment of ordered) {
+          if (installment.paidAt) continue
+          if (installment.amount > 0 && remaining >= installment.amount) {
+            paidNow.add(installment.id)
+            remaining -= installment.amount
+          } else {
+            break
+          }
+        }
+        const updatedInstallments = row.plan.installments.map((installment) =>
+          paidNow.has(installment.id)
+            ? { ...installment, paidAt: now, paidBy: user.uid }
+            : installment,
+        )
+        await updateDoc(doc(db, 'payments', row.plan.id), {
+          installments: updatedInstallments,
+        })
+        await addDoc(collection(db, 'payments', row.plan.id, 'partialPayments'), {
+          amount: amt,
+          appliedToInstallments: Array.from(paidNow),
+          remainder: remaining,
+          paymentType: partialForm.paymentType,
+          note: partialForm.note.trim(),
+          paidAt: now,
+          paidBy: user.uid,
+          paidByName: user.displayName ?? '',
+          createdAt: serverTimestamp(),
+        })
+        // Money was received; reflect 'partial' unless every installment is now paid.
+        const settled = updateStudentStatus({ ...row.plan, installments: updatedInstallments })
+        await updateDoc(doc(db, 'students', row.student.id), {
+          paymentStatus: settled === 'paid' ? 'paid' : 'partial',
+          paidAmount: increment(amt),
+          pendingAmount: increment(-amt),
+          updatedAt: serverTimestamp(),
+        })
+      } else {
+        await updateDoc(doc(db, 'students', row.student.id), {
+          paymentStatus: 'partial',
+          paidAmount: increment(amt),
+          pendingAmount: increment(-amt),
+          updatedAt: serverTimestamp(),
+        })
+      }
+
+      toast.success(`Payment of ${formatLKR(amt)} recorded`)
+      setPartialForm({ paymentType: 'Cash', amount: '', note: '' })
+      setShowPartialForm(false)
+      setSelectedStudentId(null)
+      await loadData()
+    } catch (err) {
+      console.error('[PaymentsPage] recordPartial', err)
+      toast.error('Unable to record payment.')
+    } finally {
+      setSavingPartial(false)
     }
   }
 
@@ -799,12 +923,98 @@ export default function PaymentsPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedStudentId(null)}
+                onClick={() => { setSelectedStudentId(null); setShowPartialForm(false) }}
                 className="rounded-full border border-[#DDE3EC] dark:border-white/10 p-2 text-[#0B3D6B] dark:text-white/70 hover:bg-[#F5F7FB] dark:hover:bg-white/10"
               >
                 <span className="ti ti-x" />
               </button>
             </div>
+
+            {/* FIX 3 — prominent fully-paid / partial-payment actions */}
+            {canMarkPaid && selectedRow.status !== 'paid' && (
+              <div className="mt-5 space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => handleMarkFullyPaid(selectedRow)}
+                    disabled={markingFullyPaid || savingPartial}
+                    className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    <span className="ti ti-circle-check text-lg" />
+                    {markingFullyPaid ? 'Marking…' : 'Mark Fully Paid'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPartialForm((v) => !v)}
+                    disabled={markingFullyPaid || savingPartial}
+                    className="flex items-center justify-center gap-2 rounded-xl bg-[#E8A020] px-5 py-3.5 text-sm font-bold text-[#0B3D6B] hover:bg-[#F5B942] disabled:opacity-60"
+                  >
+                    <span className="ti ti-cash text-lg" />
+                    Record Partial Payment
+                  </button>
+                </div>
+
+                {showPartialForm && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-800 dark:bg-amber-900/10">
+                    <h4 className="text-sm font-bold text-[#0D1B2A] dark:text-white">Record Partial Payment</h4>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <label className="block text-sm text-[#5A6A7A] dark:text-white/60">
+                        Payment Type
+                        <select
+                          value={partialForm.paymentType}
+                          onChange={(e) => setPartialForm((c) => ({ ...c, paymentType: e.target.value }))}
+                          className="mt-1.5 w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm text-[#0D1B2A] dark:border-white/10 dark:bg-[#1A1535] dark:text-white"
+                        >
+                          <option value="Cash">Cash</option>
+                          <option value="Bank Transfer">Bank Transfer</option>
+                          <option value="PayPal">PayPal</option>
+                          <option value="Card">Card</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </label>
+                      <label className="block text-sm text-[#5A6A7A] dark:text-white/60">
+                        Amount Paid (LKR)
+                        <input
+                          type="number"
+                          min="0"
+                          value={partialForm.amount}
+                          onChange={(e) => setPartialForm((c) => ({ ...c, amount: e.target.value }))}
+                          placeholder="10000"
+                          className="mt-1.5 w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm text-[#0D1B2A] dark:border-white/10 dark:bg-[#1A1535] dark:text-white"
+                        />
+                      </label>
+                      <label className="block text-sm text-[#5A6A7A] dark:text-white/60 sm:col-span-2">
+                        Note (optional)
+                        <input
+                          type="text"
+                          value={partialForm.note}
+                          onChange={(e) => setPartialForm((c) => ({ ...c, note: e.target.value }))}
+                          placeholder="Reference / remark"
+                          className="mt-1.5 w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm text-[#0D1B2A] dark:border-white/10 dark:bg-[#1A1535] dark:text-white"
+                        />
+                      </label>
+                    </div>
+                    <div className="mt-4 flex justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={() => { setShowPartialForm(false); setPartialForm({ paymentType: 'Cash', amount: '', note: '' }) }}
+                        className="rounded-lg border border-[#DDE3EC] px-4 py-2 text-sm font-semibold text-[#0B3D6B] hover:bg-white dark:border-white/10 dark:text-white/80"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRecordPartial(selectedRow)}
+                        disabled={savingPartial}
+                        className="rounded-lg bg-[#0B3D6B] px-5 py-2 text-sm font-bold text-white hover:bg-[#0a2d57] disabled:opacity-60"
+                      >
+                        {savingPartial ? 'Saving…' : 'Save Payment'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-[#DDE3EC] bg-[#F5F7FB] p-4 dark:bg-gray-800">

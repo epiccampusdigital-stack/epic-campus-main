@@ -9,6 +9,8 @@ import {
   orderBy,
   serverTimestamp,
   where,
+  doc,
+  updateDoc,
 } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase/client'
 import { useKitchen } from '@/app/kitchen/context'
@@ -64,6 +66,7 @@ const STATUS_STYLES: Record<OrderStatus, string> = {
   ordered: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   received: 'bg-teal-50 text-teal-700 border-teal-200',
   cancelled: 'bg-red-50 text-red-700 border-red-200',
+  rejected: 'bg-red-50 text-red-700 border-red-200',
 }
 
 // Cap an order quantity at a sane per-order maximum so a bad calc can't request
@@ -198,6 +201,13 @@ export default function OrdersPage() {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiData, setAiData] = useState<KitchenAiBudget | null>(null)
   const [aiError, setAiError] = useState('')
+  // Order History detail modal (View / Edit a previously submitted order).
+  const [detailOrder, setDetailOrder] = useState<KitchenOrder | null>(null)
+  const [detailMode, setDetailMode] = useState<'view' | 'edit'>('view')
+  const [editItems, setEditItems] = useState<OrderItem[]>([])
+  const [editSupplier, setEditSupplier] = useState('')
+  const [editNotes, setEditNotes] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
 
   function applyPreset(days: number) {
     setActiveRange(days)
@@ -437,7 +447,114 @@ export default function OrdersPage() {
     void downloadOrderChecklistPdf(orderItems, {
       dateRange: dateRangeLabel,
       manualItems: manualReviewItems,
+      usageStats,
+      studentCount: studentDivisor,
+      scaleNote,
     })
+  }
+
+  // ── Order History: View / Edit / PDF for a saved order ──────────────────
+  function orderDateIso(o: KitchenOrder): string {
+    const ts = o.createdAt as unknown
+    if (ts && typeof ts === 'object' && 'seconds' in ts) {
+      return new Date((ts as { seconds: number }).seconds * 1000).toISOString().slice(0, 10)
+    }
+    if (o.submittedAt) return String(o.submittedAt).slice(0, 10)
+    return todayIso()
+  }
+
+  function orderDateLong(o: KitchenOrder): string {
+    return new Date(orderDateIso(o)).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  }
+
+  function openOrderDetail(o: KitchenOrder, mode: 'view' | 'edit') {
+    setDetailOrder(o)
+    setDetailMode(mode)
+    setEditItems(o.items.map((it) => ({ ...it })))
+    setEditSupplier(o.supplier ?? '')
+    setEditNotes(o.notes ?? '')
+  }
+
+  function closeOrderDetail() {
+    setDetailOrder(null)
+  }
+
+  function updateEditItem(idx: number, field: 'orderQty' | 'unitCost', value: string) {
+    setEditItems((prev) => {
+      const next = [...prev]
+      const num = Number(value) || 0
+      const row = { ...next[idx], [field]: num }
+      row.totalCost = parseFloat((row.orderQty * row.unitCost).toFixed(2))
+      next[idx] = row
+      return next
+    })
+  }
+
+  function removeEditItem(idx: number) {
+    setEditItems((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  async function saveOrderEdit() {
+    if (!detailOrder) return
+    setSavingEdit(true)
+    try {
+      const newTotal = editItems.reduce((s, it) => s + (it.unitCost > 0 ? it.totalCost : 0), 0)
+      await updateDoc(doc(db, 'kitchenOrders', detailOrder.id), {
+        items: editItems,
+        totalEstimate: newTotal,
+        supplier: editSupplier || null,
+        notes: editNotes || '',
+      })
+      showToast('Order updated')
+      setDetailOrder(null)
+      await loadData()
+    } catch (err) {
+      console.error('[Orders edit]', err)
+      setErrorToast('Could not save changes.')
+      setTimeout(() => setErrorToast(''), 4000)
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  function downloadOrderPdf(o: KitchenOrder) {
+    void downloadOrderChecklistPdf(o.items, {
+      studentCount: studentDivisor,
+      fileName: `kitchen-order-${orderDateIso(o)}`,
+    })
+  }
+
+  // Per-row action buttons for the Order History (View / Edit / PDF). Edit is
+  // only enabled while the order is still 'submitted' (not yet approved/rejected).
+  function renderOrderActions(o: KitchenOrder) {
+    const editable = o.status === 'submitted'
+    return (
+      <div className="flex flex-wrap items-center justify-end gap-1.5">
+        <button
+          type="button"
+          onClick={() => openOrderDetail(o, 'view')}
+          className="rounded-lg border border-[#DDE3EC] px-2.5 py-1 text-xs font-medium text-[#5A6A7A] hover:bg-[#F5F7FB] dark:border-white/[0.08] dark:text-white/60 dark:hover:bg-white/[0.05]"
+        >
+          View
+        </button>
+        <button
+          type="button"
+          disabled={!editable}
+          onClick={() => editable && openOrderDetail(o, 'edit')}
+          title={editable ? 'Edit order' : `Cannot edit — order already ${o.status}`}
+          className="rounded-lg border border-[#DDE3EC] px-2.5 py-1 text-xs font-medium text-[#5A6A7A] hover:bg-[#F5F7FB] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/[0.08] dark:text-white/60 dark:hover:bg-white/[0.05]"
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          onClick={() => downloadOrderPdf(o)}
+          className="inline-flex items-center gap-1 rounded-lg border border-[#0B3D6B] px-2.5 py-1 text-xs font-bold text-[#0B3D6B] hover:bg-[#0B3D6B]/10 dark:border-[#E8A020] dark:text-[#E8A020] dark:hover:bg-[#E8A020]/10"
+        >
+          <span className="ti ti-download" /> PDF
+        </button>
+      </div>
+    )
   }
 
   // FIX 5B — send the generated order + data window to the kitchen AI budget route.
@@ -501,6 +618,8 @@ export default function OrdersPage() {
         totalEstimate,
         submittedBy: user?.uid ?? '',
         submittedByName: user?.displayName ?? '',
+        submittedAt: new Date().toISOString(),
+        location: 'Ahangama',
         supplier: supplier || null,
         notes: notes || '',
         createdAt: serverTimestamp(),
@@ -1175,6 +1294,7 @@ export default function OrdersPage() {
                 <p className="mt-1 text-sm text-gray-600">{o.items.length} items</p>
                 <p className="text-sm font-bold text-[#E8A020]">{formatLKR(o.totalEstimate)}</p>
                 <p className="text-xs text-gray-400">{o.submittedByName}</p>
+                <div className="mt-3">{renderOrderActions(o)}</div>
               </div>
             ))
           )}
@@ -1189,13 +1309,14 @@ export default function OrdersPage() {
                 <th className="px-4 py-3">Total (LKR)</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Submitted By</th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i} className="border-b border-[#DDE3EC] dark:border-white/[0.06]">
-                    {Array.from({ length: 5 }).map((__, j) => (
+                    {Array.from({ length: 6 }).map((__, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 animate-pulse rounded bg-[#DDE3EC] dark:bg-white/10" />
                       </td>
@@ -1204,7 +1325,7 @@ export default function OrdersPage() {
                 ))
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-sm text-[#5A6A7A] dark:text-white/40">
+                  <td colSpan={6} className="py-12 text-center text-sm text-[#5A6A7A] dark:text-white/40">
                     No orders yet
                   </td>
                 </tr>
@@ -1224,6 +1345,7 @@ export default function OrdersPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-[#5A6A7A] dark:text-white/60">{o.submittedByName}</td>
+                    <td className="px-4 py-3">{renderOrderActions(o)}</td>
                   </tr>
                 ))
               )}
@@ -1231,6 +1353,200 @@ export default function OrdersPage() {
           </table>
         </div>
       </div>
+
+      {/* ── Order History detail modal (View / Edit) ─────────────────────────── */}
+      {detailOrder && (() => {
+        const isEdit = detailMode === 'edit'
+        const modalItems = isEdit ? editItems : detailOrder.items
+        const modalGroups = groupOrderItems(modalItems)
+        const editIdxOf = new Map(editItems.map((it, i) => [it.itemId, i]))
+        const grand = modalItems.reduce((s, it) => s + (it.unitCost > 0 ? it.totalCost : 0), 0)
+        const perStudent = grand / Math.max(1, studentDivisor)
+        return (
+          <>
+            <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={closeOrderDetail} />
+            <div className="fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-white/80 bg-white/95 shadow-2xl backdrop-blur-2xl dark:border-white/[0.08] dark:bg-[#0d1a2e]/95">
+              {/* Header */}
+              <div className="border-b border-[#DDE3EC] p-5 dark:border-white/[0.06]">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-bold text-[#0D1B2A] dark:text-white">Order — {orderDateLong(detailOrder)}</h3>
+                    <p className="mt-0.5 text-xs text-[#5A6A7A] dark:text-white/50">
+                      Submitted by {detailOrder.submittedByName || '—'}
+                    </p>
+                  </div>
+                  <span className={`rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[detailOrder.status]}`}>
+                    {detailOrder.status}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm font-bold text-[#E8A020]">Total: {formatLKR(grand)}</p>
+                {isEdit && (
+                  <p className="mt-1 text-xs text-[#5A6A7A] dark:text-white/50">
+                    Editing — quantities and unit costs update the total automatically.
+                  </p>
+                )}
+              </div>
+
+              {/* Body */}
+              <div className="flex-1 space-y-4 overflow-y-auto p-5">
+                {modalGroups.map((g) => {
+                  const subtotal = g.items.reduce((s, it) => s + (it.unitCost > 0 ? it.totalCost : 0), 0)
+                  return (
+                    <div key={g.key} className="overflow-hidden rounded-xl border border-[#DDE3EC] dark:border-white/[0.08]">
+                      <div className={`flex items-center justify-between gap-2 px-3 py-2 text-white ${g.headerCls}`}>
+                        <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide">
+                          <span className="text-base">{g.emoji}</span>
+                          {g.label}
+                          <span className="font-medium normal-case opacity-80">
+                            ({g.items.length} item{g.items.length === 1 ? '' : 's'})
+                          </span>
+                        </span>
+                        <span className="text-xs font-bold">{formatLKR(subtotal)}</span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[460px] text-sm">
+                          <thead>
+                            <tr className="border-b border-[#DDE3EC] text-xs uppercase text-[#5A6A7A] dark:border-white/[0.08] dark:text-white/40">
+                              <th className="px-3 py-1.5 text-left">Item</th>
+                              <th className="px-3 py-1.5 text-right">Qty</th>
+                              <th className="px-3 py-1.5 text-left">Unit</th>
+                              <th className="px-3 py-1.5 text-right">Unit Cost</th>
+                              <th className="px-3 py-1.5 text-right">Total</th>
+                              {isEdit && <th className="px-3 py-1.5" />}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {g.items.map((item) => {
+                              const idx = editIdxOf.get(item.itemId) ?? 0
+                              return (
+                                <tr key={item.itemId} className="border-b border-[#DDE3EC] last:border-0 dark:border-white/[0.06]">
+                                  <td className="px-3 py-2 font-medium text-[#0D1B2A] dark:text-white">
+                                    <span className="mr-1">{getFoodEmoji(item.itemName)}</span>
+                                    {item.itemName}
+                                  </td>
+                                  <td className="px-3 py-2 text-right">
+                                    {isEdit ? (
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.5"
+                                        value={item.orderQty}
+                                        onChange={(e) => updateEditItem(idx, 'orderQty', e.target.value)}
+                                        className="w-20 rounded-lg border border-[#DDE3EC] bg-white px-2 py-1 text-right dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                                      />
+                                    ) : (
+                                      <span className="text-[#5A6A7A] dark:text-white/60">{formatQty(item.orderQty)}</span>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 text-left text-[#5A6A7A] dark:text-white/60">{item.unit}</td>
+                                  <td className="px-3 py-2 text-right">
+                                    {isEdit ? (
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={item.unitCost}
+                                        onChange={(e) => updateEditItem(idx, 'unitCost', e.target.value)}
+                                        className="w-24 rounded-lg border border-[#DDE3EC] bg-white px-2 py-1 text-right dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                                      />
+                                    ) : (
+                                      <span className="text-[#5A6A7A] dark:text-white/60">{formatLKR(item.unitCost)}</span>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-medium text-[#0B3D6B] dark:text-[#E8A020]">{formatLKR(item.totalCost)}</td>
+                                  {isEdit && (
+                                    <td className="px-3 py-2 text-right">
+                                      <button
+                                        type="button"
+                                        onClick={() => removeEditItem(idx)}
+                                        title="Remove item"
+                                        className="rounded-lg p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                      >
+                                        <span className="ti ti-x" />
+                                      </button>
+                                    </td>
+                                  )}
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* Order summary */}
+                <div className="rounded-xl border border-[#0B3D6B]/20 bg-[#0B3D6B]/5 p-4 dark:border-white/[0.08] dark:bg-white/[0.04]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-[#5A6A7A] dark:text-white/60">Grand Total</span>
+                    <span className="text-xl font-black text-[#E8A020]">{formatLKR(grand)}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="text-xs text-[#5A6A7A] dark:text-white/50">Cost / student (÷ {studentDivisor})</span>
+                    <span className="text-sm font-bold text-[#0D1B2A] dark:text-white">{formatLKR(perStudent)}</span>
+                  </div>
+                </div>
+
+                {/* Supplier + Notes */}
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">Supplier</label>
+                    <input
+                      type="text"
+                      value={isEdit ? editSupplier : (detailOrder.supplier ?? '')}
+                      readOnly={!isEdit}
+                      onChange={(e) => setEditSupplier(e.target.value)}
+                      className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm read-only:opacity-70 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-[#5A6A7A] dark:text-white/50">Notes</label>
+                    <input
+                      type="text"
+                      value={isEdit ? editNotes : (detailOrder.notes ?? '')}
+                      readOnly={!isEdit}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 text-sm read-only:opacity-70 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex justify-end gap-3 border-t border-[#DDE3EC] p-4 dark:border-white/[0.06]">
+                {isEdit ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={closeOrderDetail}
+                      className="rounded-xl border border-[#DDE3EC] px-4 py-2 text-sm font-medium text-[#5A6A7A] dark:border-white/20 dark:text-white/60"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void saveOrderEdit()}
+                      disabled={savingEdit}
+                      className="rounded-xl bg-[#0B3D6B] px-5 py-2 text-sm font-bold text-white hover:bg-[#0a3460] disabled:opacity-50"
+                    >
+                      {savingEdit ? 'Saving…' : 'Save Changes'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={closeOrderDetail}
+                    className="rounded-xl bg-[#0B3D6B] px-5 py-2 text-sm font-bold text-white hover:bg-[#0a3460]"
+                  >
+                    Close
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        )
+      })()}
     </div>
   )
 }

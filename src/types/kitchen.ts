@@ -5,7 +5,7 @@ export type StockUnit = 'kg' | 'litres' | 'units' | 'grams'
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'tea' | 'morning-tea' | 'evening-tea'
 export type WasteReason = 'overcooked' | 'expired' | 'leftover' | 'spoiled' | 'dropped' | 'other'
 export type WasteType = 'food_waste' | 'spoiled' | 'other'
-export type OrderStatus = 'draft' | 'submitted' | 'approved' | 'ordered' | 'received' | 'cancelled'
+export type OrderStatus = 'draft' | 'submitted' | 'approved' | 'ordered' | 'received' | 'cancelled' | 'rejected'
 
 export interface InventoryItem {
   id: string
@@ -117,6 +117,15 @@ export interface KitchenOrder {
   createdAt: Timestamp
   approvedAt?: Timestamp
   receivedAt?: Timestamp
+  /** Campus/site the order was raised for (shown on the admin approvals page). */
+  location?: string
+  /** ISO timestamp captured client-side at submit, alongside the server createdAt. */
+  submittedAt?: string
+  // Rejection metadata (set by the admin approvals page when an order is rejected).
+  rejectedBy?: string
+  rejectedByName?: string
+  rejectedAt?: Timestamp
+  rejectionReason?: string
 }
 
 export interface KitchenAISuggestion {

@@ -22,6 +22,7 @@ import StockIntakePanel from '@/components/kitchen/inventory/StockIntakePanel'
 import InventoryItemSlideOver, {
   type InventoryFormValues,
 } from '@/components/kitchen/inventory/InventoryItemSlideOver'
+import BillImportModal from '@/components/kitchen/inventory/BillImportModal'
 import FoodEmoji from '@/components/kitchen/FoodEmoji'
 import { CATEGORY_PILLS, getFoodEmoji } from '@/lib/kitchen/foodImages'
 import { formatLKR } from '@/lib/utils/formatCurrency'
@@ -146,6 +147,8 @@ export default function InventoryPage() {
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [history, setHistory] = useState<StockHistoryEntry[]>([])
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<InventoryItem | null>(null)
+  const [billImportOpen, setBillImportOpen] = useState(false)
+  const [importMsg, setImportMsg] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
 
   async function loadItems() {
@@ -512,29 +515,38 @@ export default function InventoryPage() {
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-[#0D1B2A] md:text-2xl dark:text-white">Inventory</h1>
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setViewMode(viewMode === 'grid' ? 'table' : 'grid')}
-            className="flex min-h-[44px] items-center gap-2 rounded-xl border border-[#DDE3EC] bg-white px-4 py-2 text-sm font-medium text-[#5A6A7A] dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            onClick={() => setBillImportOpen(true)}
+            className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[#E8A020] px-4 py-2 text-sm font-bold text-white hover:bg-[#d4911c]"
           >
-            {viewMode === 'grid' ? (
-              <>
-                <span className="ti ti-table" /> Table
-              </>
-            ) : (
-              <>
-                <span className="text-lg">🖼️</span> Grid
-              </>
-            )}
+            <span className="ti ti-file-invoice" /> Import from Bill
           </button>
-          <button
-            type="button"
-            onClick={openAdd}
-            className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[#E8A020] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#d4911c]"
-          >
-            <span className="ti ti-plus" /> Add Item
-          </button>
+          <div className="hidden items-center gap-2 md:flex">
+            <button
+              type="button"
+              onClick={() => setViewMode(viewMode === 'grid' ? 'table' : 'grid')}
+              className="flex min-h-[44px] items-center gap-2 rounded-xl border border-[#DDE3EC] bg-white px-4 py-2 text-sm font-medium text-[#5A6A7A] dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            >
+              {viewMode === 'grid' ? (
+                <>
+                  <span className="ti ti-table" /> Table
+                </>
+              ) : (
+                <>
+                  <span className="text-lg">🖼️</span> Grid
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={openAdd}
+              className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[#E8A020] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#d4911c]"
+            >
+              <span className="ti ti-plus" /> Add Item
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1044,6 +1056,27 @@ export default function InventoryPage() {
             </div>
           </div>
         </>
+      )}
+
+      {importMsg && (
+        <div className="fixed bottom-24 right-4 z-[80] rounded-xl bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-lg md:bottom-6">
+          {importMsg}
+        </div>
+      )}
+
+      {billImportOpen && (
+        <BillImportModal
+          existingItems={items}
+          user={{ uid: user?.uid ?? '', displayName: user?.displayName ?? 'Kitchen Staff' }}
+          onClose={() => setBillImportOpen(false)}
+          onSaved={(s) => {
+            setImportMsg(
+              `Inventory updated — ${s.restocked} item${s.restocked === 1 ? '' : 's'} restocked, ${s.added} new item${s.added === 1 ? '' : 's'} added`,
+            )
+            setTimeout(() => setImportMsg(''), 5000)
+            void loadItems()
+          }}
+        />
       )}
     </div>
   )

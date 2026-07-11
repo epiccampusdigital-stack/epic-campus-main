@@ -28,6 +28,7 @@ interface ExamPaper {
   isPublished?: boolean
   isUnlocked?: boolean
   maxAttempts?: number
+  shuffleEnabled?: boolean
 }
 
 interface ExamSection {
@@ -183,10 +184,17 @@ export default function ExamPage() {
         query(collection(db, 'examQuestions'), where('paperId', '==', paperId), orderBy('order', 'asc'))
       ).catch(() => getDocs(query(collection(db, 'examQuestions'), where('paperId', '==', paperId))))
       const fetchedQs = qsSnap.docs.map(d => ({ id: d.id, ...d.data() } as ExamQuestion))
-      // Shuffle QUESTIONS ONLY (not options): answers are saved/scored by option
-      // .index, so option order is left untouched to guarantee scoring is unaffected.
-      // Firestore is never modified — each student just sees a different question order.
-      setQuestions(shuffleArray(fetchedQs))
+      // Shuffle ONLY when the paper opts in (shuffleEnabled === true). Missing/undefined
+      // → no shuffle, so existing papers are unchanged (backward compatible). When on,
+      // both the question order AND each question's option order are randomised per
+      // student. Answers are saved/scored by option .index, so shuffling options only
+      // changes display order and never affects scoring. Firestore is never modified.
+      const displayQs = p.shuffleEnabled ? shuffleArray(fetchedQs) : fetchedQs
+      const processedQs = displayQs.map(qd => ({
+        ...qd,
+        options: p.shuffleEnabled ? shuffleArray(qd.options) : qd.options,
+      }))
+      setQuestions(processedQs)
 
       setPhase('start')
     } catch (err) {
@@ -510,8 +518,9 @@ export default function ExamPage() {
                 setAnswers({}); setFlagged(new Set()); setCurrentQ(0)
                 setTimeLeft(paper?.timeLimitSeconds ?? 3600); setScore(null)
                 setUnansweredWarning(false)
-                // Re-shuffle question order for the retry (options left in place).
-                setQuestions(prev => shuffleArray(prev))
+                // Re-shuffle question order for the retry only when the paper opts in
+                // (options keep their load-time order); otherwise leave order untouched.
+                setQuestions(prev => (paper?.shuffleEnabled ? shuffleArray(prev) : prev))
                 setPhase('start')
               }}
               className="flex-1 rounded-xl bg-[#E8A020] py-3 text-sm font-bold text-[#0B3D6B]"
@@ -659,7 +668,7 @@ export default function ExamPage() {
 
               {/* Prominent Next / Submit — below the options, sticky on mobile. Reuses
                   the existing navigation + submit logic (handleSubmit unchanged). */}
-              <div className="sticky bottom-4 z-10 mt-8 flex justify-center sm:static sm:justify-end">
+              <div className="sticky bottom-4 z-10 mt-6 flex justify-center sm:static sm:justify-end">
                 <button
                   type="button"
                   onClick={() => {
@@ -679,7 +688,7 @@ export default function ExamPage() {
                       if (confirm(`Submit? ${answered}/${questions.length} answered.`)) void handleSubmit()
                     }
                   }}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#E8A020] px-10 py-4 text-xl font-bold text-white shadow-lg shadow-amber-400/40 transition-all duration-150 hover:scale-105 hover:bg-amber-500 sm:w-auto"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#E8A020] px-8 py-3 text-lg font-semibold text-white shadow-lg shadow-amber-400/40 transition-all duration-150 hover:scale-105 hover:bg-amber-500 sm:w-auto"
                 >
                   {currentQ === questions.length - 1 ? 'Submit Exam' : 'Next Question'}
                   <span className="ti ti-chevron-right text-2xl" />

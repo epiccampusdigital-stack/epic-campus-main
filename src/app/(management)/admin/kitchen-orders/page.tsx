@@ -15,7 +15,7 @@ import {
 import { db } from '@/lib/firebase/client'
 import { useManagement } from '@/components/layout/ManagementContext'
 import { formatLKR } from '@/lib/utils/formatCurrency'
-import type { KitchenOrder, OrderStatus } from '@/types/kitchen'
+import type { KitchenOrder, OrderItem, OrderStatus } from '@/types/kitchen'
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
   draft: 'bg-gray-100 text-gray-600 border-gray-200',
@@ -24,6 +24,31 @@ const STATUS_STYLES: Record<OrderStatus, string> = {
   ordered: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   received: 'bg-teal-50 text-teal-700 border-teal-200',
   cancelled: 'bg-red-50 text-red-700 border-red-200',
+  rejected: 'bg-red-50 text-red-700 border-red-200',
+}
+
+// Bucket an order's items into the same category groups the kitchen order screen
+// uses, so the admin expandable view lines up with what staff submitted.
+const CATEGORY_GROUPS: { key: string; label: string; matches: string[] }[] = [
+  { key: 'vegetables', label: 'Vegetables', matches: ['vegetables', 'vegetable'] },
+  { key: 'protein', label: 'Meat & Protein', matches: ['protein', 'meat', 'meat & fish', 'fish'] },
+  { key: 'grains', label: 'Grains & Rice', matches: ['grains', 'grain', 'rice', 'grains & rice'] },
+  { key: 'dairy', label: 'Dairy', matches: ['dairy', 'dairy & eggs'] },
+  { key: 'condiments', label: 'Condiments & Spices', matches: ['condiments', 'condiment', 'spices', 'spice', 'condiments & spices'] },
+  { key: 'beverages', label: 'Beverages', matches: ['beverages', 'beverage'] },
+  { key: 'other', label: 'Other', matches: [] },
+]
+const NON_OTHER = new Set(CATEGORY_GROUPS.filter((g) => g.key !== 'other').flatMap((g) => g.matches))
+function groupItems(items: OrderItem[]): { key: string; label: string; items: OrderItem[] }[] {
+  return CATEGORY_GROUPS.map((g) => ({
+    key: g.key,
+    label: g.label,
+    items: items.filter((it) => {
+      const c = String(it.category ?? '').toLowerCase()
+      if (g.key === 'other') return !NON_OTHER.has(c)
+      return g.matches.includes(c)
+    }),
+  })).filter((g) => g.items.length > 0)
 }
 
 function toDate(ts: unknown): string {
@@ -50,7 +75,7 @@ export default function AdminKitchenOrdersPage() {
     try {
       const [pendSnap, histSnap] = await Promise.all([
         getDocs(query(collection(db, 'kitchenOrders'), where('status', '==', 'submitted'), orderBy('createdAt', 'desc'))),
-        getDocs(query(collection(db, 'kitchenOrders'), where('status', 'in', ['approved', 'received', 'cancelled']), orderBy('createdAt', 'desc'))),
+        getDocs(query(collection(db, 'kitchenOrders'), where('status', 'in', ['approved', 'received', 'cancelled', 'rejected']), orderBy('createdAt', 'desc'))),
       ])
       setSubmitted(pendSnap.docs.map((d) => ({ id: d.id, ...d.data() } as KitchenOrder)))
       setHistory(histSnap.docs.map((d) => ({ id: d.id, ...d.data() } as KitchenOrder)))
@@ -100,12 +125,15 @@ export default function AdminKitchenOrdersPage() {
   }
 
   async function handleReject() {
-    if (!rejectModal) return
+    if (!rejectModal || !user) return
     setProcessing(rejectModal.id)
     try {
       await updateDoc(doc(db, 'kitchenOrders', rejectModal.id), {
-        status: 'cancelled',
-        notes: `Rejected: ${rejectReason}`,
+        status: 'rejected',
+        rejectedBy: user.uid,
+        rejectedByName: user.displayName,
+        rejectedAt: serverTimestamp(),
+        rejectionReason: rejectReason || '',
       })
       setRejectModal(null)
       setRejectReason('')
@@ -155,6 +183,10 @@ export default function AdminKitchenOrdersPage() {
                   </p>
                   <p className="mt-0.5 text-xs text-[#5A6A7A] dark:text-white/40">
                     Submitted by {order.submittedByName} · {toDate(order.createdAt)}
+                    {' · '}
+                    <span className="inline-flex items-center gap-1">
+                      <span className="ti ti-map-pin" />{order.location ?? 'Ahangama'}
+                    </span>
                     {order.supplier && ` · Supplier: ${order.supplier}`}
                   </p>
                 </div>
@@ -185,28 +217,38 @@ export default function AdminKitchenOrdersPage() {
                 </div>
               </div>
               {expanded === order.id && (
-                <div className="border-t border-[#DDE3EC] p-5 dark:border-white/[0.06]">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-xs uppercase text-[#5A6A7A] dark:text-white/40">
-                        <th className="pb-2 text-left">Item</th>
-                        <th className="pb-2 text-right">Qty</th>
-                        <th className="pb-2 text-right">Unit Cost</th>
-                        <th className="pb-2 text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {order.items.map((item) => (
-                        <tr key={item.itemId} className="border-b border-[#DDE3EC] dark:border-white/[0.06]">
-                          <td className="py-2 text-[#0D1B2A] dark:text-white">{item.itemName}</td>
-                          <td className="py-2 text-right text-[#5A6A7A] dark:text-white/60">{item.orderQty} {item.unit}</td>
-                          <td className="py-2 text-right text-[#5A6A7A] dark:text-white/60">{formatLKR(item.unitCost)}</td>
-                          <td className="py-2 text-right font-medium text-[#0B3D6B] dark:text-[#E8A020]">{formatLKR(item.totalCost)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {order.notes && <p className="mt-2 text-xs text-[#5A6A7A] dark:text-white/40">Notes: {order.notes}</p>}
+                <div className="space-y-4 border-t border-[#DDE3EC] p-5 dark:border-white/[0.06]">
+                  {groupItems(order.items).map((g) => (
+                    <div key={g.key}>
+                      <p className="mb-1 text-xs font-bold uppercase tracking-wide text-[#5A6A7A] dark:text-white/50">
+                        {g.label} ({g.items.length} item{g.items.length === 1 ? '' : 's'}) ·{' '}
+                        {formatLKR(g.items.reduce((s, it) => s + (it.unitCost > 0 ? it.totalCost : 0), 0))}
+                      </p>
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-xs uppercase text-[#5A6A7A] dark:text-white/40">
+                            <th className="pb-1 text-left">Item</th>
+                            <th className="pb-1 text-right">Qty</th>
+                            <th className="pb-1 text-right">Unit</th>
+                            <th className="pb-1 text-right">Unit Cost</th>
+                            <th className="pb-1 text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {g.items.map((item) => (
+                            <tr key={item.itemId} className="border-b border-[#DDE3EC] dark:border-white/[0.06]">
+                              <td className="py-2 text-[#0D1B2A] dark:text-white">{item.itemName}</td>
+                              <td className="py-2 text-right text-[#5A6A7A] dark:text-white/60">{item.orderQty}</td>
+                              <td className="py-2 text-right text-[#5A6A7A] dark:text-white/60">{item.unit}</td>
+                              <td className="py-2 text-right text-[#5A6A7A] dark:text-white/60">{formatLKR(item.unitCost)}</td>
+                              <td className="py-2 text-right font-medium text-[#0B3D6B] dark:text-[#E8A020]">{formatLKR(item.totalCost)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                  {order.notes && <p className="text-xs text-[#5A6A7A] dark:text-white/40">Notes: {order.notes}</p>}
                 </div>
               )}
             </div>

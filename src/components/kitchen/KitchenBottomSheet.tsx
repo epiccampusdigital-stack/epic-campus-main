@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 
 interface KitchenBottomSheetProps {
   open: boolean
@@ -8,6 +8,13 @@ interface KitchenBottomSheetProps {
   title: string
   children: React.ReactNode
   footer?: React.ReactNode
+  /**
+   * When defined, the X button, backdrop click and Escape route through a guard:
+   * if `true`, the user is warned about unsaved changes before closing. When
+   * left undefined, behaviour is unchanged (no Escape handler, no prompt) so
+   * existing sheets are unaffected.
+   */
+  confirmBeforeClose?: boolean
 }
 
 export default function KitchenBottomSheet({
@@ -16,7 +23,16 @@ export default function KitchenBottomSheet({
   title,
   children,
   footer,
+  confirmBeforeClose,
 }: KitchenBottomSheetProps) {
+  const requestClose = useCallback(() => {
+    if (confirmBeforeClose) {
+      const ok = window.confirm('You have unsaved changes. Are you sure you want to close?')
+      if (!ok) return
+    }
+    onClose()
+  }, [confirmBeforeClose, onClose])
+
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden'
@@ -28,6 +44,17 @@ export default function KitchenBottomSheet({
     }
   }, [open])
 
+  // Escape-to-close is opt-in (only when the caller manages a dirty state) so
+  // other sheets keep their existing behaviour.
+  useEffect(() => {
+    if (!open || confirmBeforeClose === undefined) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') requestClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, confirmBeforeClose, requestClose])
+
   if (!open) return null
 
   return (
@@ -36,7 +63,7 @@ export default function KitchenBottomSheet({
         className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 md:bg-black/40 ${
           open ? 'opacity-100' : 'opacity-0'
         }`}
-        onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+        onClick={(e) => { if (e.target === e.currentTarget) requestClose() }}
         aria-hidden="true"
       />
       <div
@@ -57,7 +84,7 @@ export default function KitchenBottomSheet({
             </h3>
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
               className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
               aria-label="Close"
             >

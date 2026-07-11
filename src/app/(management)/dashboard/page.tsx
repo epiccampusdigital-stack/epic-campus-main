@@ -81,6 +81,19 @@ function getGreeting(): string {
   return 'Good evening'
 }
 
+// Installment paidAt may be an ISO string (new records) or a Timestamp/{seconds}
+// object (old records). Return a 'YYYY-MM-DD' day key for "paid today" checks.
+function installmentDateKey(value: unknown): string {
+  if (!value) return ''
+  if (typeof value === 'string') return value.slice(0, 10)
+  if (typeof value === 'object' && value !== null) {
+    const v = value as { toDate?: () => Date; seconds?: number }
+    if (typeof v.toDate === 'function') return v.toDate().toISOString().slice(0, 10)
+    if (typeof v.seconds === 'number') return new Date(v.seconds * 1000).toISOString().slice(0, 10)
+  }
+  return String(value).slice(0, 10)
+}
+
 interface KitchenOverview {
   monthCost: number
   lowStock: number
@@ -152,6 +165,15 @@ export default function DashboardPage() {
   const [monthFilter, setMonthFilter] = useState(currentMonthKey())
   const [allStudents, setAllStudents] = useState<Student[]>([])
   const [allPayments, setAllPayments] = useState<Payment[]>([])
+  // FIX 5 — paid installments extracted from raw payment-plan docs (parsePayment
+  // drops the installments array), used to count installment-level collections.
+  const [installmentEntries, setInstallmentEntries] = useState<
+    { studentId: string; courseId: string; amount: number; paidDate: string }[]
+  >([])
+  // FIX 2 — student ids whose payment plan has EVERY installment paid, even if the
+  // student doc's paymentStatus field was never updated to 'paid' when the last
+  // installment was marked. Combined with student-doc status for the paid count.
+  const [fullyPaidPlanStudentIds, setFullyPaidPlanStudentIds] = useState<string[]>([])
   const [allAttendance, setAllAttendance] = useState<AttendanceRecord[]>([])
   const [partnerNotifications, setPartnerNotifications] = useState<PartnerNotification[]>([])
   const [pendingApprovals, setPendingApprovals] = useState<
@@ -196,6 +218,33 @@ export default function DashboardPage() {
           parsePayment(d.id, d.data() as Record<string, unknown>),
         ),
       )
+      // FIX 5 — capture paid installments from plan docs (keyed by student id) so
+      // installment-level collections made today count toward Today's Collection.
+      const instEntries: { studentId: string; courseId: string; amount: number; paidDate: string }[] = []
+      const fullyPaidIds: string[] = []
+      for (const d of paymentsSnap.docs) {
+        const data = d.data() as Record<string, unknown>
+        const insts = Array.isArray(data.installments)
+          ? (data.installments as Array<Record<string, unknown>>)
+          : null
+        if (!insts) continue
+        const sid = String(data.studentId ?? d.id)
+        const courseId = String(data.courseId ?? data.program ?? '')
+        // FIX 2 — a plan whose every installment carries a paidAt is a fully-paid
+        // student, regardless of whether the student doc's paymentStatus was updated.
+        if (insts.length > 0 && insts.every((inst) => inst.paidAt)) fullyPaidIds.push(sid)
+        for (const inst of insts) {
+          if (!inst.paidAt) continue
+          instEntries.push({
+            studentId: sid,
+            courseId,
+            amount: Number(inst.amount ?? 0),
+            paidDate: installmentDateKey(inst.paidAt),
+          })
+        }
+      }
+      setInstallmentEntries(instEntries)
+      setFullyPaidPlanStudentIds(fullyPaidIds)
       setAllAttendance(
         attendanceSnap.docs.map((d) =>
           parseAttendance(d.id, d.data() as Record<string, unknown>),
@@ -444,11 +493,39 @@ export default function DashboardPage() {
       }
     }
 
+    // FIX 1 + FIX 5 — installment-level payments from plan docs. parsePayment drops
+    // the installments array, so plan docs contribute 0 to the loop above and the
+    // real money (installments) was never summed into monthIncome — that's why the
+    // tile only ever showed a single legacy payment. Add every installment paid in
+    // the SELECTED month to monthIncome, and those paid today to todayCollection.
+    // Scoped to the same course/location filters. Disjoint from the loop above:
+    // legacy payment docs have no installments array, plan docs default to status
+    // 'pending'/amount 0, so there is no double counting.
+    {
+      const scopedIds = new Set(filteredStudents.map((s) => s.id))
+      const viewingCurrentMonth = isTodayInMonth(monthFilter)
+      for (const inst of installmentEntries) {
+        if (courseFilter && inst.courseId !== courseFilter) continue
+        if (locationFilter && !scopedIds.has(inst.studentId)) continue
+        if (inst.paidDate.slice(0, 7) === monthFilter) monthIncome += inst.amount
+        if (viewingCurrentMonth && inst.paidDate === today) todayCollection += inst.amount
+      }
+    }
+
     const activeStudents = filteredStudents.filter((s) => s.status === 'active').length
     const attendancePresent = filteredAttendance.filter((a) => a.status === 'present').length
     const totalPendingFees = filteredStudents
-      .filter((s) => s.paymentStatus === 'partial')
-      .reduce((sum, s) => sum + (s.pendingAmount ?? 0), 0)
+      .filter((s) =>
+        s.paymentStatus === 'partial' ||
+        s.paymentStatus === 'pending'
+      )
+      .reduce((sum, s) => {
+        // Use pendingAmount if set, else fall back to
+        // feeAmount - paidAmount, else feeAmount
+        const pending = s.pendingAmount
+          ?? ((s.feeAmount ?? 0) - (s.paidAmount ?? 0))
+        return sum + Math.max(0, pending)
+      }, 0)
 
     return {
       monthIncome,
@@ -459,7 +536,23 @@ export default function DashboardPage() {
       attendancePresent,
       totalPendingFees,
     }
-  }, [filteredPayments, filteredStudents, filteredAttendance, monthFilter])
+  }, [filteredPayments, filteredStudents, filteredAttendance, monthFilter, installmentEntries, courseFilter, locationFilter])
+
+  // FIX 2 — paid student count from BOTH sources, deduped: (1) student docs whose
+  // paymentStatus is 'paid', and (2) students whose payment plan has every
+  // installment paid but whose student doc was never updated. Scoped to the current
+  // course/location filters so it stays consistent with the rest of the dashboard.
+  const paidStudentCount = useMemo(() => {
+    const scoped = new Set(filteredStudents.map((s) => s.id))
+    const ids = new Set<string>()
+    for (const s of filteredStudents) {
+      if (s.paymentStatus === 'paid') ids.add(s.id)
+    }
+    for (const sid of fullyPaidPlanStudentIds) {
+      if (scoped.has(sid)) ids.add(sid)
+    }
+    return ids.size
+  }, [filteredStudents, fullyPaidPlanStudentIds])
 
   // Expense breakdown for the selected month + location (case-insensitive; a 'Both'
   // expense counts under any single-location filter).
@@ -547,6 +640,11 @@ export default function DashboardPage() {
       label: 'Active Students',
       value: String(stats.activeStudents),
       sub: courseFilter ? 'In selected course' : 'All courses',
+    },
+    {
+      label: 'Paid Students',
+      value: String(paidStudentCount),
+      sub: 'Fully paid (status or plan)',
     },
     {
       label: 'Pending Payments',

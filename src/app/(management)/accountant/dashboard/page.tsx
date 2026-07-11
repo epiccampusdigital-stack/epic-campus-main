@@ -589,8 +589,8 @@ export default function AccountantKitchenDashboard() {
       const allMeals = mealSnap.docs.map((d) => d.data() as Record<string, unknown>)
       const curMeals = allMeals.filter((m) => String(m.date ?? '').startsWith(curMonth))
       const prevMeals = allMeals.filter((m) => String(m.date ?? '').startsWith(prevMonth))
-      const curCost = curMeals.reduce((s, m) => s + (Number(m.estimatedCost) || 0), 0)
-      const prevCost = prevMeals.reduce((s, m) => s + (Number(m.estimatedCost) || 0), 0)
+      const curCost = curMeals.reduce((s, m) => s + (Number(m.estimatedCost) || Number(m.totalCost) || 0), 0)
+      const prevCost = prevMeals.reduce((s, m) => s + (Number(m.estimatedCost) || Number(m.totalCost) || 0), 0)
       const curServings = curMeals.reduce((s, m) => s + (Number(m.totalServings) || 0), 0)
 
       // ── Chart: last 6 months — income (gold) + kitchen cost + kitchen-category expenses ──
@@ -608,7 +608,7 @@ export default function AccountantKitchenDashboard() {
         income: incomeByMonth[m] ?? 0,
         kitchen: allMeals
           .filter((x) => String(x.date ?? '').startsWith(m))
-          .reduce((s, x) => s + (Number(x.estimatedCost) || 0), 0),
+          .reduce((s, x) => s + (Number(x.estimatedCost) || Number(x.totalCost) || 0), 0),
         utility: kitchenCatExpenses
           .filter((d) => monthKeyOf(d.date) === m)
           .reduce((s, d) => s + (Number(d.amount) || 0), 0),
@@ -632,7 +632,7 @@ export default function AccountantKitchenDashboard() {
       for (const m of allMeals) {
         const dstr = String(m.date ?? '').slice(0, 10)
         if (!dstr) continue
-        dailyCostMap[dstr] = (dailyCostMap[dstr] ?? 0) + (Number(m.estimatedCost) || 0)
+        dailyCostMap[dstr] = (dailyCostMap[dstr] ?? 0) + (Number(m.estimatedCost) || Number(m.totalCost) || 0)
       }
       const dailySpend = Array.from({ length: 14 }, (_, i) => {
         const d = new Date()

@@ -76,7 +76,10 @@ export default function KitchenDashboardPage() {
   const [budgetSaving, setBudgetSaving] = useState(false)
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' } | null>(null)
   const [studentCount, setStudentCount] = useState(0)
-  const [kitchenStaffCount, setKitchenStaffCount] = useState(0)
+  const [totalStaffCount, setTotalStaffCount] = useState(0)
+  const [lastDayCost, setLastDayCost] = useState(0)
+  const [monthMealCount, setMonthMealCount] = useState(0)
+  const [topIngredient, setTopIngredient] = useState<{ name: string; qty: number; unit: string } | null>(null)
 
   const isAdmin = user?.role === 'admin' || user?.role === 'owner'
   const monthKey = thisMonthPrefix()
@@ -95,24 +98,34 @@ export default function KitchenDashboardPage() {
         const monthStr = thisMonthPrefix()
         const weekAgoStr = weekAgo()
 
-        const [mealSnap, wasteSnap, invSnap, budgetSnap, studentsSnap, kitchenUsersSnap] = await Promise.all([
+        const [mealSnap, wasteSnap, invSnap, budgetSnap, studentsSnap, usersSnap] = await Promise.all([
           getDocs(collection(db, 'mealLogs')),
           getDocs(query(collection(db, 'wasteLog'), where('date', '>=', weekAgoStr))),
           getDocs(query(collection(db, 'inventory'), where('isActive', '==', true))),
           getDoc(doc(db, 'kitchenBudget', monthStr)),
-          // Active students + kitchen staff for the head-count cards. Wrapped in
-          // .catch so a Firestore-rules denial (kitchen role) degrades to 0 rather
-          // than breaking the whole dashboard load.
-          getDocs(query(collection(db, 'students'), where('status', '==', 'active'))).catch(() => null),
-          getDocs(query(collection(db, 'users'), where('role', '==', 'kitchen'))).catch(() => null),
+          // Head-count cards. Fetch full collections and count client-side (same
+          // pattern as the management dashboard). Wrapped in .catch so a rules
+          // denial degrades to 0 rather than breaking the whole dashboard load.
+          getDocs(collection(db, 'students')).catch(() => null),
+          getDocs(collection(db, 'users')).catch(() => null),
         ])
 
-        // Active students = status === 'active' (matches the Students list filter).
-        setStudentCount(studentsSnap ? studentsSnap.docs.length : 0)
-        // Kitchen staff = role 'kitchen' AND active (treat a missing status as active).
-        setKitchenStaffCount(
-          kitchenUsersSnap
-            ? kitchenUsersSnap.docs.filter((d) => String(d.data().status ?? 'active') === 'active').length
+        // Active students = status === 'active' OR isActive === true.
+        setStudentCount(
+          studentsSnap
+            ? studentsSnap.docs.filter((d) => {
+                const x = d.data()
+                return x.status === 'active' || x.isActive === true
+              }).length
+            : 0,
+        )
+        // Total staff = every user whose role is set and is not a student.
+        setTotalStaffCount(
+          usersSnap
+            ? usersSnap.docs.filter((d) => {
+                const r = String(d.data().role ?? '')
+                return r !== '' && r !== 'student'
+              }).length
             : 0,
         )
 
@@ -126,6 +139,33 @@ export default function KitchenDashboardPage() {
           .filter((m) => m.date.startsWith(monthStr))
           .reduce((s, m) => s + (m.estimatedCost || 0), 0)
         setMonthCost(monthTotal)
+
+        // Meals this month = count of meal-log docs in the current calendar month.
+        setMonthMealCount(allMeals.filter((m) => m.date.startsWith(monthStr)).length)
+
+        // Most-recent logged day's total cost — fallback for the per-student card
+        // when nothing has been logged today yet.
+        const loggedDates = Array.from(new Set(allMeals.map((m) => m.date).filter(Boolean))).sort()
+        const lastDate = loggedDates[loggedDates.length - 1]
+        setLastDayCost(
+          lastDate ? allMeals.filter((m) => m.date === lastDate).reduce((s, m) => s + (m.estimatedCost || 0), 0) : 0,
+        )
+
+        // Top ingredient over the last 7 days (highest total qty used).
+        const ingMap: Record<string, { qty: number; unit: string }> = {}
+        for (const m of allMeals.filter((m) => m.date >= weekAgoStr)) {
+          for (const ing of m.ingredientsUsed ?? []) {
+            const name = String(ing.itemName ?? '')
+            if (!name) continue
+            if (!ingMap[name]) ingMap[name] = { qty: 0, unit: String(ing.unit ?? '') }
+            ingMap[name].qty += Number(ing.qtyUsed || 0)
+          }
+        }
+        let top: { name: string; qty: number; unit: string } | null = null
+        for (const [name, v] of Object.entries(ingMap)) {
+          if (v.qty > 0 && (!top || v.qty > top.qty)) top = { name, qty: v.qty, unit: v.unit }
+        }
+        setTopIngredient(top)
 
         const wasteTotal = wasteSnap.docs.reduce(
           (s, d) => s + (Number(d.data().estimatedLoss) || 0),
@@ -200,45 +240,36 @@ export default function KitchenDashboardPage() {
     }
   }
 
-  const statCards = [
+  // Cost per active student for today (falls back to the most recent logged day).
+  const todayCost = todayLogs.reduce((s, m) => s + (m.estimatedCost || 0), 0)
+  const costBasis = todayLogs.length > 0 ? todayCost : lastDayCost
+  const costPerStudentDay = studentCount > 0 ? costBasis / studentCount : 0
+
+  const statCards: {
+    label: string
+    value: string
+    icon: string
+    color: string
+    subtext?: string
+    small?: boolean
+    valueCls?: string
+  }[] = [
+    { label: 'Active Students', value: loading ? '…' : String(studentCount), icon: 'ti-school', color: 'text-[#0B3D6B] dark:text-[#1A6BAD]' },
+    { label: 'Total Staff', value: loading ? '…' : String(totalStaffCount), icon: 'ti-users-group', color: 'text-[#E8A020]', subtext: 'Across all departments' },
+    !loading && todayLogs.length === 0
+      ? { label: 'Meals Today', value: 'No meals logged yet today', icon: 'ti-soup', color: 'text-amber-600 dark:text-amber-400', small: true }
+      : { label: 'Meals Today', value: loading ? '…' : String(todayServings), icon: 'ti-soup', color: 'text-[#0B3D6B] dark:text-[#E8A020]', subtext: 'People served today' },
+    { label: 'Cost Per Student / Day', value: loading ? '…' : formatLKR(costPerStudentDay), icon: 'ti-coin', color: 'text-[#0B3D6B] dark:text-[#E8A020]', subtext: "Based on today's meals" },
+    { label: 'Waste This Week', value: loading ? '…' : formatLKR(weekWaste), icon: 'ti-trash', color: 'text-red-600 dark:text-red-400' },
+    { label: 'Low Stock', value: loading ? '…' : String(lowStockCount), icon: 'ti-alert-triangle', color: lowStockCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-[#0B3D6B] dark:text-[#E8A020]' },
+    { label: 'Meals This Month', value: loading ? '…' : String(monthMealCount), icon: 'ti-calendar-stats', color: 'text-[#0B3D6B] dark:text-[#E8A020]', subtext: 'Breakfast + Lunch + Dinner + Tea' },
     {
-      label: 'Active Students',
-      value: loading ? '…' : String(studentCount),
-      icon: 'ti-school',
-      color: 'text-[#0B3D6B] dark:text-[#1A6BAD]',
-    },
-    {
-      label: 'Kitchen Staff',
-      value: loading ? '…' : String(kitchenStaffCount),
-      icon: 'ti-chef-hat',
-      color: 'text-[#E8A020]',
-    },
-    {
-      label: 'Meals Today',
-      value: loading ? '…' : String(todayServings),
-      icon: 'ti-users',
-      color: 'text-[#0B3D6B] dark:text-[#E8A020]',
-    },
-    {
-      label: 'Cost This Month',
-      value: loading ? '…' : formatLKR(monthCost),
-      icon: 'ti-coin',
-      color: 'text-[#0B3D6B] dark:text-[#E8A020]',
-    },
-    {
-      label: 'Waste This Week',
-      value: loading ? '…' : formatLKR(weekWaste),
-      icon: 'ti-trash',
-      color: 'text-red-600 dark:text-red-400',
-    },
-    {
-      label: 'Low Stock',
-      value: loading ? '…' : String(lowStockCount),
-      icon: 'ti-alert-triangle',
-      color:
-        lowStockCount > 0
-          ? 'text-amber-600 dark:text-amber-400'
-          : 'text-[#0B3D6B] dark:text-[#E8A020]',
+      label: 'Top Ingredient',
+      value: loading ? '…' : (topIngredient?.name ?? '—'),
+      icon: 'ti-carrot',
+      color: 'text-emerald-600 dark:text-emerald-400',
+      subtext: loading ? undefined : topIngredient ? `${formatQty(topIngredient.qty, topIngredient.unit)} this week` : 'No usage this week',
+      valueCls: 'text-lg',
     },
   ]
 
@@ -264,17 +295,17 @@ export default function KitchenDashboardPage() {
               {lowStockCount} item{lowStockCount !== 1 ? 's are' : ' is'} running low
             </p>
           </div>
-          <div className="mt-3 flex gap-3">
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:gap-3">
             <button
               type="button"
               onClick={() => setLowStockModalOpen(true)}
-              className="flex min-h-[48px] flex-1 items-center justify-center rounded-xl border border-[#E8A020] bg-transparent text-sm font-bold text-[#E8A020] hover:bg-[#E8A020]/10 md:flex-none md:px-4"
+              className="flex min-h-[48px] w-full items-center justify-center rounded-xl border border-[#E8A020] bg-transparent text-sm font-bold text-[#E8A020] hover:bg-[#E8A020]/10 sm:w-auto sm:px-4"
             >
               View Low Stock Items
             </button>
             <Link
               href="/kitchen/orders"
-              className="flex min-h-[48px] flex-1 items-center justify-center rounded-xl bg-[#E8A020] text-sm font-bold text-[#0B3D6B] hover:bg-[#d4911c] md:flex-none md:px-4"
+              className="flex min-h-[48px] w-full items-center justify-center rounded-xl bg-[#E8A020] text-sm font-bold text-[#0B3D6B] hover:bg-[#d4911c] sm:w-auto sm:px-4"
             >
               Generate Order List
             </Link>
@@ -316,23 +347,62 @@ export default function KitchenDashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
         {statCards.map((c) => (
           <div
             key={c.label}
-            className="flex min-h-[80px] flex-col justify-center rounded-[12px] border border-white/90 bg-white/65 p-3 backdrop-blur-2xl dark:border-white/[0.08] dark:bg-white/[0.05] sm:p-4"
+            className="relative flex min-h-[100px] flex-col justify-center rounded-[12px] border border-white/90 bg-white/65 p-4 backdrop-blur-2xl dark:border-white/[0.08] dark:bg-white/[0.05]"
           >
-            <div className="flex items-center gap-2">
-              <span className={`ti ${c.icon} text-lg ${c.color}`} />
-              <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-gray-400 dark:text-white/40 sm:text-xs">
-                {c.label}
-              </p>
-            </div>
-            <p className={`mt-2 text-xl font-bold leading-tight sm:text-2xl ${c.color}`}>
+            <span className={`ti ${c.icon} absolute right-3 top-3 text-xl ${c.color}`} aria-hidden="true" />
+            <p className="pr-6 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-white/40">
+              {c.label}
+            </p>
+            <p className={`mt-1 truncate font-bold leading-tight ${c.small ? 'text-sm' : c.valueCls ?? 'text-2xl'} ${c.color}`}>
               {c.value}
             </p>
+            {c.subtext && <p className="mt-0.5 text-[11px] text-gray-400 dark:text-white/40">{c.subtext}</p>}
           </div>
         ))}
+
+        {/* CARD 9 — Monthly Budget status */}
+        <div className="relative flex min-h-[100px] flex-col justify-center rounded-[12px] border border-white/90 bg-white/65 p-4 backdrop-blur-2xl dark:border-white/[0.08] dark:bg-white/[0.05]">
+          <span className={`ti ti-wallet absolute right-3 top-3 text-xl ${
+            monthlyBudget > 0
+              ? budgetPct >= 90 ? 'text-red-500' : budgetPct >= 70 ? 'text-amber-500' : 'text-emerald-500'
+              : 'text-gray-400'
+          }`} aria-hidden="true" />
+          <p className="pr-6 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-white/40">Monthly Budget</p>
+          {loading ? (
+            <p className="mt-1 text-2xl font-bold text-gray-400">…</p>
+          ) : monthlyBudget > 0 ? (
+            <>
+              <p className={`mt-1 text-2xl font-bold leading-tight ${
+                budgetPct >= 90 ? 'text-red-600 dark:text-red-400' : budgetPct >= 70 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
+              }`}>
+                {Math.round(budgetPct)}%
+              </p>
+              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                <div className={`h-full rounded-full ${barColor}`} style={{ width: `${Math.min(100, budgetPct)}%` }} />
+              </div>
+              <p className="mt-0.5 text-[11px] text-gray-400 dark:text-white/40">{formatLKR(monthCost)} / {formatLKR(monthlyBudget)}</p>
+            </>
+          ) : (
+            <>
+              <p className="mt-1 text-sm font-bold text-gray-500 dark:text-white/50">No budget set</p>
+              {isAdmin ? (
+                <button
+                  type="button"
+                  onClick={() => { setBudgetInput(''); setBudgetModalOpen(true) }}
+                  className="mt-1 self-start text-[11px] font-semibold text-[#0B3D6B] underline dark:text-[#E8A020]"
+                >
+                  Set Budget
+                </button>
+              ) : (
+                <p className="mt-0.5 text-[11px] text-gray-400 dark:text-white/40">Ask an admin to set one</p>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       <div className="rounded-xl border border-white/90 bg-white/65 p-4 backdrop-blur-xl dark:border-white/[0.08] dark:bg-white/[0.05] md:p-5">

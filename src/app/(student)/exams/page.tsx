@@ -28,6 +28,7 @@ interface ExamPaperDoc {
   order?: number
   isUnlocked?: boolean
   type?: string
+  paperType?: 'practice' | 'exam'
 }
 
 type ExamCategoryId = 'jft-basic' | 'general' | 'irodori'
@@ -115,9 +116,11 @@ export default function ExamsListPage() {
         setPapers(
           list.filter((p) => {
             if (p.isPublished === false) return false
-            // Only hide papers explicitly locked. Legacy papers created before the
-            // isUnlocked field existed (undefined/null) are treated as unlocked.
-            if (p.isUnlocked === false) return false
+            // Exam papers are gated by an access code (not the unlock toggle), so they
+            // always appear as locked code-entry cards. Practice papers keep the toggle:
+            // only hide when explicitly locked (legacy undefined/null = unlocked).
+            const isExam = (p.paperType ?? 'practice') === 'exam'
+            if (!isExam && p.isUnlocked === false) return false
             if (p.courseTag === 'japan-ssw-45day') return student?.courseId === 'japan-ssw'
             return true
           }),
@@ -261,6 +264,35 @@ export default function ExamsListPage() {
     )
   }
 
+  // Exam-type papers are locked behind an access code — render a card that sends
+  // the student to the code-entry page instead of starting the paper directly.
+  function renderExamPaper(paper: ExamPaperDoc) {
+    return (
+      <div
+        key={paper.id}
+        className="flex w-full items-center gap-4 rounded-2xl border border-[#E8A020]/40 bg-[#E8A020]/[0.06] dark:bg-[#E8A020]/[0.08] p-4 text-left"
+      >
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#0B3D6B] text-xl text-[#E8A020]">
+          <span className="ti ti-lock" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-jakarta font-bold text-[#0D1B2A] dark:text-white">{paper.title}</p>
+            <span className="rounded-full bg-[#E8A020] px-2 py-0.5 text-[10px] font-bold text-white">EXAM</span>
+          </div>
+          <p className="mt-1 text-xs text-[#5A6A7A] dark:text-white/50">Enter exam code at the code entry page</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => router.push('/exam-code')}
+          className="flex shrink-0 items-center gap-1 rounded-xl bg-[#0B3D6B] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#1A6BAD]"
+        >
+          Enter Exam Code <span className="ti ti-chevron-right" />
+        </button>
+      </div>
+    )
+  }
+
   if (!user) return null
 
   return (
@@ -355,9 +387,31 @@ export default function ExamsListPage() {
               <p className="mt-2 text-sm text-[#5A6A7A] dark:text-white/50">No papers in this category yet</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {selectedPapers.map(renderPaper)}
-            </div>
+            (() => {
+              // Split into practice vs exam. Missing paperType → practice (backward compatible).
+              const examPapers = selectedPapers.filter((p) => (p.paperType ?? 'practice') === 'exam')
+              const practicePapers = selectedPapers.filter((p) => (p.paperType ?? 'practice') !== 'exam')
+              return (
+                <div className="space-y-6">
+                  {practicePapers.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A7A] dark:text-white/40">
+                        Practice Papers
+                      </p>
+                      {practicePapers.map(renderPaper)}
+                    </div>
+                  )}
+                  {examPapers.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[#B4770F] dark:text-[#E8A020]">
+                        Exam Papers
+                      </p>
+                      {examPapers.map(renderExamPaper)}
+                    </div>
+                  )}
+                </div>
+              )
+            })()
           )}
         </div>
       )}
