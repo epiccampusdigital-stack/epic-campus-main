@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { collection, doc, getDoc, getDocs, query, setDoc, serverTimestamp, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
+import { getActiveCampusStudentCount } from '@/lib/campus/campusStatus'
 import { useKitchen } from '@/app/kitchen/context'
 import SinhalaToggle from '@/components/kitchen/SinhalaToggle'
 import { daysUntilExpiry } from '@/lib/kitchen/expiryHelpers'
@@ -98,27 +99,20 @@ export default function KitchenDashboardPage() {
         const monthStr = thisMonthPrefix()
         const weekAgoStr = weekAgo()
 
-        const [mealSnap, wasteSnap, invSnap, budgetSnap, studentsSnap, usersSnap] = await Promise.all([
+        const [mealSnap, wasteSnap, invSnap, budgetSnap, campusStudents, usersSnap] = await Promise.all([
           getDocs(collection(db, 'mealLogs')),
           getDocs(query(collection(db, 'wasteLog'), where('date', '>=', weekAgoStr))),
           getDocs(query(collection(db, 'inventory'), where('isActive', '==', true))),
           getDoc(doc(db, 'kitchenBudget', monthStr)),
-          // Head-count cards. Fetch full collections and count client-side (same
-          // pattern as the management dashboard). Wrapped in .catch so a rules
-          // denial degrades to 0 rather than breaking the whole dashboard load.
-          getDocs(collection(db, 'students')).catch(() => null),
+          // Head-count cards. Students on campus come from the admin-selected
+          // batches (settings/campusStatus); with no selection this falls back to
+          // every active student. Wrapped in .catch so a rules denial degrades to
+          // 0 rather than breaking the whole dashboard load.
+          getActiveCampusStudentCount().catch(() => null),
           getDocs(collection(db, 'users')).catch(() => null),
         ])
 
-        // Active students = status === 'active' OR isActive === true.
-        setStudentCount(
-          studentsSnap
-            ? studentsSnap.docs.filter((d) => {
-                const x = d.data()
-                return x.status === 'active' || x.isActive === true
-              }).length
-            : 0,
-        )
+        setStudentCount(campusStudents ? campusStudents.count : 0)
         // Total staff = every user whose role is set and is not a student.
         setTotalStaffCount(
           usersSnap

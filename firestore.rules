@@ -297,6 +297,15 @@ service cloud.firestore {
         request.auth.token.role in ['admin', 'owner'];
     }
 
+    // Which batches are physically on campus. Kitchen head counts and order
+    // scaling read this; only admin/owner may change it.
+    match /settings/campusStatus {
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'reception', 'teacher', 'accountant', 'examCoordinator', 'agent', 'kitchen', 'student'];
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner'];
+    }
+
     match /dailyMenus/{menuId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null &&

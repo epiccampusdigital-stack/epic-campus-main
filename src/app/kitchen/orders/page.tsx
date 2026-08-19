@@ -13,6 +13,7 @@ import {
   updateDoc,
 } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase/client'
+import { getActiveCampusStudentCount } from '@/lib/campus/campusStatus'
 import { useKitchen } from '@/app/kitchen/context'
 import { getFoodEmoji } from '@/lib/kitchen/foodImages'
 import { formatLKR } from '@/lib/utils/formatCurrency'
@@ -234,18 +235,19 @@ export default function OrdersPage() {
   async function loadData() {
     setLoading(true)
     try {
-      const [orderSnap, invSnap, studentsSnap] = await Promise.all([
+      const [orderSnap, invSnap, campusStudents] = await Promise.all([
         getDocs(query(collection(db, 'kitchenOrders'), orderBy('createdAt', 'desc'))),
         getDocs(query(collection(db, 'inventory'), orderBy('itemName'))).catch(() =>
           getDocs(collection(db, 'inventory'))
         ),
-        // Active students for target scaling (FIX 4). Wrapped in .catch so a rules
-        // denial for the kitchen role degrades to 0 (scaling then falls back to raw).
-        getDocs(query(collection(db, 'students'), where('status', '==', 'active'))).catch(() => null),
+        // Students on campus for target scaling (FIX 4) — limited to the batches
+        // admin marked active in settings/campusStatus. Wrapped in .catch so a
+        // rules denial for the kitchen role degrades to 0 (scaling falls back to raw).
+        getActiveCampusStudentCount().catch(() => null),
       ])
       setOrders(orderSnap.docs.map((d) => ({ id: d.id, ...d.data() } as KitchenOrder)))
       setInventoryItems(invSnap.docs.map((d) => ({ id: d.id, ...d.data() } as InventoryItem)))
-      setActualStudentCount(studentsSnap ? studentsSnap.docs.length : 0)
+      setActualStudentCount(campusStudents ? campusStudents.count : 0)
     } catch (err) {
       console.error('[Orders]', err)
       setErrorToast('Could not load inventory. Check connection.')

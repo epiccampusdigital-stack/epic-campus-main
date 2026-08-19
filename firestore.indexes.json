@@ -95,6 +95,14 @@
         { "fieldPath": "studentId", "order": "ASCENDING" },
         { "fieldPath": "docKey", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "students",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "batchId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -57,6 +57,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Analytics', href: '/admin/analytics', icon: 'ti-chart-dots', roles: ['admin', 'owner'] },
   { label: 'Student Risk', href: '/admin/student-risk', icon: 'ti-alert-triangle', roles: ['admin', 'owner'] },
   { label: 'Kitchen Orders', href: '/admin/kitchen-orders', icon: 'ti-soup', roles: ['admin', 'owner'] },
+  { label: 'Campus Batches', href: '/admin/campus-status', icon: 'ti-building-community', roles: ['admin', 'owner'] },
   { label: 'Kitchen Finance', href: '/accountant/dashboard', icon: 'ti-coin', roles: ['accountant', 'admin', 'owner'] },
   { label: 'Visa Tracker', href: '/admin/visa', icon: 'ti-plane', roles: ['admin', 'owner', 'reception'] },
   { label: 'Messages', href: '/messages', icon: 'ti-message', roles: ['admin', 'owner', 'reception', 'teacher'] },
