@@ -1,0 +1,41 @@
+name: Re-engage Quiet Leads
+
+on:
+  schedule:
+    # 04:30 UTC = 10:00 Sri Lanka time (UTC+5:30), daily.
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  re_engage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger re-engagement endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repository secret is not set"
+            exit 1
+          fi
+
+          # -L with --post301/--post302 keeps the request a POST if the apex
+          # domain redirects to www.
+          HTTP_STATUS=$(curl -sS -L --post301 --post302 \
+            -o response.json -w '%{http_code}' \
+            -X POST 'https://epiccampus.live/api/cron/re-engage-leads' \
+            -H "x-cron-secret: $CRON_SECRET" \
+            -H 'Content-Length: 0')
+
+          echo "HTTP status: $HTTP_STATUS"
+          echo "Response:"
+          cat response.json || true
+          echo ""
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "::error::Re-engagement endpoint returned HTTP $HTTP_STATUS"
+            exit 1
+          fi
+
+          echo "::notice::Re-engagement run completed successfully"

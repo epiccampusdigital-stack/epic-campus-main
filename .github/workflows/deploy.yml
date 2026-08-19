@@ -58,6 +58,7 @@ jobs:
                 TWILIO_WHATSAPP_FROM:                 process.env.TWILIO_WHATSAPP_FROM,
                 STRIPE_SECRET_KEY:                    process.env.STRIPE_SECRET_KEY,
                 STRIPE_WEBHOOK_SECRET:                process.env.STRIPE_WEBHOOK_SECRET,
+                CRON_SECRET:                          process.env.CRON_SECRET,
                 NEXT_PUBLIC_APP_URL:                  'https://www.epiccampus.live',
               }
             };
@@ -74,6 +75,7 @@ jobs:
           TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
 
       - name: Deploy to Firebase
         run: npx firebase deploy --only hosting --project epic-campus --token "$FIREBASE_TOKEN" --non-interactive

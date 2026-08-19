@@ -197,6 +197,27 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Pre-enrolment lead paid their registration fee. No student record exists
+    // yet, so this only settles the lead — enrolment stays a human step.
+    const leadId = meta.leadId || ''
+    if (leadId) {
+      try {
+        await adminDb.collection('leads').doc(leadId).set(
+          {
+            status: 'paid',
+            stripeSessionId: session.id,
+            amountPaid: amount,
+            paidAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        )
+        console.log(`[Stripe webhook] Lead ${leadId} marked paid: ${amount}`)
+      } catch (err) {
+        console.error('[Stripe webhook] Lead update failed:', err)
+      }
+    }
+
     if (studentId) {
       try {
         let agentId: string | null = null

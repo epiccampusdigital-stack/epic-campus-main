@@ -13,6 +13,7 @@ import {
   LEAD_SOURCES,
   parseLead,
 } from '@/lib/crm/helpers'
+import { isAiManagedLeadId } from '@/lib/leads/aiLeads'
 import LeadForm from '@/components/crm/LeadForm'
 import LeadKanban from '@/components/crm/LeadKanban'
 import LeadTable from '@/components/crm/LeadTable'
@@ -64,7 +65,11 @@ export default function CrmPage() {
         query(collection(db, 'leads'), orderBy('createdAt', 'desc')),
       )
       setLeads(
-        snap.docs.map((d) => parseLead(d.id, d.data() as Record<string, unknown>)),
+        snap.docs
+          // AI-managed leads live in the same collection but are viewed and
+          // worked exclusively through /admin-ai/leads.
+          .filter((d) => !isAiManagedLeadId(d.id))
+          .map((d) => parseLead(d.id, d.data() as Record<string, unknown>)),
       )
     } catch (err) {
       console.error('[CrmPage]', err)

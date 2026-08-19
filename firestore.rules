@@ -140,6 +140,16 @@ service cloud.firestore {
     match /leads/{leadId} {
       allow read, write: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'reception'];
+
+      // WhatsApp / voice conversation log. Written server-side by the webhook via
+      // the Admin SDK (which bypasses these rules); staff read it in the AI Ops
+      // Console. Read-only from the client so a transcript can't be altered —
+      // this log is the compliance record for regulated recruitment.
+      match /messages/{messageId} {
+        allow read: if request.auth != null &&
+          request.auth.token.role in ['admin', 'owner'];
+        allow write: if false;
+      }
     }
 
     match /partnerCompanies/{docId} {
@@ -601,6 +611,26 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'teacher'];
+    }
+
+    // AI Knowledge Base — Owner/Admin only. Structured content blocks that later
+    // phases assemble into the WhatsApp / voice agent system prompts. Editing
+    // these changes what the agent knows; no model training is involved.
+    match /aiKnowledgeBase/{blockId} {
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner'];
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner'];
+    }
+
+    // Previous versions of knowledge blocks, archived on every save.
+    // Append-only — history is never rewritten or deleted from the client.
+    match /aiKnowledgeBase_history/{versionId} {
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner'];
+      allow create: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner'];
+      allow update, delete: if false;
     }
   }
 }

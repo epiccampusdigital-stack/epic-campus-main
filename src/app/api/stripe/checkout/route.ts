@@ -26,9 +26,13 @@ export async function POST(req: NextRequest) {
     const fixedBillId =
       extraMetadata?.fixedBillId != null ? String(extraMetadata.fixedBillId) : undefined
 
-    if (!studentId && !fixedBillId) {
+    // A pre-enrolment lead has no studentId yet — it is identified by leadId and
+    // settled against the leads collection by the webhook.
+    const leadId = extraMetadata?.leadId != null ? String(extraMetadata.leadId) : undefined
+
+    if (!studentId && !fixedBillId && !leadId) {
       return NextResponse.json(
-        { error: 'Missing studentId or fixedBillId' },
+        { error: 'Missing studentId, fixedBillId or leadId' },
         { status: 400 },
       )
     }
@@ -38,6 +42,8 @@ export async function POST(req: NextRequest) {
       studentName: studentName ? String(studentName) : '',
       fixedBillId: fixedBillId ?? '',
       billType: extraMetadata?.billType ? String(extraMetadata.billType) : '',
+      leadId: leadId ?? '',
+      feeType: extraMetadata?.feeType ? String(extraMetadata.feeType) : '',
     }
 
     const session = await stripe.checkout.sessions.create({
