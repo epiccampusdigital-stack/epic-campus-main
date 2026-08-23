@@ -30,6 +30,10 @@ function getRedirectPath(role: string): string {
       return '/epic-wall'
     case 'examCoordinator':
       return '/exams'
+    // AI Manager is scoped to the AI console only — /dashboard shows
+    // cross-cutting business data this role must not see.
+    case 'ai_manager':
+      return '/admin-ai/leads'
     case 'admin':
     case 'owner':
     case 'reception':

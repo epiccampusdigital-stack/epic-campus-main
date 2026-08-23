@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { collection, getDocs, orderBy, query } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { COURSES } from '@/lib/constants/courses'
@@ -17,6 +18,7 @@ import { isAiManagedLeadId } from '@/lib/leads/aiLeads'
 import LeadForm from '@/components/crm/LeadForm'
 import LeadKanban from '@/components/crm/LeadKanban'
 import LeadTable from '@/components/crm/LeadTable'
+import { useManagement } from '@/components/layout/ManagementContext'
 import type { CourseId, Lead, LeadSource, LeadStatus } from '@/types'
 
 type ViewMode = 'table' | 'kanban'
@@ -45,6 +47,12 @@ function StatCard({
 }
 
 export default function CrmPage() {
+  const router = useRouter()
+  const { user } = useManagement()
+  // ai_manager holds read access to /leads so it can work the AI console, but the
+  // CRM pipeline is out of scope for that role — bounce it before anything loads.
+  const userRoles = user?.roles ?? []
+  const isPureAiManager = userRoles.length > 0 && userRoles.every((r) => r === 'ai_manager')
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('table')
@@ -80,8 +88,12 @@ export default function CrmPage() {
   }, [])
 
   useEffect(() => {
+    if (isPureAiManager) {
+      router.replace('/admin-ai/leads')
+      return
+    }
     loadLeads()
-  }, [loadLeads])
+  }, [loadLeads, isPureAiManager, router])
 
   const stats = useMemo(() => computeCrmStats(leads), [leads])
   const agentStats = useMemo(() => computeAgentStats(leads), [leads])
@@ -115,6 +127,8 @@ export default function CrmPage() {
     setEditLead(null)
     setFormOpen(true)
   }
+
+  if (isPureAiManager) return null
 
   return (
     <div className="space-y-6">

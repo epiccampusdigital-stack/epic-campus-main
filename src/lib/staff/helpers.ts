@@ -10,6 +10,7 @@ export const STAFF_ROLES: StaffRole[] = [
   'examCoordinator',
   'agent',
   'kitchen',
+  'ai_manager',
 ]
 
 export function toDate(value: unknown): Date | null {
@@ -85,6 +86,7 @@ export function getRoleLabel(role: StaffRole): string {
     examCoordinator: 'Exam Coordinator',
     agent: 'Agent',
     kitchen: 'Kitchen Staff',
+    ai_manager: 'AI Manager',
   }
   return labels[role] ?? role
 }
@@ -98,6 +100,7 @@ const ROLE_STYLES: Record<StaffRole, string> = {
   examCoordinator: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   agent: 'bg-teal-50 text-teal-700 border-teal-200',
   kitchen: 'bg-orange-50 text-orange-700 border-orange-200',
+  ai_manager: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
 }
 
 export function getRoleColor(role: StaffRole): string {

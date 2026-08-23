@@ -60,7 +60,7 @@ export default function KnowledgeBasePage() {
   useEffect(() => {
     if (authLoading) return
     if (!user) return
-    if (!(hasRole('admin') || hasRole('owner'))) {
+    if (!(hasRole('admin') || hasRole('owner') || hasRole('ai_manager'))) {
       router.replace('/dashboard')
     }
   }, [user, authLoading, router, hasRole])
@@ -71,10 +71,13 @@ export default function KnowledgeBasePage() {
       const [blockList, versionMap, usersSnap] = await Promise.all([
         listKnowledgeBlocks(),
         listLatestVersions(),
-        getDocs(collection(db, 'users')),
+        // Author names are cosmetic. Roles scoped to the AI console (ai_manager)
+        // have no read access to the staff directory, so a denial here must
+        // degrade to unnamed authors rather than fail the whole page load.
+        getDocs(collection(db, 'users')).catch(() => null),
       ])
       const names: Record<string, string> = {}
-      usersSnap.docs.forEach((d) => {
+      usersSnap?.docs.forEach((d) => {
         const data = d.data()
         names[d.id] = String(data.displayName ?? data.email ?? '')
       })
@@ -90,7 +93,7 @@ export default function KnowledgeBasePage() {
   }, [])
 
   useEffect(() => {
-    if (authLoading || !user || !(hasRole('admin') || hasRole('owner'))) return
+    if (authLoading || !user || !(hasRole('admin') || hasRole('owner') || hasRole('ai_manager'))) return
     void load()
   }, [authLoading, user, hasRole, load])
 
@@ -171,7 +174,7 @@ export default function KnowledgeBasePage() {
     }
   }
 
-  const isAuthorized = user && (hasRole('admin') || hasRole('owner'))
+  const isAuthorized = user && (hasRole('admin') || hasRole('owner') || hasRole('ai_manager'))
   if (authLoading || !isAuthorized) return null
 
   return (

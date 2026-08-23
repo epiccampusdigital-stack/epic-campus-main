@@ -10,11 +10,12 @@ export const ROLE_LABELS: Record<string, string> = {
   company: 'Partner Company',
   parent: 'Parent / Guardian',
   kitchen: 'Kitchen Staff',
+  ai_manager: 'AI Manager',
 }
 
 export const COMPANY_ROLES = ['company']
 
-export const MANAGEMENT_ROLES = ['admin', 'owner', 'reception', 'accountant', 'teacher']
+export const MANAGEMENT_ROLES = ['admin', 'owner', 'reception', 'accountant', 'teacher', 'ai_manager']
 export const KITCHEN_ROLES = ['kitchen']
 export const EXAM_ROLES = ['admin', 'teacher', 'examCoordinator']
 export const EXAM_PORTAL_ROLES = ['student', 'examCoordinator', 'admin', 'teacher', 'owner']

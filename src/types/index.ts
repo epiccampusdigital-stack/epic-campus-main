@@ -6,6 +6,7 @@ export type Role =
   | 'teacher'
   | 'examCoordinator'
   | 'agent'
+  | 'ai_manager'
   | 'student'
   | 'company'
   | 'parent'

@@ -5,6 +5,8 @@
  * firebase-admin) because the Owner/Admin leads page bundles it.
  */
 
+import type { EnrollmentProgram } from '@/types'
+
 export type AiLeadStatus =
   | 'new'
   | 'qualifying'
@@ -106,6 +108,11 @@ export interface AiLead {
    * Absent on leads created before re-engagement existed — treat as 0.
    */
   reengagementCount?: number
+  /**
+   * Set once a human has converted this paid lead into a real student record.
+   * Its presence is what stops the Convert button from inviting a duplicate.
+   */
+  convertedToStudentId?: string | null
   createdAt: string
   lastMessageAt: string
   updatedAt: string
@@ -137,3 +144,22 @@ export function isAiManagedLeadId(id: string): boolean {
 
 /** LKR registration/application fee, matching the enrollment checkout flow. */
 export const REGISTRATION_FEE_LKR = 25_000
+
+/**
+ * Best-effort map from the free-text `programInterest` the AI extracts
+ * ('Japan SSW', 'korea program', …) onto the enrollment program ids the
+ * student-creation flow understands. Returns null when nothing matches — the
+ * converting staff member then picks the program by hand.
+ */
+export function programInterestToEnrollmentProgram(
+  interest: string,
+): EnrollmentProgram | null {
+  const text = interest.toLowerCase()
+  if (!text.trim()) return null
+  if (text.includes('japan') || text.includes('ssw')) return 'japan-ssw'
+  if (text.includes('korea')) return 'korea'
+  if (text.includes('china')) return 'china'
+  if (text.includes('ielts')) return 'ielts'
+  if (text.includes('nvq')) return 'nvq'
+  return null
+}

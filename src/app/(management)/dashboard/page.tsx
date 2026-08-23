@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { collection, doc, getDoc, getDocs, query, where, orderBy } from 'firebase/firestore'
 import toast from 'react-hot-toast'
@@ -150,10 +151,14 @@ function FinanceTileSkeleton() {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const { user, hasRole } = useManagement()
   const userRoles = user?.roles ?? []
   const isPureTeacher = userRoles.length > 0 && userRoles.every((r) => r === 'teacher')
   const isPureReception = userRoles.length > 0 && userRoles.every((r) => r === 'reception')
+  // AI Manager is scoped to the AI console only. This dashboard aggregates student,
+  // attendance and payment data, so bounce the role out rather than render a shell.
+  const isPureAiManager = userRoles.length > 0 && userRoles.every((r) => r === 'ai_manager')
   // Finance visibility — income/expense/profit data is restricted to these roles only.
   const canSeeFinance = hasRole('admin') || hasRole('owner') || hasRole('accountant')
   const [loading, setLoading] = useState(true)
@@ -295,12 +300,18 @@ export default function DashboardPage() {
   }, [hasRole])
 
   useEffect(() => {
-    if (isPureTeacher) {
+    if (isPureAiManager) {
+      router.replace('/admin-ai/leads')
+    }
+  }, [isPureAiManager, router])
+
+  useEffect(() => {
+    if (isPureTeacher || isPureAiManager) {
       setLoading(false)
       return
     }
     loadData()
-  }, [loadData, isPureTeacher])
+  }, [loadData, isPureTeacher, isPureAiManager])
 
   useEffect(() => {
     if (!user || !(hasRole('admin') || hasRole('owner'))) return
@@ -618,6 +629,8 @@ export default function DashboardPage() {
   }, [filteredStudents])
 
   const monthOptions = useMemo(() => getMonthPickerOptions(12), [])
+
+  if (isPureAiManager) return null
 
   if (isPureTeacher) {
     return <TeacherDashboard showFinances={user?.showFinances ?? false} />
