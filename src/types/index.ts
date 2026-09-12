@@ -188,6 +188,15 @@ export interface Student {
   }
   createdAt: string
   createdBy: string
+  /**
+   * Delivery model for the student's course. undefined must be treated as
+   * 'residential' everywhere — existing students need no migration.
+   */
+  enrollmentType?: 'residential' | 'online' | 'both'
+  deliveryAddress?: string
+  deliveryDistrict?: string
+  deliveryPhone?: string
+  materialsStatus?: 'pending' | 'packed' | 'dispatched' | 'collected' | 'delivered'
 }
 
 export interface ParentAccount {
@@ -198,6 +207,35 @@ export interface ParentAccount {
   studentId: string
   studentName: string
   linkedAt: string
+  createdAt: string
+}
+
+export type JpEnrollmentSource = 'admin' | 'stripe' | 'bank_transfer' | 'paypal'
+export type JpEnrollmentStatus = 'active' | 'expired' | 'revoked'
+
+export interface JpEnrollment {
+  id: string
+  studentId: string
+  courseId: string
+  source: JpEnrollmentSource
+  status: JpEnrollmentStatus
+  /** uid of granting staff, or 'system' */
+  grantedBy: string
+  grantedAt: string
+  /** null means no expiry */
+  expiresAt: string | null
+  /** drives drip release */
+  startedAt: string | null
+  notes?: string
+}
+
+export interface JpCourse {
+  id: string
+  title: string
+  level: string
+  priceLKR: number
+  durationMonths: number
+  published: boolean
   createdAt: string
 }
 

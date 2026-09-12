@@ -783,5 +783,59 @@ service cloud.firestore {
         request.auth.token.role in ['admin', 'owner', 'ai_manager'];
       allow update, delete: if false;
     }
+
+    // Japan Online Course (JP) catalog — any signed-in user reads (student course
+    // browser); publishing/authoring is admin/owner only.
+    match /jpCourses/{courseId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner'];
+    }
+
+    match /jpCourses/{courseId}/modules/{moduleId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner'];
+    }
+
+    match /jpCourses/{courseId}/modules/{moduleId}/lessons/{lessonId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner'];
+    }
+
+    // JP enrollments — grants of paid access to a JP course. Finance/teaching
+    // staff read all; a student reads only their own enrollment. Students must
+    // NEVER be able to write their own enrollment doc — that would let a student
+    // grant themselves paid access — so create/update/delete is finance-role
+    // only, with no owning-student carve-out (unlike most student-owned
+    // collections elsewhere in this ruleset).
+    match /jpEnrollments/{enrollmentId} {
+      allow read: if request.auth != null && (
+        request.auth.token.role in ['admin', 'owner', 'accountant', 'accounts', 'teacher'] ||
+        resource.data.studentId == request.auth.uid
+      );
+      allow create, update, delete: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'accountant', 'accounts'];
+    }
+
+    // JP lesson progress — the owning student reads/writes their own drip-release
+    // progress; admin/owner/teacher read only (never write another student's
+    // progress).
+    match /jpProgress/{studentId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == studentId ||
+        request.auth.token.role in ['admin', 'owner', 'teacher']
+      );
+      allow write: if request.auth != null && request.auth.uid == studentId;
+    }
+
+    match /jpProgress/{studentId}/lessons/{lessonId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == studentId ||
+        request.auth.token.role in ['admin', 'owner', 'teacher']
+      );
+      allow write: if request.auth != null && request.auth.uid == studentId;
+    }
   }
 }

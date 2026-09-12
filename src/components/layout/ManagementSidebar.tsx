@@ -73,6 +73,12 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'AI Importer', href: '/admin/import', icon: 'ti-sparkles', roles: ['admin', 'owner', 'reception'] },
   { label: 'AI Knowledge Base', href: '/admin-ai/knowledge-base', icon: 'ti-brain', roles: ['admin', 'owner', 'ai_manager'] },
   { label: 'AI Leads', href: '/admin-ai/leads', icon: 'ti-message-circle', roles: ['admin', 'owner', 'ai_manager'] },
+  {
+    label: 'Japanese Online',
+    href: '/japanese-online',
+    icon: 'ti-language-hiragana',
+    roles: ['admin', 'owner', 'teacher', 'accountant', 'reception'],
+  },
 ]
 
 export default function ManagementSidebar() {
