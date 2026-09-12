@@ -747,123 +747,142 @@ export default function AdminExamsPage() {
               </div>
             ) : (
               papers.map(paper => (
-                <div key={paper.id} className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-jakarta font-bold text-[#0D1B2A] dark:text-white truncate">{paper.title}</p>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          paper.isPublished ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-[#DDE3EC] dark:bg-white/20 text-[#5A6A7A] dark:text-white/40'
-                        }`}>
-                          {paper.isPublished ? 'Published' : 'Draft'}
+                <div key={paper.id} className="rounded-xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-4 transition-colors hover:border-[#0B3D6B]/30 dark:hover:border-white/20">
+                  {/* Row 1 — order badge · title · status chips */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="flex h-6 min-w-[2.25rem] shrink-0 items-center justify-center rounded-lg bg-[#0B3D6B] px-2 text-xs font-bold text-white">
+                      #{paper.order}
+                    </span>
+                    <p className="min-w-0 flex-1 truncate font-jakarta text-base font-semibold text-[#0D1B2A] dark:text-white sm:text-lg">
+                      {paper.title}
+                    </p>
+                    <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        paper.isPublished ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-[#DDE3EC] dark:bg-white/20 text-[#5A6A7A] dark:text-white/40'
+                      }`}>
+                        {paper.isPublished ? 'Published' : 'Draft'}
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        (paper.paperType ?? 'practice') === 'exam'
+                          ? 'bg-[#E8A020] text-white'
+                          : 'bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-white/50'
+                      }`}>
+                        {(paper.paperType ?? 'practice') === 'exam' ? 'EXAM' : 'PRACTICE'}
+                      </span>
+                      {paper.shuffleEnabled && (
+                        <span className="rounded-full bg-purple-100 dark:bg-purple-900/30 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-400">
+                          Shuffle ON
                         </span>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          (paper.paperType ?? 'practice') === 'exam'
-                            ? 'bg-[#E8A020] text-white'
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Row 2 — metadata */}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#5A6A7A] dark:text-white/40">
+                    <span>{paper.totalQuestions} question{paper.totalQuestions === 1 ? '' : 's'}</span>
+                    <span className="text-[#DDE3EC] dark:text-white/20">·</span>
+                    <span>{Math.round((paper.timeLimitSeconds ?? 3600) / 60)} min</span>
+                    <span className="text-[#DDE3EC] dark:text-white/20">·</span>
+                    <span>Pass {paper.passMark}%</span>
+                  </div>
+
+                  {/* Row 3 — student access / exam code (state toggle, kept visually separate from actions) */}
+                  <div className="mt-2.5">
+                    {/* Exam papers → rolling access-code generator. Practice papers → student-access toggle. */}
+                    {(paper.paperType ?? 'practice') === 'exam' ? (
+                      <ExamCodeSection
+                        paper={paper}
+                        onUpdated={(patch) =>
+                          setPapers(prev => prev.map(p => (p.id === paper.id ? { ...p, ...patch } : p)))
+                        }
+                        onToast={setToast}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={paper.isUnlocked !== false}
+                        onClick={() => void handleToggleUnlock(paper)}
+                        title={paper.isUnlocked !== false
+                          ? "Click to lock — students won't see this paper"
+                          : 'Click to unlock — students can access this paper'}
+                        aria-label={paper.isUnlocked !== false
+                          ? "Student access is on — click to lock"
+                          : 'Student access is off — click to unlock'}
+                        className={`inline-flex min-w-[160px] cursor-pointer items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-all duration-200 hover:brightness-110 ${
+                          paper.isUnlocked !== false
+                            ? 'bg-emerald-500 text-white'
                             : 'bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-white/50'
-                        }`}>
-                          {(paper.paperType ?? 'practice') === 'exam' ? 'EXAM' : 'PRACTICE'}
-                        </span>
-                        <span className="rounded-full bg-[#0B3D6B]/10 dark:bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-[#0B3D6B] dark:text-white/60">
-                          {paper.totalQuestions} question{paper.totalQuestions === 1 ? '' : 's'}
-                        </span>
-                        {paper.shuffleEnabled && (
-                          <span className="rounded-full bg-purple-100 dark:bg-purple-900/30 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-400">
-                            Shuffle ON
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-[#5A6A7A] dark:text-white/40 mt-0.5">
-                        {paper.totalQuestions}Q · {Math.round((paper.timeLimitSeconds ?? 3600)/60)}min · Pass {paper.passMark}% · Order #{paper.order}
-                      </p>
-                      {/* Exam papers → rolling access-code generator. Practice papers → student-access toggle. */}
-                      {(paper.paperType ?? 'practice') === 'exam' ? (
-                        <ExamCodeSection
-                          paper={paper}
-                          onUpdated={(patch) =>
-                            setPapers(prev => prev.map(p => (p.id === paper.id ? { ...p, ...patch } : p)))
-                          }
-                          onToast={setToast}
-                        />
-                      ) : (
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={paper.isUnlocked !== false}
-                          onClick={() => void handleToggleUnlock(paper)}
-                          title={paper.isUnlocked !== false
-                            ? "Click to lock — students won't see this paper"
-                            : 'Click to unlock — students can access this paper'}
-                          className={`mt-2 inline-flex min-w-[160px] cursor-pointer items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition-all duration-200 hover:brightness-110 ${
-                            paper.isUnlocked !== false
-                              ? 'bg-emerald-500 text-white'
-                              : 'bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-white/50'
-                          }`}
-                        >
-                          <span className={`ti ${paper.isUnlocked !== false ? 'ti-lock-open' : 'ti-lock'}`} />
-                          Student Access: {paper.isUnlocked !== false ? 'ON' : 'OFF'}
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 gap-1 flex-wrap justify-end items-center">
-                      {paper.isLive && (
-                        <button type="button" onClick={() => void startLiveExam(paper)}
-                          className="rounded-lg bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700">
-                          🔴 Start Live
-                        </button>
-                      )}
-                      {paper.isLive && paper.examDate && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const res = await fetch('/api/twilio/exam-reminder', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ paperId: paper.id }),
-                            })
-                            const data = await res.json() as { success?: boolean; sent?: number; total?: number }
-                            if (data.success) {
-                              hotToast.success(`Reminders sent to ${data.sent ?? 0} students`)
-                            } else {
-                              hotToast.error('Failed to send reminders')
-                            }
-                          }}
-                          className="flex items-center gap-1.5 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 text-xs font-bold text-amber-700 dark:text-amber-400"
-                        >
-                          <span className="ti ti-bell-ringing" /> Send Reminder
-                        </button>
-                      )}
-                      {canViewPaper(paper) && (
-                        <button type="button" onClick={() => void openViewQuestions(paper)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-[#0B3D6B]/30 dark:border-white/20 bg-[#0B3D6B]/[0.04] dark:bg-white/[0.04] px-2 py-1 text-xs font-semibold text-[#0B3D6B] dark:text-white/70">
-                          <span className="ti ti-eye" /> View Questions
-                        </button>
-                      )}
-                      <Link
-                        href={`/exam-results?paper=${paper.id}`}
-                        className="inline-flex items-center gap-1 rounded-lg border border-[#E8A020]/40 bg-[#E8A020]/10 px-2 py-1 text-xs font-semibold text-[#B4770F] dark:text-[#E8A020]"
+                        }`}
                       >
-                        <span className="ti ti-chart-bar" /> View Results
-                      </Link>
-                      <button type="button" onClick={() => { setSelectedPaper(paper); setActiveTab('questions'); void ensureDefaultSections(paper.id) }}
-                        className="rounded-lg border border-[#DDE3EC] dark:border-white/20 px-2 py-1 text-xs font-semibold text-[#0B3D6B] dark:text-white/70">
-                        Questions
+                        <span className={`ti ${paper.isUnlocked !== false ? 'ti-lock-open' : 'ti-lock'}`} />
+                        Student Access: {paper.isUnlocked !== false ? 'ON' : 'OFF'}
                       </button>
-                      <button type="button" onClick={() => void handleTogglePublish(paper)}
-                        className={`rounded-lg px-2 py-1 text-xs font-semibold ${
-                          paper.isPublished ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
-                        }`}>
-                        {paper.isPublished ? 'Unpublish' : 'Publish'}
+                    )}
+                  </div>
+
+                  {/* Row 4 — action bar: never overflows, wraps at any width */}
+                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#DDE3EC] dark:border-white/10 pt-3">
+                    {paper.isLive && (
+                      <button type="button" onClick={() => void startLiveExam(paper)}
+                        title="Start live exam" aria-label="Start live exam"
+                        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700">
+                        🔴 Start Live
                       </button>
-                      <button type="button" onClick={() => { setEditingPaper(paper); setPaperForm({ title: paper.title, description: paper.description ?? '', categoryId: paper.categoryId, totalQuestions: paper.totalQuestions, timeLimitSeconds: paper.timeLimitSeconds, passMark: paper.passMark, order: paper.order, hasAudioCheck: paper.hasAudioCheck ?? true, scoringScale: (paper.scoringScale ?? 250) as 250 | 100, paperType: (paper.paperType ?? 'practice') as 'practice' | 'exam', shuffleEnabled: paper.shuffleEnabled ?? false, isLive: paper.isLive ?? false, examDate: paper.examDate ?? '', examTime: paper.examTime ?? '', examCourseId: paper.examCourseId ?? '', examBatch: paper.examBatch ?? '' }) }}
-                        className="rounded-lg border border-[#DDE3EC] dark:border-white/20 px-2 py-1 text-xs text-[#5A6A7A] dark:text-white/60">
-                        Edit
+                    )}
+                    {paper.isLive && paper.examDate && (
+                      <button
+                        type="button"
+                        title="Send exam reminder to students" aria-label="Send exam reminder to students"
+                        onClick={async () => {
+                          const res = await fetch('/api/twilio/exam-reminder', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ paperId: paper.id }),
+                          })
+                          const data = await res.json() as { success?: boolean; sent?: number; total?: number }
+                          if (data.success) {
+                            hotToast.success(`Reminders sent to ${data.sent ?? 0} students`)
+                          } else {
+                            hotToast.error('Failed to send reminders')
+                          }
+                        }}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#E8A020] px-3 text-sm font-bold text-[#0B3D6B] hover:bg-[#d4911c]"
+                      >
+                        <span className="ti ti-bell-ringing" /> Send Reminder
                       </button>
-                      <button type="button" onClick={() => void handleDeletePaper(paper)}
-                        className="rounded-lg border border-red-200 dark:border-red-800 px-2 py-1 text-xs text-red-600 dark:text-red-400">
-                        Delete
+                    )}
+                    {canViewPaper(paper) && (
+                      <button type="button" onClick={() => void openViewQuestions(paper)}
+                        title="View questions" aria-label="View questions"
+                        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#0B3D6B]/30 dark:border-white/20 bg-[#0B3D6B]/[0.04] dark:bg-white/[0.04] px-3 text-sm font-semibold text-[#0B3D6B] dark:text-white/70">
+                        <span className="ti ti-eye" /> View Questions
                       </button>
-                    </div>
+                    )}
+                    <Link
+                      href={`/exam-results?paper=${paper.id}`}
+                      title="View results" aria-label="View results"
+                      className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#E8A020]/40 bg-[#E8A020]/10 px-3 text-sm font-semibold text-[#B4770F] dark:text-[#E8A020]"
+                    >
+                      <span className="ti ti-chart-bar" /> View Results
+                    </Link>
+                    <button type="button" onClick={() => { setSelectedPaper(paper); setActiveTab('questions'); void ensureDefaultSections(paper.id) }}
+                      className="inline-flex h-9 items-center rounded-lg border border-[#DDE3EC] dark:border-white/20 px-3 text-sm font-semibold text-[#0B3D6B] dark:text-white/70">
+                      Questions
+                    </button>
+                    <button type="button" onClick={() => { setEditingPaper(paper); setPaperForm({ title: paper.title, description: paper.description ?? '', categoryId: paper.categoryId, totalQuestions: paper.totalQuestions, timeLimitSeconds: paper.timeLimitSeconds, passMark: paper.passMark, order: paper.order, hasAudioCheck: paper.hasAudioCheck ?? true, scoringScale: (paper.scoringScale ?? 250) as 250 | 100, paperType: (paper.paperType ?? 'practice') as 'practice' | 'exam', shuffleEnabled: paper.shuffleEnabled ?? false, isLive: paper.isLive ?? false, examDate: paper.examDate ?? '', examTime: paper.examTime ?? '', examCourseId: paper.examCourseId ?? '', examBatch: paper.examBatch ?? '' }) }}
+                      className="inline-flex h-9 items-center rounded-lg border border-[#DDE3EC] dark:border-white/20 px-3 text-sm text-[#5A6A7A] dark:text-white/60">
+                      Edit
+                    </button>
+                    <button type="button" onClick={() => void handleTogglePublish(paper)}
+                      className="inline-flex h-9 items-center rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 text-sm font-semibold text-amber-700 dark:text-amber-400">
+                      {paper.isPublished ? 'Unpublish' : 'Publish'}
+                    </button>
+                    <button type="button" onClick={() => void handleDeletePaper(paper)}
+                      title="Delete paper" aria-label="Delete paper"
+                      className="inline-flex h-9 items-center rounded-lg border border-red-200 dark:border-red-800 px-3 text-sm text-red-600 dark:text-red-400 md:ml-auto">
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))

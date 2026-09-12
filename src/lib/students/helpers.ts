@@ -193,6 +193,10 @@ export function parseStudent(id: string, data: Record<string, unknown>): Student
     paidAmount: data.paidAmount != null ? Number(data.paidAmount) : undefined,
     pendingAmount: data.pendingAmount != null ? Number(data.pendingAmount) : undefined,
     status: (data.status as Student['status']) ?? 'pending',
+    accountActivationOverride:
+      data.accountActivationOverride === true || data.accountActivationOverride === false
+        ? data.accountActivationOverride
+        : null,
     visaStatus: (data.visaStatus as Student['visaStatus']) ?? 'not-started',
     notes: data.notes ? String(data.notes) : undefined,
     parentAccessCode: data.parentAccessCode

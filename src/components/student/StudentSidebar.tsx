@@ -12,6 +12,9 @@ import { logAuditEvent } from '@/lib/audit/helpers'
 import { useStudentPortal } from '@/components/student/StudentContext'
 import DarkModeToggle from '@/components/ui/DarkModeToggle'
 import { isNavActive } from '@/lib/utils/nav'
+import { LOCKED_ROUTES } from '@/lib/access/accountActivation'
+
+const ACTIVATION_TOOLTIP = 'Your account is not activated yet — contact your teacher.'
 
 function studentNavLinkClasses(active: boolean): string {
   const base = 'flex items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] transition-all duration-200 min-h-[44px] sm:min-h-0 border-l-2'
@@ -45,7 +48,7 @@ const EXAM_CODE_NAV_ITEM = { label: 'Enter Exam Code', href: '/exam-code', icon:
 export default function StudentSidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, student, sidebarOpen, setSidebarOpen } = useStudentPortal()
+  const { user, student, sidebarOpen, setSidebarOpen, isAccountActive } = useStudentPortal()
   const [mounted, setMounted] = useState(false)
   const [unreadMessages, setUnreadMessages] = useState(0)
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
@@ -149,6 +152,23 @@ export default function StudentSidebar() {
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
         {navItems.map((item) => {
           const active = isNavActive(pathname, item.href)
+          const locked = !isAccountActive && LOCKED_ROUTES.includes(item.href)
+
+          if (locked) {
+            return (
+              <div
+                key={item.href}
+                title={ACTIVATION_TOOLTIP}
+                aria-disabled="true"
+                className={`${studentNavLinkClasses(false)} cursor-not-allowed opacity-40 hover:bg-transparent dark:hover:bg-transparent`}
+              >
+                <span className={`ti ${item.icon} text-[14px] leading-none`} aria-hidden="true" />
+                {item.label}
+                <span className="ti ti-lock ml-auto text-[11px]" aria-hidden="true" />
+              </div>
+            )
+          }
+
           return (
             <Link
               key={item.href}

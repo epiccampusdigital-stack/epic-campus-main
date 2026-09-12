@@ -29,13 +29,34 @@ service cloud.firestore {
       );
       allow create: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'reception'];
+      // accountActivationOverride (the Account Activation gate) is carved out of
+      // the general self/accountant update grant below: admin/owner/reception/
+      // teacher may change it, but a student updating their own record — or an
+      // accountant, who can update everything else here — must leave it exactly
+      // as it already is. `.get(field, null)` treats "field absent" the same as
+      // "field is null" on both sides, so this doesn't block ordinary self-edits
+      // on documents that predate this field.
       allow update: if request.auth != null && (
-        request.auth.uid == studentId ||
-        resource.data.uid == request.auth.uid ||
-        request.auth.token.role in ['admin', 'owner', 'reception', 'teacher', 'accountant']
+        request.auth.token.role in ['admin', 'owner', 'reception', 'teacher'] ||
+        (
+          (request.auth.uid == studentId || resource.data.uid == request.auth.uid || request.auth.token.role == 'accountant') &&
+          request.resource.data.get('accountActivationOverride', null) == resource.data.get('accountActivationOverride', null)
+        )
       );
       allow delete: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner'];
+    }
+
+    // Account Activation — batch-level default (see src/lib/access/accountActivation.ts).
+    // Read is open to any authenticated user because students must resolve their
+    // own portal-lock state. Write is spelled out inline on purpose — NOT routed
+    // through ACTIVATION_ROLES or any other shared helper/role constant, since
+    // reception's permissions were recently audited and must not be silently
+    // widened again just because a shared list changes elsewhere.
+    match /batchSettings/{batchId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'teacher', 'reception'];
     }
 
     // Payments — single master collection for both flat transaction receipts and
@@ -74,9 +95,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Exams — staff read/write, students read only
+    // Exams — legacy title/type lookup table. Read by parents (resolving a legacy
+    // examResults row's title) and staff (partner-companies candidate panel).
+    // No student-facing code reads this collection — see audit notes.
     match /exams/{examId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'reception', 'teacher', 'accountant', 'ai_manager', 'parent'];
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin', 'teacher', 'examCoordinator'];
     }
@@ -92,23 +116,32 @@ service cloud.firestore {
         request.auth.token.role in ['admin', 'teacher', 'examCoordinator', 'owner'];
     }
 
+    // examPapers carries the live access code (accessCode/codeExpiresAt/isLive) for
+    // the exam-code entry flow, so read is scoped to every role that legitimately
+    // touches the exam system (exam-taking students, exam staff, and the management
+    // roles that can reach /admin-exams) rather than left open to any authenticated user.
     match /examPapers/{paperId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'teacher', 'reception', 'accountant', 'ai_manager', 'examCoordinator', 'student'];
       allow create, update, delete: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'teacher', 'examCoordinator'];
     }
 
     match /examSections/{sectionId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'teacher', 'reception', 'accountant', 'ai_manager', 'examCoordinator', 'student'];
       allow create, update, delete: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'teacher', 'examCoordinator'];
     }
 
     // KNOWN LIMITATION: Firestore rules cannot hide a single field (correctIndex) from
     // students, and the exam-taking UI must read this collection, so read stays open to
-    // any authenticated user. Do not tighten without moving answer-checking server-side.
+    // every role that touches the exam system — but no longer to every authenticated
+    // user (kitchen/agent/company accounts have no exam-system reason to read this).
+    // Do not tighten further without moving answer-checking server-side.
     match /examQuestions/{questionId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'teacher', 'reception', 'accountant', 'ai_manager', 'examCoordinator', 'student'];
       allow create, update, delete: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'teacher', 'examCoordinator'];
     }
@@ -152,12 +185,29 @@ service cloud.firestore {
       }
     }
 
+    // Staff (any management role) read every partner company; a company-portal user
+    // reads only their own company doc (docId == their own companyId, set on their
+    // users/{uid} doc at account creation). Write left as-is (bare auth) — not part of
+    // this pass, flagged separately.
     match /partnerCompanies/{docId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null && (
+        request.auth.token.role in ['admin', 'owner', 'reception', 'accountant', 'teacher', 'ai_manager'] ||
+        (request.auth.token.role == 'company' &&
+          docId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId)
+      );
+      allow write: if request.auth != null;
     }
 
+    // Staff (any management role) read every shortlist entry; a company-portal user
+    // reads only entries tagged with their own companyId. Write left as-is (bare
+    // auth) — not part of this pass, flagged separately.
     match /candidateShortlists/{docId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null && (
+        request.auth.token.role in ['admin', 'owner', 'reception', 'accountant', 'teacher', 'ai_manager'] ||
+        (request.auth.token.role == 'company' &&
+          resource.data.companyId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId)
+      );
+      allow write: if request.auth != null;
     }
 
     match /notifications/{docId} {
@@ -177,8 +227,17 @@ service cloud.firestore {
         request.auth.token.role in ['admin', 'owner', 'reception'];
     }
 
+    // Student reads own record (studentId is a students/{id} doc id, not the auth
+    // uid, so cross-referenced the same way as payments/examResults/visaDocuments);
+    // parents read their linked child's record via the same crosswalk; staff (any
+    // management role — attendance admin page, dashboard risk widget, student
+    // profile, /admin/student-risk all reach this with no further gate) read all.
     match /attendance/{recordId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && (
+        request.auth.token.role in ['admin', 'owner', 'reception', 'accountant', 'teacher', 'ai_manager'] ||
+        resource.data.studentId == request.auth.uid ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.studentId == resource.data.studentId
+      );
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'reception', 'teacher'];
     }
@@ -241,9 +300,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Study materials — any authenticated user can read, staff can write
+    // Study materials — no code in the app currently reads or writes this
+    // collection (dead/legacy — the live "materials" feature uses the `materials`
+    // collection instead). Read scoped to match the existing write role in case it
+    // is revived.
     match /studyMaterials/{docId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'teacher'];
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'teacher'];
     }
@@ -317,13 +380,15 @@ service cloud.firestore {
     }
 
     match /dailyMenus/{menuId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin', 'kitchen', 'owner'];
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin', 'kitchen', 'owner'];
     }
 
     match /mealTemplates/{templateId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin', 'kitchen', 'owner'];
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin', 'kitchen', 'owner'];
     }
@@ -358,8 +423,12 @@ service cloud.firestore {
         request.auth.token.role in ['admin', 'owner', 'accountant'];
     }
 
+    // No code anywhere reads this collection client-side (legacy — parent login
+    // now resolves via students.parentAccessCode instead). Read locked to the same
+    // staff roles that already write it. NEVER students.
     match /parentPortalCodes/{code} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'reception'];
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'reception'];
     }
@@ -371,8 +440,11 @@ service cloud.firestore {
         request.auth.token.role in ['admin', 'owner', 'teacher'];
     }
 
+    // Student portal never reads this (it uses consultationRequests instead) — only
+    // the /consultations management page does, reachable by any management role.
     match /roomSlots/{slotId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'reception', 'accountant', 'teacher', 'ai_manager'];
       allow create, update, delete: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'reception', 'teacher'];
     }
@@ -391,8 +463,16 @@ service cloud.firestore {
         request.auth.token.role in ['admin', 'owner'];
     }
 
+    // 1:1 teacher/student tutoring sessions (distinct from the class `schedule`
+    // collection). Student reads own (studentId crosswalked like attendance/
+    // payments); staff (teacher included, since /teacher and /sessions browse
+    // every staff member's sessions, not just the caller's own) read all.
     match /sessions/{sessionId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && (
+        request.auth.token.role in ['admin', 'owner', 'teacher', 'reception'] ||
+        resource.data.studentId == request.auth.uid ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.studentId == resource.data.studentId
+      );
       allow create, update: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'teacher', 'reception'];
       allow delete: if request.auth != null &&
@@ -417,11 +497,17 @@ service cloud.firestore {
 
     match /epicWallPosts/{postId} {
       allow read: if true;  // public read for the public /epic-wall page
-      allow create: if request.auth != null;
+      // Students publish from /epic-wall, admin/owner from /admin/epic-wall — both go
+      // through the shared WallComposer, which stamps authorId with the caller's uid.
+      allow create: if request.auth != null && (
+        request.auth.token.role in ['admin', 'owner'] ||
+        request.resource.data.authorId == request.auth.uid
+      );
       allow update: if request.auth != null && (
         request.auth.token.role in ['admin', 'owner', 'teacher', 'reception'] ||
         resource.data.authorId == request.auth.uid
       );
+      // admin/owner may delete ANY post; everyone else only their own.
       allow delete: if request.auth != null && (
         request.auth.token.role in ['admin', 'owner'] ||
         resource.data.authorId == request.auth.uid
@@ -437,24 +523,63 @@ service cloud.firestore {
       );
     }
 
+    // Read behaviour unchanged (only ever exercised by the authenticated
+    // /epic-wall page, wall is public-by-design at the epicWallPosts level).
+    // Write tightened to ownership — every call site already stamps userId with
+    // the caller's own uid (toggle-like/poll-vote reactions), so this matches
+    // current behavior exactly.
     match /epicWallReactions/{reactionId} {
       allow read: if request.auth != null;
-      allow create, update, delete: if request.auth != null;
+      allow create: if request.auth != null &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
     }
 
+    // Read behaviour unchanged (see epicWallReactions above). Create tightened to
+    // ownership — the only call site always stamps authorId with the caller's own
+    // uid, matching current behavior exactly. Delete was already ownership-scoped.
     match /epicWallStories/{storyId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      allow create: if request.auth != null &&
+        request.resource.data.authorId == request.auth.uid;
       allow delete: if request.auth != null && (
         request.auth.token.role in ['admin', 'owner'] ||
         resource.data.authorId == request.auth.uid
       );
     }
 
+    // /my-materials (student) and /materials (admin/owner/teacher) both fetch this
+    // collection with NO where() clause and filter client-side, so a per-course
+    // ownership rule isn't achievable without also rewriting those queries — role
+    // check only. Excludes kitchen/agent/accountant/ai_manager/company, none of
+    // which have any reason to read course materials.
     match /materials/{docId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin','owner','teacher','reception','examCoordinator','student'];
       allow create, update, delete: if request.auth != null &&
         request.auth.token.role in ['admin','owner','teacher','reception','examCoordinator'];
+    }
+
+    // Student-uploaded files sent to a teacher from My Materials → My Submissions.
+    // Ownership enforced the same way as epicWallPosts (authorId there, studentId
+    // here). Teacher/admin/owner can read every submission (no batch → teacher
+    // assignment table exists yet) and update readByTeacher; only the owning
+    // student may create or delete their own doc.
+    match /studentSubmissions/{submissionId} {
+      allow read: if request.auth != null && (
+        resource.data.studentId == request.auth.uid ||
+        request.auth.token.role in ['admin', 'owner', 'teacher']
+      );
+      allow create: if request.auth != null &&
+        request.resource.data.studentId == request.auth.uid;
+      allow update: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'teacher'];
+      allow delete: if request.auth != null &&
+        resource.data.studentId == request.auth.uid;
     }
 
     match /consultationRequests/{docId} {
@@ -496,21 +621,39 @@ service cloud.firestore {
          request.auth.token.role in ['admin', 'owner', 'teacher', 'reception']);
     }
 
+    // Dead collection — no page, component, or API route anywhere in the codebase
+    // reads or writes messageThreads (the live student<->staff messaging system
+    // uses `messages/{studentId}` + thread_admin/thread_teacher subcollections
+    // instead, already correctly scoped below). Locked closed entirely.
     match /messageThreads/{threadId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
     match /messageThreads/{threadId}/messages/{msgId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
 
+    // /my-schedule (student) and /schedule (management) both fetch this collection
+    // with NO where() clause and filter client-side (course match + consultation
+    // privacy), so a per-course ownership rule isn't achievable without also
+    // rewriting those queries — role check only, matching the write role list.
     match /schedule/{docId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin','owner','teacher','reception','examCoordinator','student'];
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin','owner','teacher','reception','examCoordinator'];
     }
 
+    // Staff (finance/reception/teacher/ai_manager — /accommodation and
+    // /accommodation/[houseId] have no page-level gate narrower than the
+    // management layout) read every house; a student reads only their own
+    // assigned house, resolved via students/{id}.houseId (crosswalked from
+    // users/{uid}.studentId, same pattern as elsewhere in this ruleset).
     match /accommodations/{docId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && (
+        request.auth.token.role in ['admin','owner','reception','accountant','teacher','ai_manager'] ||
+        (request.auth.token.role == 'student' &&
+          docId == get(/databases/$(database)/documents/students/$(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.studentId)).data.houseId)
+      );
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin','owner','reception','accountant'];
     }
@@ -536,13 +679,17 @@ service cloud.firestore {
     }
 
     match /accommodationBudget/{month} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin','owner','accountant','reception'];
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin','owner','accountant'];
     }
 
+    // /supplies page itself gates rendering to exactly this role set (kitchen and
+    // ai_manager are explicitly excluded there) — read matches that.
     match /supplies/{docId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin','owner','accountant','reception','teacher'];
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin','owner','kitchen','reception'];
     }
@@ -564,8 +711,11 @@ service cloud.firestore {
         request.auth.token.role in ['admin','owner'];
     }
 
+    // No client code currently reads this collection at all (write-only, via the
+    // admin bulk-import tool) — locked to the same roles as write.
     match /kitchenInventory/{docId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin','owner','kitchen'];
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin','owner','kitchen'];
     }
@@ -608,7 +758,8 @@ service cloud.firestore {
     }
 
     match /lessonPlans/{docId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'teacher'];
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'teacher'];
     }

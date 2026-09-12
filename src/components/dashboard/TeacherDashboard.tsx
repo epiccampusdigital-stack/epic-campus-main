@@ -14,7 +14,6 @@ import {
   type TeacherStatFilter,
 } from '@/lib/dashboard/teacherStats'
 import TeacherSessionsWidget from '@/components/sessions/TeacherSessionsWidget'
-import TeacherRiskWatchWidget from '@/components/risk/TeacherRiskWatchWidget'
 import { useManagement } from '@/components/layout/ManagementContext'
 import type { ExamAttempt, Student } from '@/types'
 
@@ -181,8 +180,6 @@ export default function TeacherDashboard({ showFinances = false }: { showFinance
       </section>
 
       {user && <TeacherSessionsWidget teacherId={user.uid} teacherName={user.displayName || user.email} />}
-
-      {user && <TeacherRiskWatchWidget teacherId={user.uid} />}
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Link

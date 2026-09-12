@@ -163,6 +163,12 @@ export interface Student {
   /** feeAmount - paidAmount when partial; feeAmount when pending; 0 when paid */
   pendingAmount?: number
   status: 'active' | 'pending' | 'completed' | 'withdrawn'
+  /**
+   * Account Activation gate override (separate from `status`). null = inherit
+   * from batchSettings/{batchId}; true = force active; false = force inactive.
+   * See src/lib/access/accountActivation.ts for resolution logic.
+   */
+  accountActivationOverride?: boolean | null
   visaStatus?: 'not-started' | 'in-progress' | 'approved' | 'rejected'
   notes?: string
   /** 6-digit code for parent/guardian registration */

@@ -2,6 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useStudentPortal } from '@/components/student/StudentContext'
+import { LOCKED_ROUTES } from '@/lib/access/accountActivation'
+
+const ACTIVATION_TOOLTIP = 'Your account is not activated yet — contact your teacher.'
 
 const NAV = [
   { label: 'Wall', href: '/epic-wall', icon: 'ti-home' },
@@ -13,6 +17,7 @@ const NAV = [
 
 export default function StudentBottomNav() {
   const pathname = usePathname()
+  const { isAccountActive } = useStudentPortal()
 
   function isActive(href: string) {
     return pathname === href || pathname.startsWith(`${href}/`)
@@ -26,6 +31,24 @@ export default function StudentBottomNav() {
       <ul className="flex items-stretch justify-around">
         {NAV.map((item) => {
           const active = isActive(item.href)
+          const locked = !isAccountActive && LOCKED_ROUTES.includes(item.href)
+
+          if (locked) {
+            return (
+              <li key={item.href} className="flex-1">
+                <div
+                  title={ACTIVATION_TOOLTIP}
+                  aria-disabled="true"
+                  className="relative flex cursor-not-allowed flex-col items-center gap-0.5 px-1 py-3 text-[10px] font-medium text-[#5A6A7A] opacity-40 dark:text-white/40"
+                >
+                  <span className={`ti ${item.icon} text-[22px] text-[#0B3D6B] dark:text-white/60`} aria-hidden="true" />
+                  {item.label}
+                  <span className="ti ti-lock absolute -top-0.5 right-3 text-[10px]" aria-hidden="true" />
+                </div>
+              </li>
+            )
+          }
+
           return (
             <li key={item.href} className="flex-1">
               <Link

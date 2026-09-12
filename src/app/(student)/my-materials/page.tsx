@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase/client'
 import { useStudentPortal } from '@/components/student/StudentContext'
+import StudentSubmissionsSection from '@/components/materials/StudentSubmissionsSection'
 
 interface MaterialItem {
   id: string
@@ -100,6 +101,8 @@ export default function MyMaterialsPage() {
           ))}
         </div>
       )}
+
+      <StudentSubmissionsSection />
     </div>
   )
 }

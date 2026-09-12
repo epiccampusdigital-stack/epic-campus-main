@@ -21,10 +21,22 @@ import StudentFeePanel from '@/components/payments/StudentFeePanel'
 import { parseAttendance } from '@/lib/attendance/helpers'
 import StudentAgentSection from '@/components/students/StudentAgentSection'
 import ParentAccessSection from '@/components/students/ParentAccessSection'
+import AccountActivationControl, {
+  activationChoiceFromOverride,
+  batchActivationLabel,
+  overrideFromActivationChoice,
+  type ActivationChoice,
+} from '@/components/students/AccountActivationControl'
 import StudentForm from '@/components/students/StudentForm'
 import StudentIDCard from '@/components/students/StudentIDCard'
 import WhatsAppFollowUpModal from '@/components/students/WhatsAppFollowUpModal'
 import { useManagement } from '@/components/layout/ManagementContext'
+import {
+  ACTIVATION_ROLES,
+  getBatchAccountSettings,
+  resolveAccountActivation,
+  type BatchAccountSettings,
+} from '@/lib/access/accountActivation'
 import { studentToIdCardProps } from '@/lib/students/idCard'
 import { downloadIDCard } from '@/lib/utils/downloadIDCard'
 import {
@@ -274,6 +286,12 @@ export default function StudentProfilePage() {
   const [savedLoginType, setSavedLoginType] = useState('')
   const [copiedField, setCopiedField] = useState<'email' | 'password' | null>(null)
 
+  // Account Activation
+  const [batchSettings, setBatchSettings] = useState<BatchAccountSettings | null>(null)
+  const [activationChoice, setActivationChoice] = useState<ActivationChoice>('inherit')
+  const [activationSaving, setActivationSaving] = useState(false)
+  const [activationSaveMsg, setActivationSaveMsg] = useState('')
+
   // Fee schedule state
   const [feeSchedule, setFeeSchedule] = useState<{
     registrationFee: number
@@ -295,6 +313,8 @@ export default function StudentProfilePage() {
       const studentData = studentSnap.data() as Record<string, unknown>
       const s = parseStudent(studentSnap.id, studentData)
       setStudent(s)
+      setActivationChoice(activationChoiceFromOverride(s.accountActivationOverride))
+      setBatchSettings(s.batchId ? await getBatchAccountSettings(s.batchId) : null)
       setRegNumber(String(studentData.registrationNumber ?? ''))
       setStudentIdNum(String(studentData.studentId ?? ''))
       setSavedLoginEmail(String(studentData.loginEmail ?? ''))
@@ -469,8 +489,30 @@ export default function StudentProfilePage() {
     setTimeout(() => setCopiedField(null), 2000)
   }
 
+  async function handleSaveActivation() {
+    if (!student) return
+    setActivationSaving(true)
+    setActivationSaveMsg('')
+    try {
+      const override = overrideFromActivationChoice(activationChoice)
+      await updateDoc(doc(db, 'students', studentId), { accountActivationOverride: override })
+      setActivationSaveMsg('Account Activation saved')
+      setTimeout(() => setActivationSaveMsg(''), 3000)
+      await loadData()
+    } catch (err) {
+      console.error('[StudentProfile] activation save', err)
+      setActivationSaveMsg('Failed to save — try again')
+    } finally {
+      setActivationSaving(false)
+    }
+  }
+
   // Credentials card visibility — front-desk roles only.
   const canSeeCredentials = hasRole('admin') || hasRole('owner') || hasRole('reception')
+  // Account Activation controls — admin / owner / teacher / reception only.
+  const canManageActivation = ACTIVATION_ROLES.some((r) => hasRole(r))
+  const resolvedActivation = student ? resolveAccountActivation(student, batchSettings) : false
+  const batchLabel = batchActivationLabel(batchSettings)
 
   const LOGIN_TYPE_LABELS: Record<string, string> = {
     id: 'Student ID Number',
@@ -802,6 +844,28 @@ export default function StudentProfilePage() {
                 </button>
               </div>
             </div>
+
+            {/* Account Activation — admin / owner / teacher / reception only */}
+            {canManageActivation && (
+              <div className="rounded-2xl border border-[#DDE3EC] dark:border-white/[0.08] bg-white dark:bg-white/[0.04] p-5">
+                <h3 className="mb-1 flex items-center gap-2 font-jakarta text-sm font-bold uppercase tracking-wide text-[#0B3D6B] dark:text-white">
+                  <span className="ti ti-lock-access text-base" aria-hidden="true" /> Account Activation
+                </h3>
+                <p className="mb-4 text-xs text-[#5A6A7A] dark:text-white/50">
+                  Controls the student&apos;s whole portal — separate from enrolment status. Epic Wall, payments, and
+                  consultation booking stay open either way.
+                </p>
+                <AccountActivationControl
+                  value={activationChoice}
+                  onChange={setActivationChoice}
+                  onSave={() => void handleSaveActivation()}
+                  saving={activationSaving}
+                  resolved={resolvedActivation}
+                  batchLabel={batchLabel}
+                  message={activationSaveMsg}
+                />
+              </div>
+            )}
 
             {/* Login Credentials — admin / owner / reception only */}
             {canSeeCredentials && (

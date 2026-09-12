@@ -13,6 +13,8 @@ interface StudentContextValue {
   user: EpicUser | null
   student: Student | null
   status: StudentPortalStatus
+  /** Resolved Account Activation gate — see src/lib/access/accountActivation.ts */
+  isAccountActive: boolean
   sidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
   refreshStudent: () => void
@@ -22,6 +24,7 @@ export const StudentContext = createContext<StudentContextValue>({
   user: null,
   student: null,
   status: 'idle',
+  isAccountActive: false,
   sidebarOpen: false,
   setSidebarOpen: () => {},
   refreshStudent: () => {},

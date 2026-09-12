@@ -1,14 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { onAuthStateChanged } from 'firebase/auth'
 import {
   doc,
   getDoc,
 } from 'firebase/firestore'
+import toast from 'react-hot-toast'
 import { auth, db } from '@/lib/firebase/client'
 import { loadStudentProfile } from '@/lib/students/loadStudentProfile'
+import { getBatchAccountSettings, isLockedRoute, resolveAccountActivation } from '@/lib/access/accountActivation'
 import StudentSidebar from '@/components/student/StudentSidebar'
 import StudentBottomNav from '@/components/student/StudentBottomNav'
 import StudentTopBar from '@/components/student/StudentTopBar'
@@ -43,18 +45,22 @@ function PortalLoadingScreen() {
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
 
   // Dark mode is managed by useDarkMode hook via localStorage
   const [user, setUser] = useState<EpicUser | null>(null)
   const [student, setStudent] = useState<Student | null>(null)
   const [status, setStatus] = useState<StudentPortalStatus>('idle')
+  const [isAccountActive, setIsAccountActive] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [refreshToken, setRefreshToken] = useState(0)
+  const lockNoticeShownFor = useRef<string | null>(null)
 
   const refreshStudent = useCallback(() => {
     setStatus('idle')
     setUser(null)
     setStudent(null)
+    setIsAccountActive(false)
     setRefreshToken((t) => t + 1)
   }, [])
 
@@ -113,7 +119,11 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
           return
         }
 
+        const batchSettings = profile.batchId ? await getBatchAccountSettings(profile.batchId) : null
+        if (cancelled) return
+
         setStudent(profile)
+        setIsAccountActive(resolveAccountActivation(profile, batchSettings))
         setStatus('ready')
       } catch (err) {
         if (!cancelled) {
@@ -129,11 +139,31 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     }
   }, [router, refreshToken])
 
+  // Route guard — the actual security boundary for the Account Activation gate.
+  // Greyed-out nav only prevents casual clicks; an inactive student typing a
+  // locked URL directly must still be bounced back to Epic Wall on mount.
+  useEffect(() => {
+    if (status !== 'ready' || isAccountActive) return
+    if (!isLockedRoute(pathname)) return
+    if (lockNoticeShownFor.current !== pathname) {
+      lockNoticeShownFor.current = pathname
+      toast.error('Your account is not activated yet — contact your teacher.')
+    }
+    router.replace('/epic-wall')
+  }, [status, isAccountActive, pathname, router])
+
   if (status === 'loading') {
     return <PortalLoadingScreen />
   }
 
   if (status !== 'ready' || !user || !student) {
+    return <PortalLoadingScreen />
+  }
+
+  // Block rendering of the locked page's own content while the redirect above
+  // fires, so an inactive student never even mounts (or triggers data fetches
+  // from) a gated route by typing its URL directly.
+  if (!isAccountActive && isLockedRoute(pathname)) {
     return <PortalLoadingScreen />
   }
 
@@ -143,6 +173,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         user,
         student,
         status,
+        isAccountActive,
         sidebarOpen,
         setSidebarOpen,
         refreshStudent,
