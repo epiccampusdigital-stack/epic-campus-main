@@ -239,6 +239,27 @@ export interface JpCourse {
   createdAt: string
 }
 
+export interface JpModule {
+  id: string
+  title: string
+  order: number
+  createdAt: string
+}
+
+export interface JpLesson {
+  id: string
+  title: string
+  order: number
+  type: 'video' | 'material' | 'quiz'
+  bunnyVideoId: string | null
+  durationSec: number | null
+  isFreePreview: boolean
+  /** 1 = available immediately on enrollment */
+  releaseWeek: number
+  description: string | null
+  createdAt: string
+}
+
 export interface StudentDocument {
   id: string
   name: string

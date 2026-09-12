@@ -6,6 +6,7 @@ import { collection, getDocs, query, where } from 'firebase/firestore'
 import toast from 'react-hot-toast'
 import { db } from '@/lib/firebase/client'
 import { useManagement } from '@/components/layout/ManagementContext'
+import CourseBuilder from '@/components/jp/CourseBuilder'
 import { formatDate } from '@/lib/students/helpers'
 import {
   extendJpEnrollment,
@@ -495,7 +496,9 @@ export default function JapaneseOnlinePage() {
       <div>
         {activeTab === 'students' && <StudentsTab />}
         {activeTab === 'access' && <AccessTab grantedBy={user.uid} />}
-        {activeTab === 'course-builder' && <ComingSoon />}
+        {activeTab === 'course-builder' && (
+          <CourseBuilder courseId={JP_COURSE_ID} canEdit={hasRole('admin') || hasRole('owner')} />
+        )}
         {activeTab === 'payments' && <ComingSoon />}
         {activeTab === 'fulfilment' && <ComingSoon />}
         {activeTab === 'campus-sessions' && <ComingSoon />}
