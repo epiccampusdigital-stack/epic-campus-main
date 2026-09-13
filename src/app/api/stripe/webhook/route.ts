@@ -6,6 +6,7 @@ import { adminAuth, adminDb } from '@/lib/firebase/admin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { sendWhatsApp } from '@/lib/twilio'
 import { processPaymentCommissionsAdmin } from '@/lib/commissions/admin'
+import { markOrderPaid } from '@/lib/jp/orders'
 
 function generateTempPassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#'
@@ -54,8 +55,21 @@ export async function POST(req: NextRequest) {
     const studentName = meta.studentName || ''
     const fixedBillId = meta.fixedBillId || ''
     const enrollmentId = meta.enrollmentId || ''
+    const jpOrderId = meta.jpOrderId || ''
     const amount = (session.amount_total || 0) / 100
     const paymentDate = new Date().toISOString().slice(0, 10)
+
+    // JP Foundation course checkout. markOrderPaid is the single place that
+    // grants JP course access — every rail (this webhook, PayPal capture,
+    // staff bank-transfer approval) funnels through it.
+    if (jpOrderId) {
+      try {
+        await markOrderPaid(jpOrderId, session.id, 'stripe')
+        console.log(`[Stripe webhook] JP order ${jpOrderId} marked paid: ${amount}`)
+      } catch (err) {
+        console.error('[Stripe webhook] JP order update failed:', err)
+      }
+    }
 
     if (enrollmentId) {
       try {
@@ -218,7 +232,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (studentId) {
+    // JP orders are tracked entirely through jpOrders/markOrderPaid above —
+    // skip the generic residential "payments" record + commission
+    // processing below, which don't apply to a JP course purchase.
+    if (studentId && !jpOrderId) {
       try {
         let agentId: string | null = null
         let agentName: string | null = null

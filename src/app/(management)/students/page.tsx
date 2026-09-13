@@ -20,7 +20,16 @@ import { StudentTableEmpty, StudentTableMeta } from '@/components/students/Stude
 import { getDefaultLocationFilter } from '@/lib/locations/helpers'
 import LocationFilterSelect from '@/components/ui/LocationFilterSelect'
 import { useManagement } from '@/components/layout/ManagementContext'
+import OnlineStudentsTab from '@/components/students/OnlineStudentsTab'
 import type { CourseId, ExamAttempt, ExamResult, Student, StudentLocation } from '@/types'
+
+type StudentsPageTab = 'residential' | 'online'
+
+// 'residential', 'both', and undefined (pre-existing students never had this
+// field) all count as residential — everyone who isn't purely 'online'.
+function isResidentialStudent(s: Student): boolean {
+  return s.enrollmentType !== 'online'
+}
 
 const PAGE_SIZE = 10
 
@@ -55,6 +64,7 @@ export default function StudentsPage() {
     ? (teacherStatParam as TeacherStatFilter)
     : null
 
+  const [pageTab, setPageTab] = useState<StudentsPageTab>('residential')
   const [students, setStudents] = useState<Student[]>([])
   const [examResults, setExamResults] = useState<ExamResult[]>([])
   const [examAttempts, setExamAttempts] = useState<ExamAttempt[]>([])
@@ -121,7 +131,7 @@ export default function StudentsPage() {
   }, [students])
 
   const filtered = useMemo(() => {
-    let list = students
+    let list = students.filter(isResidentialStudent)
     if (teacherStat) {
       list = filterStudentsByTeacherStat(list, teacherStat, examResults, examAttempts)
     }
@@ -252,16 +262,40 @@ export default function StudentsPage() {
         </div>
       </div>
 
-      {teacherStat && (
-        <div className="flex items-center justify-between rounded-lg border border-[#E8A020]/40 bg-[#E8A020]/10 px-4 py-3 text-sm text-[#0B3D6B]">
-          <span>
-            Showing <strong>{TEACHER_STAT_LABELS[teacherStat]}</strong> only
-          </span>
-          <a href="/students" className="font-semibold hover:underline">
-            Clear filter
-          </a>
-        </div>
-      )}
+      <div className="flex gap-1 border-b border-gray-200 dark:border-white/10">
+        {([
+          { key: 'residential', label: 'Residential' },
+          { key: 'online', label: 'Online' },
+        ] as { key: StudentsPageTab; label: string }[]).map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setPageTab(tab.key)}
+            className={`px-4 py-2.5 font-jakarta text-sm font-semibold border-b-2 transition-colors duration-200 ${
+              pageTab === tab.key
+                ? 'border-[#E8A020] text-[#0B3D6B] dark:text-[#E8A020]'
+                : 'border-transparent text-[#5A6A7A] dark:text-white/50 hover:text-[#0B3D6B] dark:hover:text-white'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {pageTab === 'online' && <OnlineStudentsTab />}
+
+      {pageTab === 'residential' && (
+        <>
+          {teacherStat && (
+            <div className="flex items-center justify-between rounded-lg border border-[#E8A020]/40 bg-[#E8A020]/10 px-4 py-3 text-sm text-[#0B3D6B]">
+              <span>
+                Showing <strong>{TEACHER_STAT_LABELS[teacherStat]}</strong> only
+              </span>
+              <a href="/students" className="font-semibold hover:underline">
+                Clear filter
+              </a>
+            </div>
+          )}
 
       <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1A1535] p-4">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
@@ -447,6 +481,8 @@ export default function StudentsPage() {
               onPageChange={setPage}
             />
           )}
+        </>
+      )}
         </>
       )}
 

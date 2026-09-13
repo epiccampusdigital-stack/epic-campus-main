@@ -1,45 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { adminAuth, adminDb } from '@/lib/firebase/admin'
+import { adminDb } from '@/lib/firebase/admin'
 import { signBunnyEmbedToken, buildBunnyEmbedUrl } from '@/lib/jp/bunny'
 import { findJpLessonById } from '@/lib/jp/courses'
 import { buildJpEnrollmentId, isJpEnrollmentActive, parseJpEnrollment } from '@/lib/jp/enrollments'
 import { isLessonReleased } from '@/lib/jp/drip'
+import { resolveStudentId, verifySignedIn } from '@/lib/jp/serverAuth'
 import type { JpEnrollment } from '@/types'
 
 export const dynamic = 'force-dynamic'
-
-async function verifySignedIn(req: NextRequest): Promise<string | null> {
-  const authHeader = req.headers.get('authorization') || ''
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
-  if (!token) return null
-  try {
-    const decoded = await adminAuth.verifyIdToken(token)
-    return decoded.uid
-  } catch {
-    return null
-  }
-}
-
-// Mirrors the client-side fallback chain in loadStudentProfile (studentId
-// linked on the user doc, then a students doc keyed by uid, then a uid
-// field lookup) — done with the Admin SDK so it doesn't depend on the
-// caller's own Firestore security-rule context.
-async function resolveStudentId(uid: string): Promise<string | null> {
-  const userSnap = await adminDb.collection('users').doc(uid).get()
-  const linkedStudentId = userSnap.exists ? String(userSnap.data()?.studentId ?? '') : ''
-  if (linkedStudentId) {
-    const linkedSnap = await adminDb.collection('students').doc(linkedStudentId).get()
-    if (linkedSnap.exists) return linkedSnap.id
-  }
-
-  const byDocId = await adminDb.collection('students').doc(uid).get()
-  if (byDocId.exists) return byDocId.id
-
-  const byUid = await adminDb.collection('students').where('uid', '==', uid).limit(1).get()
-  if (!byUid.empty) return byUid.docs[0].id
-
-  return null
-}
 
 async function getActiveEnrollment(studentId: string, courseId: string): Promise<JpEnrollment | null> {
   const id = buildJpEnrollmentId(studentId, courseId)

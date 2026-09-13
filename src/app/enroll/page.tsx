@@ -1,63 +1,98 @@
 import Link from 'next/link'
 import PublicNav from '@/components/public/PublicNav'
 import PublicFooter from '@/components/public/PublicFooter'
-import EnrollmentForm from '@/components/enrollment/EnrollmentForm'
 
 export const metadata = {
   title: 'Enroll — EPIC Campus',
-  description: 'Start your journey to Japan, Korea, China or global career success. Enroll at EPIC Campus today.',
+  description: 'Choose between the residential campus programme in Galle or the online JFT Foundation course.',
 }
 
-export default function EnrollPage() {
+interface ChooserCard {
+  title: string
+  headline: string
+  price: string
+  whoFor: string
+  bullets: string[]
+  buttonLabel: string
+  href: string
+}
+
+const CARDS: ChooserCard[] = [
+  {
+    title: 'Study at Campus',
+    headline: '45-day residential programme in Galle',
+    price: '',
+    whoFor: "Who it's for: you can relocate for 45 days, and you're within the SSW age limit",
+    bullets: [
+      'Full campus facilities, daily classes',
+      'Accommodation and meals included',
+    ],
+    buttonLabel: 'Apply for Campus Programme',
+    href: '/enroll/residential',
+  },
+  {
+    title: 'Learn Online',
+    headline: '5-month JFT Foundation course — LKR 25,000 plus postage',
+    price: '',
+    whoFor: "Who it's for: any age, anywhere in Sri Lanka, can't relocate",
+    bullets: [
+      'Video lessons at home, at your own pace',
+      'Printed study pack posted to you',
+      'One campus day a month',
+    ],
+    buttonLabel: 'Start Online Course',
+    href: '/enroll/online',
+  },
+]
+
+export default function EnrollChooserPage() {
   return (
     <div className="min-h-screen bg-[#F5F7FB] dark:bg-[#130F2A]">
       <PublicNav />
-      <main className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-12 lg:grid-cols-5">
-          {/* Trust panel */}
-          <div className="lg:col-span-2">
-            <Link href="/" className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-[#5A6A7A] dark:text-white/50 hover:text-[#0B3D6B] dark:hover:text-white transition-colors">
-              <span className="ti ti-arrow-left" /> Back to home
-            </Link>
-            <div className="rounded-2xl bg-[#0B3D6B] p-7 text-white sticky top-24">
-              <h2 className="font-jakarta text-[22px] font-black mb-2">Start your journey</h2>
-              <p className="text-[13px] text-white/50 mb-8 leading-relaxed">
-                Fill in your details and our team will contact you within 24 hours.
-              </p>
-              <div className="space-y-4">
-                {[
-                  { icon: 'ti-shield-check', text: '98% visa approval rate — highest in Sri Lanka' },
-                  { icon: 'ti-certificate', text: 'TVEC approved and government registered' },
-                  { icon: 'ti-headset', text: 'Full support from application to settlement' },
-                  { icon: 'ti-building', text: '50+ partner universities and companies' },
-                  { icon: 'ti-users', text: '1,500+ students placed since 2011' },
-                ].map(item => (
-                  <div key={item.icon} className="flex items-start gap-3">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#E8A020]/20">
-                      <span className={`ti ${item.icon} text-[#E8A020] text-[13px]`} />
-                    </div>
-                    <p className="text-[13px] text-white/60 leading-relaxed">{item.text}</p>
-                  </div>
+      <main className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mb-10 text-center">
+          <Link
+            href="/"
+            className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-[#5A6A7A] transition-colors hover:text-[#0B3D6B] dark:text-white/50 dark:hover:text-white"
+          >
+            <span className="ti ti-arrow-left" /> Back to home
+          </Link>
+          <h1 className="font-jakarta text-[32px] font-black text-[#0B3D6B] dark:text-white">
+            How would you like to prepare?
+          </h1>
+          <p className="mx-auto mt-2 max-w-xl text-[15px] text-[#5A6A7A] dark:text-white/50">
+            Both paths lead to the same JFT Foundation qualification — pick whichever fits your life right now.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {CARDS.map((card) => (
+            <div
+              key={card.href}
+              className="flex flex-col rounded-2xl border border-[#DDE3EC] bg-white p-8 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.04]"
+            >
+              <h2 className="font-jakarta text-[22px] font-black text-[#0B3D6B] dark:text-white">{card.title}</h2>
+              <p className="mt-1 font-inter text-sm font-semibold text-[#E8A020]">{card.headline}</p>
+              <p className="mt-4 font-inter text-sm font-medium text-[#0D1B2A] dark:text-white/80">{card.whoFor}</p>
+
+              <ul className="mt-4 flex-1 space-y-2.5">
+                {card.bullets.map((b) => (
+                  <li key={b} className="flex items-start gap-2.5 text-sm text-[#5A6A7A] dark:text-white/60">
+                    <span className="ti ti-circle-check mt-0.5 shrink-0 text-[#0B3D6B] dark:text-[#E8A020]" aria-hidden="true" />
+                    {b}
+                  </li>
                 ))}
-              </div>
-              <div className="mt-8 grid grid-cols-2 gap-4 border-t border-white/10 pt-6">
-                {[['1,500+', 'Students placed'], ['98%', 'Visa success'], ['50+', 'Partners'], ['15yr', 'Experience']].map(([num, label]) => (
-                  <div key={label}>
-                    <p className="font-jakarta text-[20px] font-black text-[#E8A020]">{num}</p>
-                    <p className="text-[10px] text-white/30 uppercase tracking-wider">{label}</p>
-                  </div>
-                ))}
-              </div>
+              </ul>
+
+              <Link
+                href={card.href}
+                className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-[#E8A020] px-6 py-3.5 font-jakarta text-sm font-bold text-[#0B3D6B] transition-colors hover:bg-[#F5B942]"
+              >
+                {card.buttonLabel}
+                <span className="ti ti-arrow-right" aria-hidden="true" />
+              </Link>
             </div>
-          </div>
-          {/* Form */}
-          <div className="lg:col-span-3">
-            <div className="rounded-2xl border border-[#DDE3EC] bg-white p-8 dark:border-white/[0.08] dark:bg-white/[0.04]">
-              <h1 className="font-jakarta text-[28px] font-black text-[#0B3D6B] dark:text-white mb-1">Enroll at EPIC Campus</h1>
-              <p className="text-[14px] text-[#5A6A7A] dark:text-white/50 mb-8">Start your journey to Japan, Korea, China or global career success.</p>
-              <EnrollmentForm />
-            </div>
-          </div>
+          ))}
         </div>
       </main>
       <PublicFooter />

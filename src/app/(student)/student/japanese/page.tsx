@@ -8,7 +8,8 @@ import { useStudentPortal } from '@/components/student/StudentContext'
 import { resolveStudentAccess } from '@/lib/access/studentAccess'
 import { getJpEnrollment } from '@/lib/jp/enrollments'
 import { getNextReleaseDate, isLessonReleased } from '@/lib/jp/drip'
-import type { JpCourse, JpEnrollment, JpLesson, JpModule } from '@/types'
+import { computeCourseProgress, listCourseProgress } from '@/lib/jp/progress'
+import type { JpCourse, JpEnrollment, JpLesson, JpLessonProgress, JpModule } from '@/types'
 
 // Course builder (and a real course catalog) arrives in a later phase — for
 // now every JP student page targets this single hard-coded course, matching
@@ -35,11 +36,7 @@ export default function JapaneseCoursePage() {
   const [lessonsByModule, setLessonsByModule] = useState<Record<string, JpLesson[]>>({})
   const [enrollment, setEnrollment] = useState<JpEnrollment | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
-
-  // Phase 4 will persist lesson completions — there is nowhere to read them
-  // from yet, so this stays empty and every released lesson reads as
-  // "Available" rather than "Completed".
-  const completedLessonIds = useMemo(() => new Set<string>(), [])
+  const [progressDocs, setProgressDocs] = useState<JpLessonProgress[]>([])
 
   const load = useCallback(async () => {
     if (!student || !user) return
@@ -52,14 +49,16 @@ export default function JapaneseCoursePage() {
       }
       setHasAccess(true)
 
-      const [courseSnap, modulesSnap, enrollmentResult] = await Promise.all([
+      const [courseSnap, modulesSnap, enrollmentResult, progressResult] = await Promise.all([
         getDoc(doc(db, 'jpCourses', JP_COURSE_ID)),
         getDocs(query(collection(db, 'jpCourses', JP_COURSE_ID, 'modules'), orderBy('order'))),
         getJpEnrollment(student.id, JP_COURSE_ID),
+        listCourseProgress(user.uid),
       ])
 
       setCourse(courseSnap.exists() ? { id: courseSnap.id, ...(courseSnap.data() as Omit<JpCourse, 'id'>) } : null)
       setEnrollment(enrollmentResult)
+      setProgressDocs(progressResult)
 
       const moduleList = modulesSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<JpModule, 'id'>) }))
       setModules(moduleList)
@@ -85,17 +84,25 @@ export default function JapaneseCoursePage() {
     void load()
   }, [load])
 
-  const releasedCount = useMemo(() => {
-    if (!enrollment) return 0
+  const releasedLessons = useMemo(() => {
+    if (!enrollment) return []
     return Object.values(lessonsByModule)
       .flat()
-      .filter((l) => isLessonReleased(l, enrollment)).length
+      .filter((l) => isLessonReleased(l, enrollment))
   }, [lessonsByModule, enrollment])
 
-  const completedCount = useMemo(
-    () => Object.values(lessonsByModule).flat().filter((l) => completedLessonIds.has(l.id)).length,
-    [lessonsByModule, completedLessonIds],
+  const { completedCount, releasedCount, percent } = useMemo(
+    () => computeCourseProgress(releasedLessons, progressDocs),
+    [releasedLessons, progressDocs],
   )
+
+  const progressByLessonId = useMemo(() => {
+    const map: Record<string, JpLessonProgress> = {}
+    progressDocs.forEach((p) => {
+      map[p.lessonId] = p
+    })
+    return map
+  }, [progressDocs])
 
   function toggleModule(moduleId: string) {
     setExpanded((prev) => {
@@ -124,6 +131,12 @@ export default function JapaneseCoursePage() {
         <p className="max-w-sm font-inter text-sm text-[#5A6A7A] dark:text-white/60">
           Contact your coordinator if you believe this is a mistake.
         </p>
+        <Link
+          href="/student/japanese/enroll"
+          className="mt-2 rounded-lg bg-[#E8A020] px-4 py-2 font-jakarta text-sm font-bold text-[#0B3D6B] hover:bg-[#F5B942]"
+        >
+          Enroll now
+        </Link>
       </div>
     )
   }
@@ -145,10 +158,7 @@ export default function JapaneseCoursePage() {
           {completedCount} of {releasedCount} released lessons completed
         </p>
         <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[#DDE3EC] dark:bg-white/10">
-          <div
-            className="h-full rounded-full bg-[#E8A020]"
-            style={{ width: releasedCount ? `${Math.round((completedCount / releasedCount) * 100)}%` : '0%' }}
-          />
+          <div className="h-full rounded-full bg-[#E8A020]" style={{ width: `${percent}%` }} />
         </div>
       </div>
 
@@ -180,34 +190,46 @@ export default function JapaneseCoursePage() {
                   {lessons.map((lesson) => {
                     const released = enrollment ? isLessonReleased(lesson, enrollment) : lesson.isFreePreview
                     const unlockDate = enrollment ? getNextReleaseDate(lesson, enrollment) : null
-                    const completed = completedLessonIds.has(lesson.id)
+                    const lessonProgress = progressByLessonId[lesson.id]
+                    const completed = lessonProgress?.completed ?? false
                     const state: 'available' | 'completed' | 'locked' = completed
                       ? 'completed'
                       : released
                         ? 'available'
                         : 'locked'
+                    const watchPercent =
+                      !completed && lessonProgress && lessonProgress.durationSec > 0
+                        ? Math.min(100, Math.round((lessonProgress.watchedSec / lessonProgress.durationSec) * 100))
+                        : 0
 
                     const row = (
-                      <div className="flex items-center gap-3 rounded-lg px-3 py-2.5">
-                        <span className={`ti ${lessonIcon(lesson.type)} text-[#5A6A7A]`} aria-hidden="true" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-inter text-sm font-medium text-[#0D1B2A] dark:text-white">
-                            {lesson.order}. {lesson.title}
-                          </p>
-                          <p className="font-inter text-xs text-[#5A6A7A] dark:text-white/50">
-                            {lesson.durationSec ? `${Math.round(lesson.durationSec / 60)} min` : lesson.type}
-                          </p>
+                      <div className="rounded-lg px-3 py-2.5">
+                        <div className="flex items-center gap-3">
+                          <span className={`ti ${lessonIcon(lesson.type)} text-[#5A6A7A]`} aria-hidden="true" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-inter text-sm font-medium text-[#0D1B2A] dark:text-white">
+                              {lesson.order}. {lesson.title}
+                            </p>
+                            <p className="font-inter text-xs text-[#5A6A7A] dark:text-white/50">
+                              {lesson.durationSec ? `${Math.round(lesson.durationSec / 60)} min` : lesson.type}
+                            </p>
+                          </div>
+                          {state === 'completed' && (
+                            <span className="ti ti-circle-check text-emerald-500" aria-hidden="true" />
+                          )}
+                          {state === 'available' && (
+                            <span className="ti ti-player-play text-[#1A6BAD]" aria-hidden="true" />
+                          )}
+                          {state === 'locked' && (
+                            <span className="font-inter text-xs text-[#5A6A7A] dark:text-white/50">
+                              Unlocks {formatUnlockDate(unlockDate)}
+                            </span>
+                          )}
                         </div>
-                        {state === 'completed' && (
-                          <span className="ti ti-circle-check text-emerald-500" aria-hidden="true" />
-                        )}
-                        {state === 'available' && (
-                          <span className="ti ti-player-play text-[#1A6BAD]" aria-hidden="true" />
-                        )}
-                        {state === 'locked' && (
-                          <span className="font-inter text-xs text-[#5A6A7A] dark:text-white/50">
-                            Unlocks {formatUnlockDate(unlockDate)}
-                          </span>
+                        {watchPercent > 0 && (
+                          <div className="ml-7 mt-1.5 h-1 w-24 overflow-hidden rounded-full bg-[#DDE3EC] dark:bg-white/10">
+                            <div className="h-full rounded-full bg-[#1A6BAD]" style={{ width: `${watchPercent}%` }} />
+                          </div>
                         )}
                       </div>
                     )

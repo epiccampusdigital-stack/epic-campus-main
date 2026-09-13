@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { markOrderPaid } from '@/lib/jp/orders'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +25,7 @@ async function getAccessToken(): Promise<string> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { orderId } = await req.json() as { orderId: string }
+    const { orderId, jpOrderId } = await req.json() as { orderId: string; jpOrderId?: string }
     const accessToken = await getAccessToken()
 
     const res = await fetch(`${PAYPAL_BASE}/v2/checkout/orders/${orderId}/capture`, {
@@ -36,6 +37,18 @@ export async function POST(req: NextRequest) {
     })
 
     const capture = await res.json() as { status: string; id: string }
+
+    // JP Foundation course checkout. markOrderPaid is the single place that
+    // grants JP course access — every rail (this route, the Stripe webhook,
+    // staff bank-transfer approval) funnels through it.
+    if (jpOrderId && capture.status === 'COMPLETED') {
+      try {
+        await markOrderPaid(jpOrderId, capture.id, 'paypal')
+      } catch (err) {
+        console.error('[PayPal CaptureOrder] JP order update failed:', err)
+      }
+    }
+
     return NextResponse.json({ status: capture.status, captureId: capture.id })
   } catch (err) {
     console.error('[PayPal CaptureOrder]', err)

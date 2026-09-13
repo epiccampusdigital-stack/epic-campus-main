@@ -30,9 +30,13 @@ export async function POST(req: NextRequest) {
     // settled against the leads collection by the webhook.
     const leadId = extraMetadata?.leadId != null ? String(extraMetadata.leadId) : undefined
 
-    if (!studentId && !fixedBillId && !leadId) {
+    // A JP Foundation checkout is identified by jpOrderId — the webhook
+    // settles it via markOrderPaid, not the generic studentId payment path.
+    const jpOrderId = extraMetadata?.jpOrderId != null ? String(extraMetadata.jpOrderId) : undefined
+
+    if (!studentId && !fixedBillId && !leadId && !jpOrderId) {
       return NextResponse.json(
-        { error: 'Missing studentId, fixedBillId or leadId' },
+        { error: 'Missing studentId, fixedBillId, leadId or jpOrderId' },
         { status: 400 },
       )
     }
@@ -44,6 +48,7 @@ export async function POST(req: NextRequest) {
       billType: extraMetadata?.billType ? String(extraMetadata.billType) : '',
       leadId: leadId ?? '',
       feeType: extraMetadata?.feeType ? String(extraMetadata.feeType) : '',
+      jpOrderId: jpOrderId ?? '',
     }
 
     const session = await stripe.checkout.sessions.create({

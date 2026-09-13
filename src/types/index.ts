@@ -260,6 +260,78 @@ export interface JpLesson {
   createdAt: string
 }
 
+// jpProgress/{uid}/lessons/{lessonId} — keyed by the student's Firebase Auth
+// UID, NOT the students/{id} document ID (those differ for most students in
+// this database). See src/lib/jp/progress.ts.
+export interface JpLessonProgress {
+  lessonId: string
+  watchedSec: number
+  durationSec: number
+  completed: boolean
+  lastAt: string
+  completedAt: string | null
+}
+
+export type JpOrderRail = 'stripe' | 'bank_transfer' | 'paypal'
+export type JpOrderStatus = 'pending' | 'awaiting_verification' | 'paid' | 'failed' | 'refunded'
+
+export interface JpOrder {
+  id: string
+  /** students doc id */
+  studentId: string
+  /** Firebase Auth uid */
+  uid: string
+  courseId: string
+  courseFeeLKR: number
+  postageLKR: number
+  totalLKR: number
+  rail: JpOrderRail
+  status: JpOrderStatus
+  /** stripe session id, paypal order id, or bank ref code */
+  paymentRef: string | null
+  /** Storage path for a bank slip */
+  receiptUploadPath: string | null
+  deliveryName: string
+  deliveryAddress: string
+  deliveryDistrict: string
+  deliveryPhone: string
+  createdAt: string
+  paidAt: string | null
+  /** uid of staff who approved a bank transfer */
+  verifiedBy: string | null
+  notes: string | null
+}
+
+export type JpFulfilmentStatus = 'pending' | 'packed' | 'dispatched' | 'collected' | 'delivered'
+
+export interface JpFulfilment {
+  /** same as orderId */
+  id: string
+  orderId: string
+  studentId: string
+  status: JpFulfilmentStatus
+  packedBy: string | null
+  packedAt: string | null
+  dispatchedAt: string | null
+  /** SL Post registered number — no tracking API, display only */
+  postalRef: string | null
+  collectedAtCampus: boolean
+  notes: string | null
+}
+
+// Single doc at jpSettings/config.
+export interface JpSettings {
+  postageFlatLKR: number
+  bankName: string
+  bankAccountName: string
+  bankAccountNumber: string
+  bankBranch: string
+  /** e.g. "Study pack posted within one week" */
+  dispatchPromiseText: string
+  refundPolicyText: string
+  updatedAt: string
+}
+
 export interface StudentDocument {
   id: string
   name: string

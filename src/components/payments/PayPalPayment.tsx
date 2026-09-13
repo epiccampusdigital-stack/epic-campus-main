@@ -10,6 +10,8 @@ interface PayPalPaymentProps {
   description: string
   planId?: string
   installmentIndex?: number
+  /** Extra fields merged into the capture-order request body — e.g. jpOrderId, so /api/paypal/capture-order can settle a JP order via markOrderPaid. */
+  extraCaptureFields?: Record<string, string>
   onSuccess?: (captureId: string) => void
   onCancel?: () => void
   onError?: (err: unknown) => void
@@ -24,6 +26,7 @@ export default function PayPalPayment({
   description,
   planId,
   installmentIndex,
+  extraCaptureFields,
   onSuccess,
   onCancel,
   onError,
@@ -73,7 +76,7 @@ export default function PayPalPayment({
             const res = await fetch('/api/paypal/capture-order', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ orderId: data.orderID }),
+              body: JSON.stringify({ orderId: data.orderID, ...extraCaptureFields }),
             })
             const capture = await res.json() as { status: string; captureId: string }
             if (capture.status === 'COMPLETED') {
