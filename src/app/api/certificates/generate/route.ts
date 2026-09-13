@@ -53,10 +53,19 @@ export async function POST(req: NextRequest) {
     const completionDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
     const verifyUrl = `epiccampus.live/verify/${certNumber}`
 
+    // The JP online course shares courseId 'japan-ssw' with the residential
+    // SSW track (no new field added, per the existing Student schema), but
+    // it isn't the SSW programme — an online student's certificate should
+    // say so rather than reusing the residential course's name.
+    const isJpOnline = student.enrollmentType === 'online' || student.enrollmentType === 'both'
+    const courseName = isJpOnline && student.courseId === 'japan-ssw'
+      ? 'JFT Foundation (Japanese Online Course)'
+      : COURSE_NAMES[String(student.courseId)] ?? 'Course'
+
     const certData = {
       studentName: String(student.name ?? student.displayName ?? 'Student'),
       courseId: String(student.courseId ?? 'course'),
-      courseName: COURSE_NAMES[String(student.courseId)] ?? 'Course',
+      courseName,
       batch: String(student.batch ?? `Batch ${String(student.batchNumber ?? '')}`),
       completionDate,
       certificateNumber: certNumber,

@@ -332,6 +332,53 @@ export interface JpSettings {
   updatedAt: string
 }
 
+export type JpSupportThreadStatus = 'open' | 'ai_answered' | 'escalated' | 'closed'
+
+export interface JpSupportThread {
+  id: string
+  /** students doc id — see the jpEnrollments comment for why this isn't the uid */
+  studentId: string
+  uid: string
+  subject: string
+  status: JpSupportThreadStatus
+  /** staff uid once escalated */
+  assignedTo: string | null
+  lastMessageAt: string
+  createdAt: string
+}
+
+export interface JpSupportMessage {
+  id: string
+  threadId: string
+  author: 'student' | 'ai' | 'staff'
+  authorUid: string | null
+  body: string
+  createdAt: string
+}
+
+export interface JpCampusSession {
+  id: string
+  courseId: string
+  title: string
+  date: string
+  startTime: string
+  endTime: string
+  venue: string
+  capacity: number | null
+  notes: string | null
+  createdAt: string
+}
+
+// jpCampusSessions/{sessionId}/rsvps/{uid} — doc id is the student's Auth uid.
+export interface JpSessionRsvp {
+  uid: string
+  studentId: string
+  rsvp: 'yes' | 'no' | null
+  attended: boolean
+  rsvpAt: string | null
+  markedBy: string | null
+}
+
 export interface StudentDocument {
   id: string
   name: string

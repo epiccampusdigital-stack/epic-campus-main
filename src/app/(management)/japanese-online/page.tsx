@@ -17,7 +17,21 @@ import {
   revokeJpEnrollment,
 } from '@/lib/jp/enrollments'
 import { isLessonReleased } from '@/lib/jp/drip'
+import {
+  addJpSupportMessage,
+  closeJpSupportThread,
+  listJpSupportMessages,
+  listJpSupportThreads,
+} from '@/lib/jp/support'
+import {
+  deleteJpCampusSession,
+  listJpCampusSessions,
+  listJpSessionRsvps,
+  markJpSessionAttendance,
+  upsertJpCampusSession,
+} from '@/lib/jp/campusSessions'
 import type {
+  JpCampusSession,
   JpEnrollment,
   JpEnrollmentSource,
   JpFulfilment,
@@ -25,7 +39,11 @@ import type {
   JpLessonProgress,
   JpModule,
   JpOrder,
+  JpSessionRsvp,
   JpSettings,
+  JpSupportMessage,
+  JpSupportThread,
+  JpSupportThreadStatus,
   Role,
 } from '@/types'
 
@@ -1190,6 +1208,496 @@ function FulfilmentTab() {
   )
 }
 
+const SUPPORT_STATUS_LABELS: Record<JpSupportThreadStatus, string> = {
+  open: 'Open',
+  ai_answered: 'AI answered',
+  escalated: 'Escalated',
+  closed: 'Closed',
+}
+
+function SupportTab() {
+  const { user } = useManagement()
+  const [threads, setThreads] = useState<JpSupportThread[]>([])
+  const [statusFilter, setStatusFilter] = useState<JpSupportThreadStatus | ''>('escalated')
+  const [loading, setLoading] = useState(true)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [messages, setMessages] = useState<JpSupportMessage[]>([])
+  const [messagesLoading, setMessagesLoading] = useState(false)
+  const [reply, setReply] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const list = await listJpSupportThreads(statusFilter || undefined)
+      setThreads(list)
+    } catch (err) {
+      console.error('[SupportTab] load', err)
+      toast.error('Could not load support threads.')
+    } finally {
+      setLoading(false)
+    }
+  }, [statusFilter])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const loadMessages = useCallback(async (threadId: string) => {
+    setMessagesLoading(true)
+    try {
+      const list = await listJpSupportMessages(threadId)
+      setMessages(list)
+    } catch (err) {
+      console.error('[SupportTab] load messages', err)
+      toast.error('Could not load the conversation.')
+    } finally {
+      setMessagesLoading(false)
+    }
+  }, [])
+
+  function openThread(threadId: string) {
+    setSelectedId(threadId)
+    void loadMessages(threadId)
+  }
+
+  async function handleReply() {
+    if (!selectedId || !reply.trim() || !user) return
+    setBusy(true)
+    try {
+      await addJpSupportMessage(selectedId, { author: 'staff', authorUid: user.uid, body: reply.trim() })
+      setReply('')
+      await loadMessages(selectedId)
+      await load()
+    } catch (err) {
+      console.error('[SupportTab] reply', err)
+      toast.error('Could not send reply.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleClose() {
+    if (!selectedId) return
+    setBusy(true)
+    try {
+      await closeJpSupportThread(selectedId)
+      toast.success('Thread closed')
+      await loadMessages(selectedId)
+      await load()
+    } catch (err) {
+      console.error('[SupportTab] close', err)
+      toast.error('Could not close thread.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const selectedThread = threads.find((t) => t.id === selectedId) ?? null
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+      <div className="rounded-xl border border-[#DDE3EC] bg-white dark:border-white/10 dark:bg-slate-800">
+        <div className="border-b border-[#DDE3EC] p-3 dark:border-white/10">
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as JpSupportThreadStatus | '')
+              setSelectedId(null)
+            }}
+            className="w-full rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 font-inter text-sm text-[#0D1B2A] dark:border-white/10 dark:bg-slate-900 dark:text-white"
+          >
+            <option value="escalated">Escalated</option>
+            <option value="open">Open</option>
+            <option value="ai_answered">AI answered</option>
+            <option value="closed">Closed</option>
+            <option value="">All</option>
+          </select>
+        </div>
+        {loading ? (
+          <div className="flex h-32 items-center justify-center">
+            <div className="h-6 w-6 animate-spin rounded-full border-[3px] border-[#0B3D6B] border-t-[#E8A020]" />
+          </div>
+        ) : threads.length === 0 ? (
+          <EmptyRow label="No threads here." />
+        ) : (
+          <div className="max-h-[520px] divide-y divide-[#DDE3EC] overflow-y-auto dark:divide-white/10">
+            {threads.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => openThread(t.id)}
+                className={`block w-full px-4 py-3 text-left hover:bg-[#F5F7FB] dark:hover:bg-white/5 ${
+                  selectedId === t.id ? 'bg-[#F5F7FB] dark:bg-white/5' : ''
+                }`}
+              >
+                <p className="truncate font-inter text-sm font-medium text-[#0D1B2A] dark:text-white">{t.subject}</p>
+                <p className="mt-0.5 font-inter text-xs text-[#5A6A7A] dark:text-white/50">
+                  {SUPPORT_STATUS_LABELS[t.status]} · {formatDate(t.lastMessageAt)}
+                </p>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:border-white/10 dark:bg-slate-800">
+        {!selectedThread ? (
+          <EmptyRow label="Select a thread to view the conversation." />
+        ) : messagesLoading ? (
+          <div className="flex h-32 items-center justify-center">
+            <div className="h-6 w-6 animate-spin rounded-full border-[3px] border-[#0B3D6B] border-t-[#E8A020]" />
+          </div>
+        ) : (
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between gap-3 border-b border-[#DDE3EC] pb-3 dark:border-white/10">
+              <p className="font-jakarta text-sm font-bold text-[#0B3D6B] dark:text-white">{selectedThread.subject}</p>
+              <button
+                type="button"
+                disabled={busy || selectedThread.status === 'closed'}
+                onClick={() => void handleClose()}
+                className="rounded-lg border border-[#DDE3EC] px-3 py-1.5 font-jakarta text-xs font-bold text-[#0B3D6B] hover:bg-[#F5F7FB] disabled:opacity-50 dark:border-white/10 dark:text-white dark:hover:bg-white/5"
+              >
+                {selectedThread.status === 'closed' ? 'Closed' : 'Close thread'}
+              </button>
+            </div>
+
+            <div className="my-3 max-h-96 space-y-2 overflow-y-auto">
+              {messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
+                    m.author === 'student'
+                      ? 'bg-[#F5F7FB] dark:bg-white/5'
+                      : m.author === 'staff'
+                        ? 'ml-auto bg-[#0B3D6B] text-white'
+                        : 'border border-[#DDE3EC] dark:border-white/10'
+                  }`}
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-wide opacity-70">{m.author}</p>
+                  <p className="mt-0.5 whitespace-pre-wrap font-inter">{m.body}</p>
+                </div>
+              ))}
+            </div>
+
+            {selectedThread.status !== 'closed' && (
+              <div className="mt-auto flex items-end gap-2">
+                <textarea
+                  value={reply}
+                  onChange={(e) => setReply(e.target.value)}
+                  rows={2}
+                  placeholder="Reply as staff…"
+                  className="flex-1 rounded-lg border border-[#DDE3EC] bg-white px-3 py-2 font-inter text-sm text-[#0D1B2A] dark:border-white/10 dark:bg-slate-900 dark:text-white"
+                />
+                <button
+                  type="button"
+                  disabled={busy || !reply.trim()}
+                  onClick={() => void handleReply()}
+                  className="rounded-lg bg-[#E8A020] px-4 py-2.5 font-jakarta text-sm font-bold text-[#0B3D6B] hover:bg-[#F5B942] disabled:opacity-50"
+                >
+                  Send
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CampusSessionsTab() {
+  const { user } = useManagement()
+  const [sessions, setSessions] = useState<JpCampusSession[]>([])
+  const [loading, setLoading] = useState(true)
+  const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState<JpCampusSession | null>(null)
+  const [form, setForm] = useState({ title: '', date: '', startTime: '', endTime: '', venue: '', capacity: '', notes: '' })
+  const [saving, setSaving] = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [rsvps, setRsvps] = useState<JpSessionRsvp[]>([])
+  const [rsvpsLoading, setRsvpsLoading] = useState(false)
+  const [busyUid, setBusyUid] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const list = await listJpCampusSessions(JP_COURSE_ID)
+      setSessions(list)
+    } catch (err) {
+      console.error('[CampusSessionsTab] load', err)
+      toast.error('Could not load campus sessions.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  function openAdd() {
+    setEditing(null)
+    setForm({ title: '', date: '', startTime: '', endTime: '', venue: '', capacity: '', notes: '' })
+    setFormOpen(true)
+  }
+
+  function openEdit(session: JpCampusSession) {
+    setEditing(session)
+    setForm({
+      title: session.title,
+      date: session.date,
+      startTime: session.startTime,
+      endTime: session.endTime,
+      venue: session.venue,
+      capacity: session.capacity != null ? String(session.capacity) : '',
+      notes: session.notes ?? '',
+    })
+    setFormOpen(true)
+  }
+
+  async function handleSave() {
+    if (!form.title.trim() || !form.date || !form.startTime || !form.endTime || !form.venue.trim()) {
+      toast.error('Title, date, start/end time and venue are required.')
+      return
+    }
+    setSaving(true)
+    try {
+      await upsertJpCampusSession({
+        id: editing?.id,
+        courseId: JP_COURSE_ID,
+        title: form.title.trim(),
+        date: form.date,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        venue: form.venue.trim(),
+        capacity: form.capacity.trim() ? Number(form.capacity) : null,
+        notes: form.notes.trim() || null,
+      })
+      toast.success(editing ? 'Session updated' : 'Session created')
+      setFormOpen(false)
+      await load()
+    } catch (err) {
+      console.error('[CampusSessionsTab] save', err)
+      toast.error('Could not save session.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete(sessionId: string) {
+    if (!confirm('Delete this campus session?')) return
+    try {
+      await deleteJpCampusSession(sessionId)
+      toast.success('Session deleted')
+      if (expandedId === sessionId) setExpandedId(null)
+      await load()
+    } catch (err) {
+      console.error('[CampusSessionsTab] delete', err)
+      toast.error('Could not delete session.')
+    }
+  }
+
+  async function toggleExpand(sessionId: string) {
+    if (expandedId === sessionId) {
+      setExpandedId(null)
+      return
+    }
+    setExpandedId(sessionId)
+    setRsvpsLoading(true)
+    try {
+      const list = await listJpSessionRsvps(sessionId)
+      setRsvps(list)
+    } catch (err) {
+      console.error('[CampusSessionsTab] load rsvps', err)
+      toast.error('Could not load RSVPs.')
+    } finally {
+      setRsvpsLoading(false)
+    }
+  }
+
+  async function handleMarkAttendance(sessionId: string, rsvp: JpSessionRsvp, attended: boolean, staffUid: string) {
+    setBusyUid(rsvp.uid)
+    try {
+      await markJpSessionAttendance(sessionId, rsvp.uid, rsvp.studentId, attended, staffUid)
+      setRsvps((prev) => prev.map((r) => (r.uid === rsvp.uid ? { ...r, attended, markedBy: staffUid } : r)))
+    } catch (err) {
+      console.error('[CampusSessionsTab] mark attendance', err)
+      toast.error('Could not update attendance.')
+    } finally {
+      setBusyUid(null)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={openAdd}
+          className="rounded-lg bg-[#E8A020] px-4 py-2 font-jakarta text-sm font-bold text-[#0B3D6B] hover:bg-[#F5B942]"
+        >
+          + New campus session
+        </button>
+      </div>
+
+      {formOpen && (
+        <div className="rounded-xl border border-[#DDE3EC] bg-white p-5 dark:border-white/10 dark:bg-slate-800">
+          <p className="font-jakarta text-sm font-bold text-[#0B3D6B] dark:text-white">
+            {editing ? 'Edit session' : 'New session'}
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <input
+              type="text"
+              placeholder="Title"
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              className="rounded-lg border border-[#DDE3EC] px-3 py-2 font-inter text-sm dark:border-white/10 dark:bg-slate-900 dark:text-white sm:col-span-2"
+            />
+            <input
+              type="date"
+              value={form.date}
+              onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+              className="rounded-lg border border-[#DDE3EC] px-3 py-2 font-inter text-sm dark:border-white/10 dark:bg-slate-900 dark:text-white"
+            />
+            <input
+              type="text"
+              placeholder="Venue"
+              value={form.venue}
+              onChange={(e) => setForm((f) => ({ ...f, venue: e.target.value }))}
+              className="rounded-lg border border-[#DDE3EC] px-3 py-2 font-inter text-sm dark:border-white/10 dark:bg-slate-900 dark:text-white"
+            />
+            <input
+              type="text"
+              placeholder="Start time, e.g. 9:00 AM"
+              value={form.startTime}
+              onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))}
+              className="rounded-lg border border-[#DDE3EC] px-3 py-2 font-inter text-sm dark:border-white/10 dark:bg-slate-900 dark:text-white"
+            />
+            <input
+              type="text"
+              placeholder="End time, e.g. 3:00 PM"
+              value={form.endTime}
+              onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))}
+              className="rounded-lg border border-[#DDE3EC] px-3 py-2 font-inter text-sm dark:border-white/10 dark:bg-slate-900 dark:text-white"
+            />
+            <input
+              type="number"
+              placeholder="Capacity (optional)"
+              value={form.capacity}
+              onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
+              className="rounded-lg border border-[#DDE3EC] px-3 py-2 font-inter text-sm dark:border-white/10 dark:bg-slate-900 dark:text-white"
+            />
+            <textarea
+              placeholder="Notes (optional)"
+              value={form.notes}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              rows={2}
+              className="rounded-lg border border-[#DDE3EC] px-3 py-2 font-inter text-sm dark:border-white/10 dark:bg-slate-900 dark:text-white sm:col-span-2"
+            />
+          </div>
+          <div className="mt-4 flex items-center gap-2">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void handleSave()}
+              className="rounded-lg bg-[#E8A020] px-4 py-2 font-jakarta text-sm font-bold text-[#0B3D6B] hover:bg-[#F5B942] disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormOpen(false)}
+              className="font-inter text-xs text-[#5A6A7A] hover:text-[#0B3D6B] dark:text-white/50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex h-32 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[#0B3D6B] border-t-[#E8A020]" />
+        </div>
+      ) : sessions.length === 0 ? (
+        <EmptyRow label="No campus sessions scheduled yet." />
+      ) : (
+        <div className="space-y-3">
+          {sessions.map((s) => {
+            const isExpanded = expandedId === s.id
+            const yesCount = rsvps.filter((r) => r.rsvp === 'yes').length
+            return (
+              <div key={s.id} className="rounded-xl border border-[#DDE3EC] bg-white dark:border-white/10 dark:bg-slate-800">
+                <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+                  <button type="button" onClick={() => void toggleExpand(s.id)} className="flex items-center gap-2 text-left">
+                    <span className={`ti ${isExpanded ? 'ti-chevron-down' : 'ti-chevron-right'} text-[#5A6A7A]`} aria-hidden="true" />
+                    <span className="font-jakarta text-sm font-semibold text-[#0D1B2A] dark:text-white">{s.title}</span>
+                  </button>
+                  <span className="font-inter text-xs text-[#5A6A7A] dark:text-white/50">
+                    {formatDate(s.date)} · {s.startTime}–{s.endTime} · {s.venue}
+                  </span>
+                  <div className="ml-auto flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openEdit(s)}
+                      className="font-inter text-xs text-[#1A6BAD] hover:underline"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDelete(s.id)}
+                      className="font-inter text-xs text-red-600 hover:underline dark:text-red-300"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+                {isExpanded && (
+                  <div className="border-t border-[#DDE3EC] px-4 py-3 dark:border-white/10">
+                    {rsvpsLoading ? (
+                      <div className="flex h-16 items-center justify-center">
+                        <div className="h-5 w-5 animate-spin rounded-full border-[3px] border-[#0B3D6B] border-t-[#E8A020]" />
+                      </div>
+                    ) : rsvps.length === 0 ? (
+                      <EmptyRow label="No RSVPs yet." />
+                    ) : (
+                      <div className="space-y-1.5">
+                        <p className="font-inter text-xs text-[#5A6A7A] dark:text-white/50">{yesCount} coming</p>
+                        {rsvps.map((r) => (
+                          <div key={r.uid} className="flex items-center justify-between gap-3 rounded-lg bg-[#F5F7FB] px-3 py-2 dark:bg-white/5">
+                            <span className="font-inter text-xs text-[#0D1B2A] dark:text-white">{r.studentId}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-inter text-xs text-[#5A6A7A] dark:text-white/50">
+                                RSVP: {r.rsvp ?? '—'}
+                              </span>
+                              <label className="flex items-center gap-1.5 font-inter text-xs text-[#0D1B2A] dark:text-white">
+                                <input
+                                  type="checkbox"
+                                  checked={r.attended}
+                                  disabled={busyUid === r.uid}
+                                  onChange={(e) => void handleMarkAttendance(s.id, r, e.target.checked, user?.uid ?? '')}
+                                  className="h-4 w-4 rounded border-[#DDE3EC]"
+                                />
+                                Attended
+                              </label>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function JapaneseOnlinePage() {
   const router = useRouter()
   const { user, loading: authLoading, hasRole } = useManagement()
@@ -1257,8 +1765,8 @@ export default function JapaneseOnlinePage() {
         )}
         {activeTab === 'payments' && <PaymentsTab />}
         {activeTab === 'fulfilment' && <FulfilmentTab />}
-        {activeTab === 'campus-sessions' && <ComingSoon />}
-        {activeTab === 'support' && <ComingSoon />}
+        {activeTab === 'campus-sessions' && <CampusSessionsTab />}
+        {activeTab === 'support' && <SupportTab />}
       </div>
     </div>
   )

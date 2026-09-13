@@ -888,5 +888,62 @@ service cloud.firestore {
       allow write: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner'];
     }
+
+    // JP support threads — studentId is a students/{id} document ID, not the
+    // owning student's Auth UID (same mismatch as jpEnrollments/jpOrders —
+    // see the jpEnrollments comment above), so ownership is verified via the
+    // same get()-on-uid pattern rather than comparing studentId to
+    // request.auth.uid directly. A student may create their own thread and
+    // update it (add a message, close it) — teaching staff read/manage all.
+    match /jpSupportThreads/{threadId} {
+      allow read: if request.auth != null && (
+        request.auth.token.role in ['admin', 'owner', 'teacher'] ||
+        get(/databases/$(database)/documents/students/$(resource.data.studentId)).data.uid == request.auth.uid
+      );
+      allow create: if request.auth != null && (
+        request.auth.token.role in ['admin', 'owner', 'teacher'] ||
+        get(/databases/$(database)/documents/students/$(request.resource.data.studentId)).data.uid == request.auth.uid
+      );
+      allow update: if request.auth != null && (
+        request.auth.token.role in ['admin', 'owner', 'teacher'] ||
+        get(/databases/$(database)/documents/students/$(resource.data.studentId)).data.uid == request.auth.uid
+      );
+    }
+
+    match /jpSupportThreads/{threadId}/messages/{messageId} {
+      allow read: if request.auth != null && (
+        request.auth.token.role in ['admin', 'owner', 'teacher'] ||
+        get(/databases/$(database)/documents/students/$(get(/databases/$(database)/documents/jpSupportThreads/$(threadId)).data.studentId)).data.uid == request.auth.uid
+      );
+      allow create: if request.auth != null && (
+        request.auth.token.role in ['admin', 'owner', 'teacher'] ||
+        get(/databases/$(database)/documents/students/$(get(/databases/$(database)/documents/jpSupportThreads/$(threadId)).data.studentId)).data.uid == request.auth.uid
+      );
+      allow update, delete: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner'];
+    }
+
+    // JP campus sessions — the monthly in-person day for online students.
+    // Any signed-in user reads; only teaching/admin staff create the
+    // sessions themselves.
+    match /jpCampusSessions/{sessionId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        request.auth.token.role in ['admin', 'owner', 'teacher'];
+    }
+
+    // RSVPs are keyed by the student's own Auth UID (not a students/{id}
+    // document ID), so ownership here is a direct uid comparison — no
+    // get()-on-uid indirection needed, unlike the collections above.
+    match /jpCampusSessions/{sessionId}/rsvps/{uid} {
+      allow read: if request.auth != null && (
+        request.auth.uid == uid ||
+        request.auth.token.role in ['admin', 'owner', 'teacher']
+      );
+      allow write: if request.auth != null && (
+        request.auth.uid == uid ||
+        request.auth.token.role in ['admin', 'owner', 'teacher']
+      );
+    }
   }
 }
