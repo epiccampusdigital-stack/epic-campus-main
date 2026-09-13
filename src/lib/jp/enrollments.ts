@@ -6,7 +6,7 @@ export function buildJpEnrollmentId(studentId: string, courseId: string): string
   return `${studentId}_${courseId}`
 }
 
-function parseJpEnrollment(id: string, data: Record<string, unknown>): JpEnrollment {
+export function parseJpEnrollment(id: string, data: Record<string, unknown>): JpEnrollment {
   return {
     id,
     studentId: String(data.studentId ?? ''),

@@ -167,6 +167,15 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     return <PortalLoadingScreen />
   }
 
+  const enrollmentType = student.enrollmentType ?? 'residential'
+  // Residential/'both' students keep today's row shell (sidebar + column)
+  // byte-for-byte — only 'online' switches to a stacked column so the top
+  // bar StudentSidebar renders for them spans the full width naturally
+  // instead of being squeezed into a row's sidebar slot.
+  const shellClassName = `flex h-screen overflow-hidden bg-[#eef2f7] dark:bg-[#080d18] text-[#0D1B2A] dark:text-white/90 transition-colors duration-300 font-['DM_Sans']${
+    enrollmentType === 'online' ? ' flex-col' : ''
+  }`
+
   return (
     <StudentContext.Provider
       value={{
@@ -174,12 +183,13 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         student,
         status,
         isAccountActive,
+        enrollmentType,
         sidebarOpen,
         setSidebarOpen,
         refreshStudent,
       }}
     >
-      <div className="flex h-screen overflow-hidden bg-[#eef2f7] dark:bg-[#080d18] text-[#0D1B2A] dark:text-white/90 transition-colors duration-300 font-['DM_Sans']">
+      <div className={shellClassName}>
         <StudentSidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
           <StudentTopBar />

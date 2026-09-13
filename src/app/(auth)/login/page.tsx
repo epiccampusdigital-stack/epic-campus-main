@@ -12,6 +12,7 @@ import {
 import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import { auth, googleProvider, db } from '@/lib/firebase/client'
 import { logAuditEvent } from '@/lib/audit/helpers'
+import { loadStudentProfile } from '@/lib/students/loadStudentProfile'
 import type { Role } from '@/types'
 import {
   GoogleButton,
@@ -24,10 +25,10 @@ import {
 } from '@/components/auth/AuthShell'
 import Link from 'next/link'
 
-function getRedirectPath(role: string): string {
+function getRedirectPath(role: string, studentEnrollmentType?: string): string {
   switch (role) {
     case 'student':
-      return '/epic-wall'
+      return studentEnrollmentType === 'online' ? '/student/japanese' : '/epic-wall'
     case 'examCoordinator':
       return '/exams'
     // AI Manager is scoped to the AI console only — /dashboard shows
@@ -127,8 +128,24 @@ async function completeSignIn(user: User): Promise<SignInResult> {
       details: 'User signed in',
     })
 
+    // Only students branch by enrollment type — resolve it here so
+    // getRedirectPath can send online students straight to their course
+    // instead of Epic Wall. Every other role is unaffected.
+    let studentEnrollmentType: string | undefined
+    if (role === 'student') {
+      try {
+        const profile = await loadStudentProfile(user.uid, {
+          studentId: userData.studentId ? String(userData.studentId) : undefined,
+          email: user.email ?? undefined,
+        })
+        studentEnrollmentType = profile?.enrollmentType
+      } catch (err) {
+        console.error('[login] Could not resolve student enrollment type:', err)
+      }
+    }
+
     return {
-      redirectPath: getRedirectPath(role),
+      redirectPath: getRedirectPath(role, studentEnrollmentType),
       role: String(role),
       phone: String(userData.phone ?? ''),
       uid: user.uid,

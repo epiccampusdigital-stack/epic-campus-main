@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useStudentPortal } from '@/components/student/StudentContext'
 import { LOCKED_ROUTES } from '@/lib/access/accountActivation'
+import { getVisibleTabs } from '@/lib/student/navTabs'
 
 const ACTIVATION_TOOLTIP = 'Your account is not activated yet — contact your teacher.'
 
@@ -17,7 +18,15 @@ const NAV = [
 
 export default function StudentBottomNav() {
   const pathname = usePathname()
-  const { isAccountActive } = useStudentPortal()
+  const { isAccountActive, enrollmentType } = useStudentPortal()
+  // For enrollmentType 'residential'/'both'/undefined this returns NAV
+  // unchanged — only 'online' would get a different list, but online
+  // students don't get a bottom bar at all (see the early return below):
+  // StudentSidebar renders their nav as a top bar across every breakpoint
+  // instead, so there's only ever one nav surface.
+  const navItems = getVisibleTabs(enrollmentType, NAV)
+
+  if (enrollmentType === 'online') return null
 
   function isActive(href: string) {
     return pathname === href || pathname.startsWith(`${href}/`)
@@ -29,7 +38,7 @@ export default function StudentBottomNav() {
       aria-label="Student navigation"
     >
       <ul className="flex items-stretch justify-around">
-        {NAV.map((item) => {
+        {navItems.map((item) => {
           const active = isActive(item.href)
           const locked = !isAccountActive && LOCKED_ROUTES.includes(item.href)
 

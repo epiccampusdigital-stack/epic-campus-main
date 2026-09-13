@@ -2,6 +2,7 @@
 
 import { createContext, useContext } from 'react'
 import type { EpicUser, Student } from '@/types'
+import type { StudentEnrollmentType } from '@/lib/student/navTabs'
 
 export type StudentPortalStatus =
   | 'idle'
@@ -15,6 +16,8 @@ interface StudentContextValue {
   status: StudentPortalStatus
   /** Resolved Account Activation gate — see src/lib/access/accountActivation.ts */
   isAccountActive: boolean
+  /** Drives nav gating (see src/lib/student/navTabs.ts) — defaults to 'residential' when unset. */
+  enrollmentType: StudentEnrollmentType
   sidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
   refreshStudent: () => void
@@ -25,6 +28,7 @@ export const StudentContext = createContext<StudentContextValue>({
   student: null,
   status: 'idle',
   isAccountActive: false,
+  enrollmentType: 'residential',
   sidebarOpen: false,
   setSidebarOpen: () => {},
   refreshStudent: () => {},

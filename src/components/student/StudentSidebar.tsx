@@ -13,6 +13,7 @@ import { useStudentPortal } from '@/components/student/StudentContext'
 import DarkModeToggle from '@/components/ui/DarkModeToggle'
 import { isNavActive } from '@/lib/utils/nav'
 import { LOCKED_ROUTES } from '@/lib/access/accountActivation'
+import { getVisibleTabs } from '@/lib/student/navTabs'
 
 const ACTIVATION_TOOLTIP = 'Your account is not activated yet — contact your teacher.'
 
@@ -48,7 +49,7 @@ const EXAM_CODE_NAV_ITEM = { label: 'Enter Exam Code', href: '/exam-code', icon:
 export default function StudentSidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, student, sidebarOpen, setSidebarOpen, isAccountActive } = useStudentPortal()
+  const { user, student, sidebarOpen, setSidebarOpen, isAccountActive, enrollmentType } = useStudentPortal()
   const [mounted, setMounted] = useState(false)
   const [unreadMessages, setUnreadMessages] = useState(0)
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
@@ -133,7 +134,10 @@ export default function StudentSidebar() {
   const courseLabel = student ? getCourseBadge(student.courseId) : ''
   const courseName = student ? (COURSE_MAP[student.courseId]?.label ?? courseLabel) : ''
 
-  const navItems = [...BASE_NAV_ITEMS.slice(0, 1), EXAM_NAV_ITEM, EXAM_CODE_NAV_ITEM, ...BASE_NAV_ITEMS.slice(1)]
+  const residentialNavItems = [...BASE_NAV_ITEMS.slice(0, 1), EXAM_NAV_ITEM, EXAM_CODE_NAV_ITEM, ...BASE_NAV_ITEMS.slice(1)]
+  // For enrollmentType 'residential'/'both'/undefined this returns
+  // residentialNavItems unchanged — only 'online' gets a different list.
+  const onlineNavItems = getVisibleTabs(enrollmentType, residentialNavItems)
 
   const sidebarContent = (
     <div className="flex h-full w-[240px] flex-col bg-white/95 dark:bg-[#0D0B1E]/95 backdrop-blur-xl border-r border-[#0B3D6B]/8 dark:border-white/[0.06] transition-all duration-300">
@@ -150,7 +154,7 @@ export default function StudentSidebar() {
       <div className="mx-4 border-t border-[#0B3D6B]/10 dark:border-white/[0.06]" />
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
-        {navItems.map((item) => {
+        {residentialNavItems.map((item) => {
           const active = isNavActive(pathname, item.href)
           const locked = !isAccountActive && LOCKED_ROUTES.includes(item.href)
 
@@ -227,6 +231,52 @@ export default function StudentSidebar() {
   )
 
   if (!mounted) return null
+
+  // Online students get a top bar in place of the sidebar entirely (across
+  // all breakpoints) — StudentBottomNav stays hidden for them so there's
+  // only ever one nav surface. Residential/'both' rendering below this
+  // branch is completely unchanged.
+  if (enrollmentType === 'online') {
+    return (
+      <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b border-[#0B3D6B]/8 bg-white/95 px-4 backdrop-blur-xl dark:border-white/[0.06] dark:bg-[#0D0B1E]/95">
+        <div className="flex items-center gap-2">
+          <img src="/favicon.png" alt="EPIC Campus" className="h-7 w-7 rounded-md object-cover" />
+          <span className="hidden text-[14px] font-semibold text-[#0B3D6B] dark:text-[#E8A020] sm:inline">
+            EPIC Campus
+          </span>
+        </div>
+
+        <nav className="flex items-center gap-1">
+          {onlineNavItems.map((item) => {
+            const active = isNavActive(pathname, item.href)
+            return (
+              <Link key={item.href} href={item.href} className={studentNavLinkClasses(active)}>
+                <span className={`ti ${item.icon} text-[14px] leading-none`} aria-hidden="true" />
+                <span className="hidden sm:inline">{item.label}</span>
+                {item.href === '/student/messages' && unreadMessages > 0 && (
+                  <span className="ml-1 rounded-full bg-[#E8A020] px-2 py-0.5 text-[10px] font-bold text-[#0B3D6B]">
+                    {unreadMessages}
+                  </span>
+                )}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="flex items-center gap-2">
+          <DarkModeToggle />
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex items-center gap-2 rounded-[9px] px-[10px] py-[8px] text-[12px] font-medium text-gray-500 transition-all duration-200 hover:bg-[#0B3D6B]/[0.06] hover:text-[#0B3D6B] dark:text-white/45 dark:hover:bg-white/[0.05] dark:hover:text-white/70"
+          >
+            <span className="ti ti-logout text-[14px]" aria-hidden="true" />
+            <span className="hidden sm:inline">Logout</span>
+          </button>
+        </div>
+      </header>
+    )
+  }
 
   return (
     <>

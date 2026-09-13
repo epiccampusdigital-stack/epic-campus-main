@@ -805,15 +805,20 @@ service cloud.firestore {
     }
 
     // JP enrollments — grants of paid access to a JP course. Finance/teaching
-    // staff read all; a student reads only their own enrollment. Students must
-    // NEVER be able to write their own enrollment doc — that would let a student
-    // grant themselves paid access — so create/update/delete is finance-role
-    // only, with no owning-student carve-out (unlike most student-owned
-    // collections elsewhere in this ruleset).
+    // staff read all; a student reads only their own enrollment. studentId is
+    // a students/{id} document ID, which is not guaranteed to equal the
+    // owning student's Auth UID (most existing student docs predate uid
+    // linkage), so ownership is verified via a get() on that student doc's
+    // own `uid` field rather than comparing studentId to request.auth.uid
+    // directly. Students must NEVER be able to write their own enrollment
+    // doc — that would let a student grant themselves paid access — so
+    // create/update/delete is finance-role only, with no owning-student
+    // carve-out (unlike most student-owned collections elsewhere in this
+    // ruleset).
     match /jpEnrollments/{enrollmentId} {
       allow read: if request.auth != null && (
         request.auth.token.role in ['admin', 'owner', 'accountant', 'accounts', 'teacher'] ||
-        resource.data.studentId == request.auth.uid
+        get(/databases/$(database)/documents/students/$(resource.data.studentId)).data.uid == request.auth.uid
       );
       allow create, update, delete: if request.auth != null &&
         request.auth.token.role in ['admin', 'owner', 'accountant', 'accounts'];
